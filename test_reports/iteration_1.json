@@ -1,0 +1,31 @@
+{
+  "summary": "First iteration – both backend and frontend tested for FSL platform (Phase 1 + Phase 2 hub). Backend: 26/26 pytest tests pass covering auth (all 5 roles + INVALID_CREDENTIALS + /me), hub visibility, Serie A settings/summary (slots 08:30..12:30, 8 competizioni, 144 capacity, 1224 gare, 17 giornate, 21/day, 42/weekend), Amici isolation (2 fields, 1 competition, 10 clubs, no cross-tenant leak), full RBAC matrix (FORBIDDEN_ROLE, TOURNAMENT_SCOPE, TOURNAMENT_READ_ONLY, secretary cannot create, referee no audit, club manager only own club), creation modes (scratch with computed slots, template=serie_a_bambini→8 comp/3 fields, duplicate→18 clubs/8 comp/0 teams), full status flow (draft→active→completed→archived with reason validation and 400 without reason, 409 patch on archived, super-admin restore with reason, audit entries with reason), structure endpoints (duplicate club 409, referee 403). Public endpoints: list excludes draft, Serie A detail returns 1224 matches summary/8 competitions/18 clubs with only public contacts, unknown slug 404. Frontend: verified login+landing for super_admin/director/secretary/referee/club_manager; hub grid with tournament-card-<slug>, hub-archived-item-winter-stars-2025, hub-create-tournament-button, tournament-switcher-button + drawer navigation to Amici (2 fields grid, 1 championship KPI); wizard end-to-end (mode template→serie_a_bambini→name→next×3→summary shows 8/144/1224/17→submit→overview with overview-activate-button); secretary settings shows settings-readonly-note and no save button; club_manager /societa shows club-dashboard-name=Roma Nord; club_manager visiting /admin shows permission-denied; referee lands on /arbitro with referee-empty; director hub shows all 4 seed tournaments incl. archived winter; public home lists tournaments (draft future-cup absent), Serie A public page shows 1224/144/8/3 strip and public-category-select, 18 club cards on /squadre; mobile viewport 390 shows public-menu-toggle and sidebar-toggle on admin.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global (Radix DialogContent)", "issues": ["Console warning: 'Missing Description or aria-describedby for DialogContent' on drawer/dialog components – a11y improvement, not blocking."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "(Optional a11y) Add DialogDescription or aria-describedby to Radix DialogContent instances (tournament switcher drawer, wizard dialogs) to suppress accessibility warnings.",
+    "(Optional test-hygiene) TEST_* tournaments created by regression tests pollute the public home list once transitioned to active (published flips to true). Consider a scoped cleanup endpoint or filter TEST_* names in test teardown."
+  ],
+  "critical_code_review_comments": [
+    "TRANSITIONS in services/tournaments.py forbids draft→completed directly; wizard-created 'girone_unico' tournament used in status-flow test correctly goes draft→active→completed→archived and restore→completed. Good.",
+    "public.py returns numbers.matches_total from db.matches (played), while UI 'strip' uses summary.matches_total (1224). This is intentional – public page shows the planned total via summary. Documented in tests.",
+    "structure.py create_club uses slugify(name); good for uniqueness. Consider also normalizing accents (e.g., à→a) for Italian club names.",
+    "auth returns landing per role; /api/auth/me returns {user, landing} (nested). Ensure frontend consumers align (currently correct).",
+    "compute_slots caps at 40 slots – acceptable safeguard; document in docstring."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (26/26)", "frontend": "100% on tested flows"},
+  "test_credentials": "Read from /app/memory/test_credentials.md (all 5 roles worked).",
+  "seed_data_creation": "Regression tests created several TEST_scratch_*, TEST_tpl_*, TEST_dup_*, TEST_flow_*, TEST_struct_*, TEST_wiz_* tournaments (never touched the 4 seed tournaments). Some TEST_flow_* went through active status so are now published on public home – purely cosmetic pollution.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Regression suite at /app/backend/tests/backend_test.py is the source of truth for API contract (auth, RBAC, hub, wizard-modes, status flow, public). It requires REACT_APP_BACKEND_URL in env and pytest with '-o addopts=' to bypass the -n xdist setting in pytest.ini (or install pytest-xdist – already there but auto-loading breaks single-arg runs). All key data-testids used by the UI checks: login-email-input/password-input/submit, tournament-card-<slug>, hub-archived-item-<slug>, hub-create-tournament-button, tournament-switcher-button, tournament-drawer-item-<slug>, new-tournament-mode-template, new-tournament-template-<key>, new-tournament-name-input, new-tournament-next-button, new-tournament-submit-button, overview-activate-button, overview-terminate-button, overview-archive-button, reason-dialog-input/confirm, read-only-banner, overview-restore-button, settings-readonly-note, settings-save-button, referee-empty, club-dashboard-name, permission-denied, public-tournament-list, public-category-select, public-menu-toggle, sidebar-toggle.",
+  "rca of the issue": "No functional bugs detected."
+}

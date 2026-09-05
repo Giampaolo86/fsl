@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 205 85% 11%;
+    --foreground: 214 26% 97%;
+    --card: 206 82% 15%;
+    --card-foreground: 214 26% 97%;
+    --popover: 206 82% 15%;
+    --popover-foreground: 214 26% 97%;
+    --primary: 218 90% 45%;
+    --primary-foreground: 214 26% 97%;
+    --secondary: 206 70% 21%;
+    --secondary-foreground: 214 26% 97%;
+    --muted: 206 60% 19%;
+    --muted-foreground: 209 25% 73%;
+    --accent: 38 90% 56%;
+    --accent-foreground: 205 85% 11%;
+    --destructive: 6 78% 55%;
+    --destructive-foreground: 214 26% 97%;
+    --border: 214 26% 97% / 0.14;
+    --input: 214 26% 97% / 0.18;
+    --ring: 216 100% 55%;
+    --radius: 8px;
+  }
+  * {
+    @apply border-border;
+  }
+  html {
+    background: #03131f;
+  }
+  body {
+    @apply bg-navy-900 text-fsl-white font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  ::selection {
+    background: rgba(244, 174, 43, 0.35);
+  }
+  :focus-visible {
+    outline: 2px solid #1778ff;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  h1, h2, h3, .display {
+    @apply font-display uppercase;
+    letter-spacing: -0.005em;
+  }
+}
+
+@layer components {
+  .fsl-card {
+    @apply bg-navy-800 rounded-lg border border-white/[0.14] shadow-card;
+  }
+  .fsl-card-gold {
+    @apply bg-navy-800 rounded-lg border border-fsl-gold/30 shadow-card;
+  }
+  .fsl-kicker {
+    @apply font-display uppercase text-fsl-gold text-xs tracking-[0.08em] font-bold;
+  }
+  .fsl-section-title {
+    @apply font-display uppercase font-bold text-xl md:text-2xl text-fsl-white leading-none;
+  }
+  .fsl-input {
+    @apply h-11 w-full rounded-md border border-white/20 bg-ink-950/60 px-3 text-sm text-fsl-white placeholder:text-fsl-slate/60 focus:border-fsl-blue-light focus:outline-none focus:ring-2 focus:ring-fsl-blue-light/40 transition-colors;
+  }
+  .fsl-label {
+    @apply text-xs font-semibold uppercase tracking-wide text-fsl-slate;
+  }
+  .btn {
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition-[background-color,transform,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fsl-blue-light disabled:opacity-50 disabled:pointer-events-none active:translate-y-px;
+  }
+  .btn-primary {
+    @apply btn bg-fsl-blue text-fsl-white hover:bg-fsl-blue-light shadow-[0_6px_18px_-8px_rgba(11,87,217,0.9)];
+  }
+  .btn-gold {
+    @apply btn bg-fsl-gold text-ink-950 hover:bg-fsl-gold-dark focus-visible:ring-fsl-gold;
+  }
+  .btn-ghost {
+    @apply btn border border-white/20 bg-transparent text-fsl-white hover:bg-white/[0.06] hover:border-white/40;
+  }
+  .btn-danger {
+    @apply btn bg-fsl-danger text-fsl-white hover:bg-[#c73b2b];
+  }
+  .hero-overlay {
+    background: linear-gradient(90deg, rgba(4, 30, 50, 0.92) 0%, rgba(4, 30, 50, 0.6) 45%, rgba(4, 30, 50, 0.2) 100%),
+      linear-gradient(180deg, rgba(4, 30, 50, 0.05) 0%, rgba(4, 30, 50, 0.9) 100%);
+  }
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.06;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .table-dark th {
+    @apply sticky top-0 z-10 bg-navy-800 text-left text-[11px] font-semibold uppercase tracking-wider text-fsl-slate px-4 h-12 border-b border-white/10;
+  }
+  .table-dark td {
+    @apply px-4 h-[52px] border-b border-white/[0.06] text-sm align-middle;
+  }
+  .table-dark tbody tr {
+    @apply transition-colors hover:bg-white/[0.04];
+  }
+}
+
+@layer base {
+  [data-debug-wrapper="true"] {
+    display: contents !important;
+  }
+}

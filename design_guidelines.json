@@ -1,0 +1,149 @@
+{
+  "theme": "dark",
+  "brand": "Future Stars League",
+  "payoff": "La Serie A del futuro",
+  "language": "Italian",
+  "colors": {
+    "background": {
+      "max": "#03131F",
+      "main": "#041E32",
+      "card_elevated": "#072B47"
+    },
+    "primary": {
+      "action": "#0B57D9",
+      "hover_focus_data": "#1778FF"
+    },
+    "premium": {
+      "cta_highlights": "#F4AE2B",
+      "hover": "#D88913"
+    },
+    "text": {
+      "primary": "#F5F7FA",
+      "secondary": "#A8BACB"
+    },
+    "status": {
+      "success": "#66B847",
+      "warning": "#F0A31A",
+      "danger": "#E54835"
+    },
+    "borders": {
+      "gold": "rgba(244, 174, 43, 0.2)",
+      "white": "rgba(245, 247, 250, 0.2)"
+    },
+    "tailwind_config_extensions": {
+      "ink": { "950": "#03131F" },
+      "navy": { "900": "#041E32", "800": "#072B47" },
+      "blue": { "600": "#0B57D9", "500": "#1778FF" },
+      "gold": { "500": "#F4AE2B", "600": "#D88913" },
+      "white": { "50": "#F5F7FA" },
+      "slate": { "300": "#A8BACB" },
+      "success": { "500": "#66B847" },
+      "warning": { "500": "#F0A31A" },
+      "danger": { "500": "#E54835" }
+    }
+  },
+  "typography": {
+    "fonts": {
+      "hero_numbers": "Barlow Condensed, sans-serif",
+      "ui_text": "Inter, sans-serif"
+    },
+    "rules": {
+      "hero_titles": "Barlow Condensed ExtraBold, uppercase, tracking -1% to 1%",
+      "section_titles": "Barlow Condensed Bold",
+      "interface": "Inter Regular/Medium/Semibold",
+      "numbers": "Always use tabular-nums utility for data, tables, and sports numbers.",
+      "restrictions": "Do NOT use any other font families."
+    }
+  },
+  "layouts": {
+    "breakpoints": ["360px", "390px", "768px", "1024px", "1280px", "1536px"],
+    "container": {
+      "desktop_base": "1536px",
+      "public_max": "1488px",
+      "margins": "24px padding on sides for main container"
+    },
+    "grid": {
+      "columns": 12,
+      "gap": "16-24px (gap-4 to gap-6 in Tailwind)"
+    },
+    "dimensions": {
+      "sidebar": "144px to 168px on desktop, collapsible under 1280px breakpoint",
+      "header_public": "72px to 80px fixed/sticky height"
+    },
+    "spacing_scale": [4, 8, 12, 16, 24, 32, 48, 64],
+    "border_radius": {
+      "controls": "8px (rounded-lg)",
+      "cards": "12px (rounded-xl)",
+      "modals_hero": "16px (rounded-2xl)"
+    }
+  },
+  "visual_enhancers": {
+    "shadows": "Light blue-black shadows. Avoid excessive glows.",
+    "borders": "1px gold or white at 20-35% opacity (e.g. border-white/20, border-gold-500/30).",
+    "focus_rings": "Always visible on interactive elements: light blue or gold, must meet AA contrast.",
+    "hero_overlay": "Editorial realistic photos must have a navy overlay (e.g., bg-navy-900/60 to bg-navy-900/80) to seamlessly integrate text and maintain legibility."
+  },
+  "components": {
+    "buttons": {
+      "primary": "Blue (#0B57D9). Hover: #1778FF.",
+      "premium": "Gold (#F4AE2B). Use strictly for high-relevance actions, marketing CTAs, or publishing. Hover: #D88913.",
+      "destructive": "Red (#E54835) ONLY for errors, critical expirations, or destructive actions."
+    },
+    "tables": {
+      "style": "Dark themes, rows 48-56px height.",
+      "header": "Sticky headers.",
+      "filters": "Persistent filter bars.",
+      "density": "High data density but readable, utilizing tabular-nums."
+    },
+    "status_badges": {
+      "pattern": "Always combination of: Color + Icon + Text. E.g., Green dot/icon + 'Attivo'."
+    },
+    "empty_loading_states": {
+      "style": "Cinematic and data-rich. Avoid generic spinners if possible; use skeleton loaders styled with navy-800. Empty states should feel like a sports dashboard waiting for data."
+    }
+  },
+  "media": {
+    "photography": "Editorial realistic youth soccer, natural light or evening stadium lights. NO smiling posed stock photos.",
+    "logos": "Generate SVG placeholders for club badges if real ones aren't available.",
+    "image_urls": [
+      {
+        "category": "Hero Background / Evening Lights",
+        "url": "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwxfHx5b3V0aCUyMHNvY2NlciUyMGdhbWUlMjBuaWdodHxlbnwwfHx8fDE3ODg1NjU4NjR8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Stadium evening lights, youth soccer match feel"
+      },
+      {
+        "category": "Action / Match",
+        "url": "https://images.unsplash.com/photo-1598880513655-d1c6d4b2dfbf?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwzfHx5b3V0aCUyMHNvY2NlciUyMGdhbWUlMjBuaWdodHxlbnwwfHx8fDE3ODg1NjU4NjR8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Youth soccer action on pitch during day/evening"
+      }
+    ]
+  },
+  "accessibility": {
+    "standard": "WCAG 2.2 AA",
+    "focus": "Focus ring always visible on keyboard navigation",
+    "contrast": "Text must meet 4.5:1 ratio against dark navy backgrounds. Use white-50 for primary text."
+  },
+  "instructions_to_main_agent": [
+    "Ensure all text is in Italian.",
+    "Configure Tailwind CSS to use the exact specified colors and fonts. Do not deviate.",
+    "Build the application as a Hybrid Fullstack app (Sports League Management Platform + Public Sports Portal).",
+    "Implement the 'Hub Tornei' with tournament cards and an Active/Archive selector drawer.",
+    "Implement the 'Crea nuovo torneo' wizard (Start from scratch, Use template, Duplicate).",
+    "Implement the 'Control Room' overview with stat cards and fields grid.",
+    "Implement 'Impostazioni torneo' with tabs for categories, series, fields, slots, formula, scoring.",
+    "Implement the Public Portal: hero section, upcoming matches, mini standings, teams, tournament stats.",
+    "Implement 'Area Società' dashboard and 'Area Arbitro' mobile view.",
+    "Ensure the UI is completely dark-themed, cinematic, emotional, and data-rich.",
+    "DO NOT use a generic SaaS look. Follow the highly specific sports layout provided.",
+    "Make sure all interactive and key informational elements have a `data-testid` attribute.",
+    "Use Javascript (.js/.jsx) instead of TypeScript.",
+    "No completely transparent backgrounds on headers or overlays that have content under them."
+  ],
+  "universal_guidelines": {
+    "aesthetic": "Avoid 'AI slop'. Create deep, layered interfaces with z-index hierarchy.",
+    "transitions": "DO NOT use 'transition: all'. Apply specific transitions (e.g. 'transition-colors', 'transition-transform').",
+    "alignment": "Do NOT center align the app container. Respect natural reading flows.",
+    "icons": "Use lucide-react for standard icons, but prefer @phosphor-icons/react or @heroicons/react for more specific sports/dashboard needs. NO emojis as icons.",
+    "toasts": "Use 'sonner' for toast notifications."
+  }
+}
