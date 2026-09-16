@@ -69,6 +69,21 @@ class EventsIn(BaseModel):
     events: list[dict]
 
 
+STAT_KEYS = ("goal", "assist", "penalty_saved", "mvp", "yellow_card", "red_card", "own_goal")
+
+
+class SheetIn(BaseModel):
+    attendance: dict = {}
+    ratings: dict = {}
+    stats: dict = {}
+    home_pen: Optional[int] = None
+    away_pen: Optional[int] = None
+    notes: str = ""
+    reason: str = ""
+    checklist: Optional[dict] = None
+    close: bool = False
+
+
 class CallupsIn(BaseModel):
     home: Optional[list[str]] = None
     away: Optional[list[str]] = None
@@ -281,6 +296,10 @@ async def get_match(tournament_id: str, match_id: str, user: CurrentUser = Depen
     d["tickets"] = [e.public() for e in await scoped("error_reports", tournament_id).list({"match_id": m.id}, sort=[("created_at", -1)])] if role != "referee" else []
     d["can_edit_match"] = role in OPS or (role == "referee" and m.status not in FINAL + ("report_submitted",))
     d["can_officialize"] = role in OPS
+    mine = await _club_teams(user, tournament_id) if role == "club_manager" else set()
+    lock = m.status in FINAL + ("report_submitted",) and role not in OPS
+    d["can_callup"] = {side: (not lock) and (role in OPS | {"secretary"} or (role == "referee" and m.referee_user_id == user.id) or getattr(m, f"{side}_team_id") in mine) for side in ("home", "away")}
+    d["can_fill_sheet"] = role in OPS or (role == "referee" and m.referee_user_id == user.id and m.status not in FINAL + ("report_submitted",))
     return d
 
 
@@ -371,8 +390,10 @@ async def _after_official(t_id, m: Match, user):
     if c and m.stage == "qualification":
         await engine.snapshot_standings(t_id, c, m.id, user)
     from .extras import charge_callups
+    from ..services import badges
 
     await charge_callups(t_id, m, user)
+    await badges.recompute(t_id, user)
 
 
 @router.post("/matches/{match_id}/report")
@@ -393,6 +414,103 @@ async def submit_report(tournament_id: str, match_id: str, body: ScoreIn, user: 
     await audit.record(user, "report.submitted", "match", m.id, tournament_id, after=score)
     await audit.record(user, "result.officialized", "match", m.id, tournament_id, after={**score, "source": "referee_report"})
     await _after_official(tournament_id, m2, user)
+    return (await _enrich(tournament_id, [m2]))[0]
+
+
+def events_from_stats(m: Match, stats: dict) -> list[MatchEvent]:
+    side_of = {pid: m.home_team_id for pid in m.callups.get("home", [])}
+    side_of.update({pid: m.away_team_id for pid in m.callups.get("away", [])})
+    out = []
+    for pid, st in stats.items():
+        if pid not in side_of:
+            continue
+        for k in STAT_KEYS:
+            for _ in range(int(st.get(k) or 0)):
+                out.append(MatchEvent(id=engine.new_event_id(), team_id=side_of[pid], player_id=pid, type=k))
+    return out
+
+
+def sheet_problems(m: Match, attendance: dict) -> list[str]:
+    problems = []
+    for side, label in (("home", "casa"), ("away", "ospite")):
+        ids = m.callups.get(side, [])
+        if not ids:
+            problems.append(f"Distinta squadra {label} mancante")
+        elif not any(attendance.get(pid) == "present" for pid in ids):
+            problems.append(f"Nessun giocatore presente per la squadra {label}")
+    pending = [pid for side in ("home", "away") for pid in m.callups.get(side, []) if attendance.get(pid) not in ("present", "absent")]
+    if pending:
+        problems.append(f"{len(pending)} giocatori ancora da confermare")
+    return problems
+
+
+@router.post("/matches/{match_id}/sheet")
+async def save_sheet(tournament_id: str, match_id: str, body: SheetIn, user: CurrentUser = Depends(get_current_user)):
+    t, role = await require_tournament(tournament_id, user, roles=OPS | {"referee"}, writable=True)
+    m = await _match_or_404(tournament_id, match_id)
+    if role == "referee":
+        if m.referee_user_id != user.id:
+            raise forbidden("Gara non assegnata a te")
+        if m.status in FINAL + ("report_submitted",):
+            raise conflict("Gara già inviata: può riaprirla solo il Direttore")
+    if m.status in ("cancelled", "postponed"):
+        raise conflict("Gara annullata o rinviata")
+    callup_ids = set(m.callups.get("home", [])) | set(m.callups.get("away", []))
+    attendance = {pid: v for pid, v in body.attendance.items() if pid in callup_ids and v in ("present", "absent")}
+    present = {pid for pid, v in attendance.items() if v == "present"}
+    stats = {}
+    for pid, st in body.stats.items():
+        if pid in present and isinstance(st, dict):
+            clean = {k: int(v) for k, v in st.items() if k in STAT_KEYS and int(v or 0) > 0}
+            if clean:
+                stats[pid] = clean
+    ratings = {}
+    for pid, v in body.ratings.items():
+        if pid not in present or v is None or v == "":
+            continue
+        v = float(v)
+        if v < 4 or v > 10 or (v * 2) != int(v * 2):
+            raise bad_request("I voti vanno da 4 a 10 con passo 0,5")
+        ratings[pid] = v
+    events = events_from_stats(m, stats)
+    m.events = events
+    h, a = score_from_events(m)
+    score = {"home": h, "away": a, "home_pen": body.home_pen if m.stage == "finals" else None, "away_pen": body.away_pen if m.stage == "finals" else None}
+    patch = {"attendance": attendance, "ratings": ratings, "stats": stats, "events": [e.model_dump() for e in events], "score": score, "checklist": body.checklist or m.checklist}
+    if body.notes:
+        patch["sheet_notes"] = body.notes
+    rectify = m.status in FINAL
+    if not body.close:
+        if rectify:
+            raise conflict("Gara ufficiale: per modificare usa «Rettifica e ripubblica» con motivazione")
+        if m.status in ("scheduled", "confirmed"):
+            patch["status"] = "in_progress"
+        m2 = await scoped("matches", tournament_id).update(m.id, patch, user.id)
+        await audit.record(user, "match.sheet", "match", m.id, tournament_id, after={"present": len(present), "score": f"{h}-{a}"})
+        return (await _enrich(tournament_id, [m2]))[0]
+    problems = sheet_problems(m, attendance)
+    if problems:
+        raise conflict("Tabellino incompleto: " + "; ".join(problems))
+    if m.stage == "finals" and h == a and (score["home_pen"] is None or score["away_pen"] is None or score["home_pen"] == score["away_pen"]):
+        raise bad_request("Fase finale in parità: inserisci i rigori")
+    for pid in present:
+        ratings.setdefault(pid, 6.0)
+    patch["ratings"] = ratings
+    if rectify and not body.reason:
+        raise bad_request("La rettifica richiede una motivazione")
+    if role == "referee":
+        status, kind = "report_submitted", "referee_report"
+    else:
+        status, kind = ("rectified", "rectification") if rectify else ("official", "officialization")
+    patch["status"] = status
+    await _write_version(tournament_id, m, kind, score, user, role, notes=body.notes if role == "referee" else "", director_notes=body.notes if role != "referee" else "", reason=body.reason)
+    m2 = await scoped("matches", tournament_id).update_versioned(m.id, m.version, patch, user.id)
+    if not m2:
+        raise conflict("La gara è stata aggiornata da un altro utente: ricarica")
+    action = "report.submitted" if role == "referee" else ("result.rectified" if rectify else "result.officialized")
+    await audit.record(user, action, "match", m.id, tournament_id, before=m.score if rectify else None, after={**score, "present": len(present), "source": "sheet"}, reason=body.reason or body.notes)
+    if status in FINAL:
+        await _after_official(tournament_id, m2, user)
     return (await _enrich(tournament_id, [m2]))[0]
 
 
@@ -425,6 +543,9 @@ async def reopen(tournament_id: str, match_id: str, body: dict, user: CurrentUse
     await _write_version(tournament_id, m, "reopen", m.score, user, role, reason=reason)
     m2 = await scoped("matches", tournament_id).update_versioned(m.id, m.version, {"status": "under_review"}, user.id)
     await audit.record(user, "report.reopened", "match", m.id, tournament_id, before={"status": m.status}, after={"status": "under_review"}, reason=reason)
+    from ..services import badges
+
+    await badges.recompute(tournament_id, user)
     return (await _enrich(tournament_id, [m2]))[0]
 
 

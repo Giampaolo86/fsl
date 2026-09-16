@@ -136,7 +136,7 @@ class MatchEvent(BaseModel):
     team_id: str
     player_id: Optional[str] = None
     assist_player_id: Optional[str] = None
-    type: Literal["goal", "own_goal", "yellow_card", "red_card", "mvp", "substitution", "injury"]
+    type: Literal["goal", "own_goal", "yellow_card", "red_card", "mvp", "assist", "penalty_saved", "substitution", "injury"]
     minute: int = 0
     note: str = ""
 
@@ -166,6 +166,8 @@ class Match(BaseDocument):
     events: list[MatchEvent] = []
     checklist: dict = {"teams_present": False, "lists_verified": False, "signatures": False}
     ratings: dict = {}
+    stats: dict = {}
+    sheet_notes: str = ""
     version: int = 1
 
 
@@ -255,6 +257,56 @@ class Team(BaseDocument):
     name: str
     category: str
     series: str
+
+
+class PlayerBadge(BaseDocument):
+    tournament_id: str
+    player_id: str
+    team_id: Optional[str] = None
+    club_id: Optional[str] = None
+    code: str
+    label: str
+    scope: Literal["match", "season", "career"] = "season"
+    match_id: Optional[str] = None
+    competition_id: Optional[str] = None
+    match_day: Optional[int] = None
+    value: Optional[float] = None
+    manual: bool = False
+    note: str = ""
+    earned_at: Optional[str] = None
+
+
+class MediaFile(BaseDocument):
+    tournament_id: str
+    storage_path: str
+    original_filename: str
+    content_type: str
+    size: int = 0
+    kind: Literal["image", "video", "file"] = "file"
+    uploaded_by: Optional[str] = None
+    club_id: Optional[str] = None
+
+
+class Post(BaseDocument):
+    tournament_id: str
+    kind: Literal["news", "interview", "gallery", "video", "match_story", "badge"] = "news"
+    title: str
+    slug: str = ""
+    excerpt: str = ""
+    body: str = ""
+    cover_url: Optional[str] = None
+    media: list[dict] = []
+    status: Literal["draft", "scheduled", "published", "withdrawn"] = "draft"
+    publish_at: Optional[str] = None
+    published_at: Optional[str] = None
+    author_id: Optional[str] = None
+    author_name: str = ""
+    club_ids: list[str] = []
+    team_ids: list[str] = []
+    match_id: Optional[str] = None
+    player_ids: list[str] = []
+    auto: bool = False
+    auto_key: Optional[str] = None
 
 
 class AuditLog(BaseDocument):

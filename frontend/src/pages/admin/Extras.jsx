@@ -10,8 +10,9 @@ import { useTournamentDetail } from "@/hooks/useTournamentData";
 import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
+import { BadgesAdmin } from "@/pages/admin/Badges";
 
-const BADGE = { bomber: "Bomber", assistman: "Assistman", muro: "Muro" };
+const BADGE = { bomber: "Bomber", doppietta: "Doppietta", tripletta: "Tripletta", assistman: "Assistman", muro: "Muro" };
 
 export function AwardsBoard({ rows, testId = "awards-board" }) {
   if (!rows?.length) return <EmptyState icon={Award} title="Nessun premio assegnato" description="I premi nascono dalle pagelle delle gare ufficiali." testId={testId} />;
@@ -42,6 +43,7 @@ export function OutcomesList({ outcomes, testId = "outcomes-list" }) {
 
 export function Awards() {
   const { tournamentId } = useParams();
+  const { user } = useAuth();
   const [rows, setRows] = useState(null);
   const [outcomes, setOutcomes] = useState([]);
   useEffect(() => { api.get(`/tournaments/${tournamentId}/awards`).then((r) => setRows(r.data)); api.get(`/tournaments/${tournamentId}/outcomes`).then((r) => setOutcomes(r.data)); }, [tournamentId]);
@@ -50,6 +52,7 @@ export function Awards() {
     <div className="space-y-8">
       <PageHeader kicker="Pagelle, premi e nomination" title="Premi" subtitle="Classifica MVP e badge calcolati dalle pagelle stile fantacalcio delle gare ufficiali." />
       <AwardsBoard rows={rows} />
+      <BadgesAdmin tournamentId={tournamentId} canManage={user.is_super_admin || user.role === "director"} />
       {outcomes.length > 0 && <section><SectionTitle>Esiti stagione</SectionTitle><OutcomesList outcomes={outcomes} /></section>}
     </div>
   );

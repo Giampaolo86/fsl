@@ -56,8 +56,9 @@ async def _public_matches(t_id: str, ms) -> list[dict]:
             d["score"] = {"home": None, "away": None, "home_pen": None, "away_pen": None}
         for e in d.get("events", []):
             p = players.get(e.get("player_id"))
-            e["player_name"] = _pname(p) if p and p.profile_visibility == "public" and p.media_consent else ("Giocatore" if p else "")
-            e.pop("player_id", None)
+            ok = bool(p and p.profile_visibility == "public" and p.media_consent)
+            e["player_name"] = _pname(p) if ok else ("Giocatore" if p else "")
+            e["player_id"] = e.get("player_id") if ok else None
             e.pop("assist_player_id", None)
         out.append(d)
     return out
@@ -130,7 +131,7 @@ async def tournament_home(slug: str, category: Optional[str] = None):
         "recent_results": await _public_matches(t.id, recent),
         "standings": mini,
         "top_scorers": await _top_scorers(t.id, all_matches, 8),
-        "news": [],
+        "news": await __import__("app.routers.posts", fromlist=["public_posts"]).public_posts(t.id, limit=4),
     }
 
 
@@ -161,12 +162,42 @@ async def public_match(slug: str, match_id: str):
         from .extras import fanta_rows
 
         players = {p.id: p for p in await scoped("players", t.id).list({"team_id": {"$in": [m.home_team_id, m.away_team_id]}})}
-        d["ratings"] = [{**r, "name": r["name"] if r["public_ok"] else "Giocatore", "player_id": None} for r in fanta_rows(m, players)]
+        rows = fanta_rows(m, players)
+        earned = await scoped("badges", t.id).list({"match_id": m.id}, limit=500)
+        by_pid = {}
+        for b in earned:
+            by_pid.setdefault(b.player_id, []).append({"code": b.code, "label": b.label, "scope": b.scope})
+        d["ratings"] = [{**r, "name": r["public_name"] if r["public_ok"] else "Giocatore", "player_id": r["player_id"] if r["public_ok"] else None, "unlocked": by_pid.get(r["player_id"], [])} for r in rows]
+        pub = {r["player_id"]: r["public_name"] for r in rows if r["public_ok"]}
+        d["badges_unlocked"] = [{"code": b.code, "label": b.label, "scope": b.scope, "player": pub[b.player_id]} for b in earned if b.player_id in pub and (b.scope != "match" or b.code in ("mvp", "doppietta", "tripletta", "porta_inviolata", "para_rigori"))]
     else:
         d["ratings"] = []
+        d["badges_unlocked"] = []
     recent = await scoped("matches", t.id).list({"status": {"$in": FINAL}, "$or": [{"home_team_id": {"$in": [m.home_team_id, m.away_team_id]}}, {"away_team_id": {"$in": [m.home_team_id, m.away_team_id]}}]}, sort=[("kickoff_at", -1)], limit=10)
     d["recent_form"] = await _public_matches(t.id, recent)
     return d
+
+
+@router.get("/tournaments/{slug}/matches/{match_id}/social")
+async def public_social(slug: str, match_id: str):
+    t = await _published(slug)
+    m = await scoped("matches", t.id).get(match_id)
+    if not m:
+        raise not_found("Partita")
+    from .extras import social_payload
+
+    return await social_payload(t.id, m, public=True)
+
+
+@router.get("/tournaments/{slug}/players/{player_id}")
+async def public_player(slug: str, player_id: str):
+    t = await _published(slug)
+    p = await scoped("players", t.id).get(player_id)
+    if not p or p.profile_visibility != "public" or not p.media_consent:
+        raise not_found("Giocatore")
+    from .extras import player_card
+
+    return await player_card(t.id, p, public=True)
 
 
 @router.get("/tournaments/{slug}/standings")

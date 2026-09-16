@@ -3,7 +3,11 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Award, CalendarDays, Target } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { MatchCard, MatchStatusBadge, kickoffLabel } from "@/components/fsl/MatchCard";
-import { RatingRow } from "@/components/fsl/Ratings";
+import { RatingsColumns } from "@/components/fsl/Ratings";
+import { PlayerCardDialog } from "@/components/fsl/PlayerCard";
+import { BadgeChip } from "@/components/fsl/BadgeChips";
+import { SocialCard } from "@/components/fsl/SocialCard";
+import { STAT_META } from "@/lib/fanta";
 import { AwardsBoard, OutcomesList } from "@/pages/admin/Extras";
 import { PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { StandingsTable } from "@/components/fsl/StandingsTable";
@@ -44,6 +48,8 @@ export function PublicMatches() {
 export function PublicMatchCenter() {
   const { matchId } = useParams();
   const { slug, data: m, error, reload } = useSlugData(`/matches/${matchId}`);
+  const [openPlayer, setOpenPlayer] = useState(null);
+  const fetchCard = useCallback((pid) => api.get(`/public/tournaments/${slug}/players/${pid}`), [slug]);
   useEffect(() => {
     if (!m || m.status !== "in_progress") return undefined;
     const id = setInterval(reload, 5000);
@@ -53,8 +59,7 @@ export function PublicMatchCenter() {
   if (!m) return <LoadingState full />;
   const live = m.status === "in_progress";
   const hasScore = m.score.home !== null;
-  const teamName = (id) => (id === m.home_team_id ? m.home.club?.name : m.away.club?.name);
-  const LABEL = { goal: "Gol", own_goal: "Autogol", yellow_card: "Ammonizione", red_card: "Espulsione", substitution: "Sostituzione", injury: "Infortunio", mvp: "MVP" };
+  const episodes = ["goal", "own_goal", "penalty_saved", "yellow_card", "red_card"].map((t) => [t, m.events.filter((e) => e.type === t)]).filter(([, l]) => l.length);
   return (
     <div>
       <section className="relative grain bg-navy-800 border-b border-white/10">
@@ -71,10 +76,16 @@ export function PublicMatchCenter() {
       <Wrap>
         <div className="grid lg:grid-cols-[1fr_1.3fr] gap-6">
           <div>
-            <SectionTitle>Cronaca</SectionTitle>
+            <SectionTitle right={<span className="text-xs text-fsl-slate">Dati del tabellino ufficiale</span>}>Tabellino</SectionTitle>
             <div className="fsl-card divide-y divide-white/[0.06]" data-testid="match-center-events">
-              {m.events.length === 0 && <p className="p-6 text-sm text-fsl-slate text-center">{hasScore ? "Nessun evento pubblicato." : "La cronaca sarà disponibile durante la gara."}</p>}
-              {[...m.events].sort((a, b) => a.minute - b.minute).map((e) => <div key={e.id} className="flex items-center gap-3 px-4 h-12 text-sm"><span className="num font-display font-bold text-fsl-gold w-10">{e.minute}'</span><span className={`h-2.5 w-2.5 rounded-full ${e.type === "goal" ? "bg-fsl-success" : e.type === "yellow_card" ? "bg-fsl-warning" : e.type === "red_card" ? "bg-fsl-danger" : "bg-fsl-slate"}`} /><span className="font-semibold">{LABEL[e.type]}</span><span className="text-fsl-slate">{teamName(e.team_id)}</span><span className="ml-auto text-fsl-slate">{e.player_name}</span></div>)}
+              {episodes.length === 0 && <p className="p-6 text-sm text-fsl-slate text-center">{hasScore ? "Nessun episodio registrato." : "Il tabellino sarà disponibile durante la gara."}</p>}
+              {episodes.map(([type, list]) => (
+                <div key={type} className="px-4 py-3 grid grid-cols-[1fr_auto_1fr] gap-3 items-start text-sm">
+                  <div className="space-y-1 text-right">{list.filter((e) => e.team_id === m.home_team_id).map((e) => <div key={e.id}>{e.player_id ? <button onClick={() => setOpenPlayer(e.player_id)} className="hover:text-fsl-gold" data-testid={`episode-player-${e.player_id}`}>{e.player_name}</button> : <span className="text-fsl-slate">{e.player_name || "—"}</span>}</div>)}</div>
+                  <span className="h-6 px-2 rounded-full bg-navy-700 text-[10px] font-bold uppercase inline-flex items-center gap-1 self-start"><span className={`h-2 w-2 rounded-full ${type === "goal" ? "bg-fsl-success" : type === "yellow_card" ? "bg-fsl-warning" : type === "red_card" ? "bg-fsl-danger" : "bg-fsl-slate"}`} />{STAT_META[type].label}</span>
+                  <div className="space-y-1">{list.filter((e) => e.team_id === m.away_team_id).map((e) => <div key={e.id}>{e.player_id ? <button onClick={() => setOpenPlayer(e.player_id)} className="hover:text-fsl-gold" data-testid={`episode-player-${e.player_id}`}>{e.player_name}</button> : <span className="text-fsl-slate">{e.player_name || "—"}</span>}</div>)}</div>
+                </div>
+              ))}
             </div>
             <SectionTitle>Forma recente</SectionTitle>
             <div className="space-y-2">{m.recent_form.slice(0, 5).map((r) => <MatchCard key={r.id} m={r} to={`/tornei/${slug}/partite/${r.id}`} compact />)}{m.recent_form.length === 0 && <p className="text-sm text-fsl-slate">Nessun risultato ufficiale precedente.</p>}</div>
@@ -83,14 +94,24 @@ export function PublicMatchCenter() {
         </div>
         {m.ratings?.length > 0 && (
           <section className="mt-8" data-testid="match-center-ratings">
-            <SectionTitle right={<span className="text-xs text-fsl-slate">Fantavoto = voto + bonus · MVP al miglior fantavoto</span>}>Pagelle</SectionTitle>
-            <div className="grid md:grid-cols-2 gap-3">
-              <div className="space-y-2">{m.ratings.filter((r) => r.side === "home").map((r, i) => <RatingRow key={i} r={r} />)}</div>
-              <div className="space-y-2">{m.ratings.filter((r) => r.side === "away").map((r, i) => <RatingRow key={i} r={r} right />)}</div>
-            </div>
+            <SectionTitle right={<span className="text-xs text-fsl-slate">Voto base 6 · bonus/malus dal tabellino · MVP in oro</span>}>Pagelle</SectionTitle>
+            <RatingsColumns rows={m.ratings} home={m.home.club?.name} away={m.away.club?.name} onOpen={setOpenPlayer} />
+          </section>
+        )}
+        {m.badges_unlocked?.length > 0 && (
+          <section className="mt-8" data-testid="match-center-badges">
+            <SectionTitle right={<span className="text-xs text-fsl-slate">Assegnati automaticamente all'ufficializzazione</span>}>Badge sbloccati</SectionTitle>
+            <div className="flex flex-wrap gap-2">{m.badges_unlocked.map((b, i) => <span key={i} className="inline-flex items-center gap-2 h-9 pl-1 pr-3 rounded-full border border-fsl-gold/40 bg-navy-800 text-sm"><BadgeChip b={b} small /><span className="text-fsl-slate">{b.player}</span></span>)}</div>
+          </section>
+        )}
+        {hasScore && (
+          <section className="mt-8" data-testid="match-center-social">
+            <SectionTitle right={<span className="text-xs text-fsl-slate">Scarica o condividi su WhatsApp, Instagram, Messaggi</span>}>Social Match Center</SectionTitle>
+            <SocialCard url={`/public/tournaments/${slug}/matches/${matchId}/social`} version={`${m.status}-${m.score.home}-${m.score.away}-${m.ratings?.length}`} />
           </section>
         )}
       </Wrap>
+      <PlayerCardDialog playerId={openPlayer} onClose={() => setOpenPlayer(null)} fetcher={fetchCard} />
     </div>
   );
 }

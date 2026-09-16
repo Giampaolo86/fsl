@@ -28,7 +28,7 @@ const TOURNAMENT_NAV = (id) => [
   { to: `/admin/t/${id}/pagamenti`, label: "Pagamenti", icon: CreditCard },
   { to: `/admin/t/${id}/comunicazioni`, label: "Contatti", icon: Phone },
   { to: `/admin/t/${id}/ticket`, label: "Ticket", icon: Ticket },
-  { to: `/admin/t/${id}/media`, label: "Media", icon: Image },
+  { to: `/admin/t/${id}/media`, label: "Blog e interviste", icon: Image },
   { to: `/admin/t/${id}/audit`, label: "Audit", icon: Archive },
 ];
 

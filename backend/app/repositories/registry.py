@@ -5,9 +5,12 @@ from ..models.domain import (
     ErrorReport,
     Field_,
     Match,
+    MediaFile,
     MatchReportVersion,
     Organization,
     Player,
+    PlayerBadge,
+    Post,
     StandingsSnapshot,
     Team,
     Tournament,
@@ -37,6 +40,9 @@ SCOPED = {
     "report_versions": ("referee_report_versions", MatchReportVersion),
     "standings_snapshots": ("standings_snapshots", StandingsSnapshot),
     "error_reports": ("tickets", ErrorReport),
+    "badges": ("player_badges", PlayerBadge),
+    "posts": ("posts", Post),
+    "media": ("media_files", MediaFile),
 }
 
 

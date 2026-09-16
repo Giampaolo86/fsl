@@ -19,6 +19,8 @@ import Venues from "@/pages/admin/Venues";
 import Audit from "@/pages/admin/Audit";
 import UsersPage from "@/pages/admin/Users";
 import ModulePlaceholder from "@/pages/admin/ModulePlaceholder";
+import BlogManager from "@/pages/admin/Blog";
+import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
 import ClubDashboard from "@/pages/club/ClubDashboard";
 import { ClubModule, ClubTeams } from "@/pages/club/ClubModules";
 import RefereeMatches, { RefereeModule } from "@/pages/referee/RefereeMatches";
@@ -73,9 +75,8 @@ function App() {
                 <Route path="ticket" element={<Tickets />} />
                 <Route path="premi" element={<Awards />} />
                 <Route path="pagamenti" element={<Payments />} />
-                {["comunicazioni", "media"].map((m) => (
-                  <Route key={m} path={m} element={<ModulePlaceholder module={m} />} />
-                ))}
+                <Route path="media" element={<BlogManager />} />
+                <Route path="comunicazioni" element={<ModulePlaceholder module="comunicazioni" />} />
               </Route>
 
               <Route path="/societa" element={<ProtectedRoute roles={["club_manager"]}><ClubShell /></ProtectedRoute>}>
@@ -86,6 +87,7 @@ function App() {
                 <Route path="partite/:matchId" element={<ClubMatch />} />
                 <Route path="segnalazioni" element={<ClubReports />} />
                 <Route path="pagamenti" element={<Payments clubMode />} />
+                <Route path="blog" element={<BlogManager clubMode />} />
                 {["documenti", "profilo"].map((m) => (
                   <Route key={m} path={m} element={<ClubModule module={m} />} />
                 ))}
@@ -112,7 +114,8 @@ function App() {
                 <Route path="partite" element={<PublicMatches />} />
                 <Route path="partite/:matchId" element={<PublicMatchCenter />} />
                 <Route path="statistiche" element={<PublicStats />} />
-                <Route path="news" element={<PublicModule title="News" phase="Fase 6" />} />
+                <Route path="news" element={<PublicNews />} />
+                <Route path="news/:postSlug" element={<PublicPost />} />
                 <Route path="segnala-errore" element={<PublicModule title="Segnala un errore" phase="Fase 5" />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

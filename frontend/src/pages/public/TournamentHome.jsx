@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, BarChart3, CalendarDays, Grid3X3, Shield, Trophy, Users, Volleyball } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
+import { PostCard } from "@/components/fsl/Article";
 import { MatchCard } from "@/components/fsl/MatchCard";
 import { SectionTitle } from "@/components/fsl/Primitives";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
@@ -89,6 +90,13 @@ export default function TournamentHome() {
           </div>
         </div>
       </section>
+
+      {data.news?.length > 0 && (
+        <section className="mx-auto max-w-[1488px] px-6 mt-10" data-testid="home-news">
+          <SectionTitle right={<Link to={`/tornei/${slug}/news`} className="text-xs text-fsl-gold hover:underline">Tutte le news</Link>}>Ultime news</SectionTitle>
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">{data.news.map((p) => <PostCard key={p.id} p={p} to={`/tornei/${slug}/news/${p.slug}`} />)}</div>
+        </section>
+      )}
 
       <section className="mx-auto max-w-[1488px] px-6 mt-10">
         <SectionTitle right={<Link to={`/tornei/${slug}/squadre`} className="text-xs text-fsl-gold hover:underline">Tutte le squadre</Link>}>Le squadre</SectionTitle>

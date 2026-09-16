@@ -12,6 +12,7 @@ const NAV = (slug) =>
         ["Classifiche", `/tornei/${slug}/classifiche`],
         ["Squadre", `/tornei/${slug}/squadre`],
         ["Statistiche", `/tornei/${slug}/statistiche`],
+        ["News", `/tornei/${slug}/news`],
         ["Regolamento", `/tornei/${slug}/regolamento`],
       ]
     : [
