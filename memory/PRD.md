@@ -59,11 +59,18 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] Blog e interviste (`routers/posts.py`, `pages/admin/Blog.jsx`, `pages/public/PublicBlog.jsx`): notizie/interviste/gallery/video/match story, upload chunked (4 MB) su Emergent Object Storage servito da `/api/media/{id}`, tag società e partita, bozza/programmato/pubblicato/ritirato, filtri, anteprima, Match story automatica da gara ufficiale (nomi secondo consenso), portale News + articolo + «Ultime news» in home; Responsabile Società limitato ai contenuti della propria società (`/societa/blog`); programmati visibili solo alla data
 - [x] Test: 30/30 backend iterazione 4 (`/app/backend/tests/test_iteration4.py`), flussi frontend verificati (`/app/test_reports/iteration_4.json`)
 
+## Implementato (2026-06) – Iterazione 5
+- [x] Foto giocatori: upload da Rose (staff e società, solo propria rosa) → Object Storage, ritaglio quadrato 512px (Pillow), visibile in scheda giocatore, pagelle/Match Center (solo con consenso) e MVP nella grafica social (`POST /players/{id}/photo`)
+- [x] Documenti società (facoltativi, nessun blocco): tipi (certificato medico, identità, consenso privacy/immagine, iscrizione, altro), file su storage, scadenza con stato valido / in scadenza 30-15-7 / scaduto, versioni (replaces_id), verifica Segreteria (verificato/respinto), riepilogo per società in Control Room (`/admin/t/:id/documenti`) e Area Società (`/societa/documenti`)
+- [x] Notifiche in-app per società (campanella in Area Società, `NotificationsBell`): badge stagionali/carriera sbloccati da propri giocatori, documenti in scadenza/scaduti (dedupe per soglia), esito verifica documenti; segna come lette
+- [x] Media a pagamento (Stripe, sandbox reclamabile, gestione fiscale completa/managed payments con fallback a calcolo tasse): staff carica foto (0,49 €) e video (0,99 €) dal tab «Foto/Video» del workspace gara; portale: sezione «Foto e video della gara» con anteprima sfocata+filigrana, checkout Stripe hosted, `/payment/success` con polling stato e link download riservato (token), `/payment/cancel`; webhook `/api/stripe/webhook`; Control Room «Vendite» (incasso, conteggi, elenco). Catalogo Stripe: lookup_key `fsl_video_099`, `fsl_photo_049` (EUR)
+- [x] Test: 19/19 backend iterazione 5 (`/app/backend/tests/test_iteration5.py`), flussi frontend verificati (`/app/test_reports/iteration_5.json`); pagamento completo con carta test non eseguito automaticamente
+
 ## Backlog prioritizzato
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana
-- P1 (Fase 5): documenti versionati (Object Storage), scadenze, pagamenti/ricevute (anche quota a convocazione v39), comunicazioni, segnalazione pubblica con captcha
-- P1 (Fase 6): sponsor, personalizzazione visiva società con approvazione, foto giocatori in scheda/social card, embed video esterni (YouTube)
+- P1 (Fase 5): comunicazioni email/SMS (provider da scegliere), segnalazione pubblica con captcha, rimborsi Stripe da Control Room
+- P1 (Fase 6): sponsor, personalizzazione visiva società con approvazione, anteprima video (thumbnail) per lo shop, pacchetti foto scontati
 - P2 (Fase 7): MFA SA/DT, rate limiting, WCAG audit, backup, monitoring
 
 ## Decisioni aperte
-Provider email/SMS; gateway pagamenti online (adapter); policy retention; Pantone su mazzetta fisica.
+Provider email/SMS; policy retention; Pantone su mazzetta fisica. Stripe: sandbox da reclamare (link onboarding nel riepilogo), modalità fiscale attuale «Stripe gestisce tutto» (cambiabile su richiesta).
