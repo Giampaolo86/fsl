@@ -1,0 +1,118 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789040563721,
+      "tag": "0000_public_gauntlet",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789041549730,
+      "tag": "0001_typical_iron_fist",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789042701051,
+      "tag": "0002_ambiguous_trish_tilby",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789054939505,
+      "tag": "0003_moaning_marvel_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789062476977,
+      "tag": "0004_tan_sharon_carter",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789065632371,
+      "tag": "0005_nifty_killmonger",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789084855094,
+      "tag": "0006_broken_eternity",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789151246681,
+      "tag": "0007_tidy_maria_hill",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789233955829,
+      "tag": "0008_needy_winter_soldier",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1789239764911,
+      "tag": "0009_sparkling_paper_doll",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1789384475114,
+      "tag": "0010_early_payback",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1789385319125,
+      "tag": "0011_typical_lockjaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1789388041144,
+      "tag": "0012_tough_human_robot",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1789423211916,
+      "tag": "0013_complex_spacker_dave",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1789424032369,
+      "tag": "0014_nifty_jack_flag",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1789458031949,
+      "tag": "0015_rare_maggott",
+      "breakpoints": true
+    }
+  ]
+}
