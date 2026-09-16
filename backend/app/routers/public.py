@@ -151,6 +151,13 @@ async def public_match(slug: str, match_id: str):
     d = (await _public_matches(t.id, [m]))[0]
     c = await scoped("competitions", t.id).get(m.competition_id)
     d["standings"] = await engine.compute_standings(t.id, c) if c else []
+    if m.status in FINAL:
+        from .extras import fanta_rows
+
+        players = {p.id: p for p in await scoped("players", t.id).list({"team_id": {"$in": [m.home_team_id, m.away_team_id]}})}
+        d["ratings"] = [{**r, "name": r["name"] if r["public_ok"] else "Giocatore", "player_id": None} for r in fanta_rows(m, players)]
+    else:
+        d["ratings"] = []
     recent = await scoped("matches", t.id).list({"status": {"$in": FINAL}, "$or": [{"home_team_id": {"$in": [m.home_team_id, m.away_team_id]}}, {"away_team_id": {"$in": [m.home_team_id, m.away_team_id]}}]}, sort=[("kickoff_at", -1)], limit=10)
     d["recent_form"] = await _public_matches(t.id, recent)
     return d
@@ -168,7 +175,10 @@ async def public_stats(slug: str):
     t = await _published(slug)
     ms = await scoped("matches", t.id).list({"status": {"$in": FINAL}}, limit=5000)
     goals = sum((m.score.get("home") or 0) + (m.score.get("away") or 0) for m in ms)
-    return {"matches_official": len(ms), "goals": goals, "avg_goals": round(goals / len(ms), 2) if ms else 0, "top_scorers": await _top_scorers(t.id, ms, 20)}
+    from .extras import awards_board
+
+    outcomes = await scoped("season_outcomes", t.id).list(sort=[("competition_name", 1)]) if "season_outcomes" in __import__("app.repositories.registry", fromlist=["SCOPED"]).SCOPED else []
+    return {"matches_official": len(ms), "goals": goals, "avg_goals": round(goals / len(ms), 2) if ms else 0, "top_scorers": await _top_scorers(t.id, ms, 20), "awards": (await awards_board(t.id, public=True))[:20], "outcomes": [o.public() for o in outcomes]}
 
 
 @router.get("/tournaments/{slug}/clubs/{club_slug}")

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertTriangle, Check, CheckCircle2, Flag, History, ListChecks, RotateCcw, Send, Users } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Flag, History, ListChecks, RotateCcw, Send, Star, Users } from "lucide-react";
 import { toast } from "sonner";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
+import { RatingsPanel } from "@/components/fsl/Ratings";
 import { MatchStatusBadge, kickoffLabel } from "@/components/fsl/MatchCard";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
 import { ReasonDialog } from "@/components/fsl/ReasonDialog";
@@ -57,7 +58,7 @@ export default function MatchWorkspace({ tournamentId: tidProp, backTo, compact 
   const assign = (uid) => act(() => api.patch(`/tournaments/${tid}/matches/${matchId}`, { referee_user_id: uid }), "Arbitro assegnato");
   const checklist = (k) => setM({ ...m, checklist: { ...m.checklist, [k]: !m.checklist[k] } });
 
-  const TABS = [["callups", "Convocazioni", Users], ["events", "Eventi", ListChecks], ["report", isRef ? "Referto" : "Ufficializza", Flag], ["history", "Storia", History]];
+  const TABS = [["callups", "Convocazioni", Users], ["events", "Eventi", ListChecks], ["report", isRef ? "Referto" : "Ufficializza", Flag], ["ratings", "Pagelle", Star], ["history", "Storia", History]];
   const CallupList = ({ side, teamId }) => {
     const ids = m.callups[side] || [];
     const toggle = (pid) => saveCallups(side, ids.includes(pid) ? ids.filter((x) => x !== pid) : [...ids, pid]);
@@ -94,7 +95,7 @@ export default function MatchWorkspace({ tournamentId: tidProp, backTo, compact 
         )}
       </section>
 
-      <div className="grid grid-cols-4 gap-1 fsl-card p-1" role="tablist">{TABS.map(([k, l, Icon]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`h-11 rounded-md text-xs font-semibold uppercase inline-flex items-center justify-center gap-1.5 ${tab === k ? "bg-fsl-blue" : "text-fsl-slate hover:text-fsl-white"}`} data-testid={`tab-${k}`}><Icon className="h-4 w-4" /><span className="hidden sm:inline">{l}</span></button>)}</div>
+      <div className="grid grid-cols-5 gap-1 fsl-card p-1" role="tablist">{TABS.map(([k, l, Icon]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`h-11 rounded-md text-xs font-semibold uppercase inline-flex items-center justify-center gap-1.5 ${tab === k ? "bg-fsl-blue" : "text-fsl-slate hover:text-fsl-white"}`} data-testid={`tab-${k}`}><Icon className="h-4 w-4" /><span className="hidden sm:inline">{l}</span></button>)}</div>
 
       {tab === "callups" && <div className="grid md:grid-cols-2 gap-3"><CallupList side="home" teamId={m.home_team_id} /><CallupList side="away" teamId={m.away_team_id} /></div>}
 
@@ -150,6 +151,8 @@ export default function MatchWorkspace({ tournamentId: tidProp, backTo, compact 
           )}
         </div>
       )}
+
+      {tab === "ratings" && <RatingsPanel tournamentId={tid} matchId={matchId} editable={isRef ? m.referee_user_id === user.id : m.can_officialize} homeName={m.home.club?.name} awayName={m.away.club?.name} />}
 
       {tab === "history" && (
         <div className="fsl-card divide-y divide-white/[0.06]" data-testid="report-history">

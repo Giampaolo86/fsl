@@ -59,6 +59,8 @@ export default function Settings() {
           match_days: s.match_days,
           day_start: s.day_start,
           day_end: s.day_end,
+          break_start: s.break_start || null,
+          break_end: s.break_end || null,
           match_duration_min: Number(s.match_duration_min),
           buffer_min: Number(s.buffer_min),
           formula: s.formula,
@@ -138,6 +140,12 @@ export default function Settings() {
 
         <section className="fsl-card p-6">
           <SectionTitle>Campi, giorni e slot</SectionTitle>
+          <div className="mb-4 flex flex-wrap gap-2" data-testid="settings-time-presets">
+            <span className="fsl-label self-center mr-1">Preset orari:</span>
+            {[["Mattina", "08:30", "13:30", null, null], ["Pomeriggio", "14:30", "19:30", null, null], ["Giornata intera", "08:30", "19:30", "13:30", "14:30"], ["Fino a sera", "08:30", "21:30", "13:30", "14:30"]].map(([l, a, b, bs, be]) => (
+              <button key={l} type="button" className="btn-ghost h-9 text-xs" onClick={() => setS((x) => ({ ...x, day_start: a, day_end: b, break_start: bs, break_end: be }))} data-testid={`settings-preset-${l.toLowerCase().replace(/ /g, "-")}`}>{l} {a}–{b}</button>
+            ))}
+          </div>
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="Numero campi" hint="Il generatore userà esattamente questo numero di campi"><input type="number" min="1" className="fsl-input" value={s.fields_count} onChange={(e) => upd("fields_count", e.target.value)} data-testid="settings-fields-input" /></Field>
             <div>
@@ -152,7 +160,9 @@ export default function Settings() {
               </div>
             </div>
             <Field label="Inizio giornata"><input type="time" className="fsl-input" value={s.day_start} onChange={(e) => upd("day_start", e.target.value)} data-testid="settings-daystart-input" /></Field>
-            <Field label="Fine giornata"><input type="time" className="fsl-input" value={s.day_end} onChange={(e) => upd("day_end", e.target.value)} data-testid="settings-dayend-input" /></Field>
+            <Field label="Fine giornata" hint="Fino a 23:00: gli slot si estendono automaticamente"><input type="time" min="06:00" max="23:00" className="fsl-input" value={s.day_end} onChange={(e) => upd("day_end", e.target.value)} data-testid="settings-dayend-input" /></Field>
+            <Field label="Pausa dalle (opzionale)" hint="Es. pausa pranzo: nessuna gara nella finestra"><input type="time" className="fsl-input" value={s.break_start || ""} onChange={(e) => upd("break_start", e.target.value || null)} data-testid="settings-breakstart-input" /></Field>
+            <Field label="Pausa fino alle"><input type="time" className="fsl-input" value={s.break_end || ""} onChange={(e) => upd("break_end", e.target.value || null)} data-testid="settings-breakend-input" /></Field>
             <Field label="Durata gara (min)"><input type="number" min="10" className="fsl-input" value={s.match_duration_min} onChange={(e) => upd("match_duration_min", e.target.value)} data-testid="settings-duration-input" /></Field>
             <Field label="Cambio campo (min)"><input type="number" min="0" className="fsl-input" value={s.buffer_min} onChange={(e) => upd("buffer_min", e.target.value)} data-testid="settings-buffer-input" /></Field>
             <Field label="Max gare per squadra a weekend"><input type="number" min="1" className="fsl-input" value={s.max_matches_per_team_per_weekend} onChange={(e) => upd("max_matches_per_team_per_weekend", e.target.value)} data-testid="settings-maxweekend-input" /></Field>

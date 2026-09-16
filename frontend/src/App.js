@@ -31,6 +31,7 @@ import MatchWorkspace from "@/components/fsl/MatchWorkspace";
 import { Rosters, Standings, Tickets } from "@/pages/admin/Engine";
 import { ClubCalendar, ClubMatch, ClubReports } from "@/pages/club/ClubEngine";
 import { RefereeMatch } from "@/pages/referee/RefereeMatches";
+import { Awards, Payments } from "@/pages/admin/Extras";
 
 const ADMIN_ROLES = ["super_admin", "director", "secretary"];
 
@@ -70,7 +71,9 @@ function App() {
                 <Route path="classifiche" element={<Standings />} />
                 <Route path="rose" element={<Rosters />} />
                 <Route path="ticket" element={<Tickets />} />
-                {["pagamenti", "comunicazioni", "media"].map((m) => (
+                <Route path="premi" element={<Awards />} />
+                <Route path="pagamenti" element={<Payments />} />
+                {["comunicazioni", "media"].map((m) => (
                   <Route key={m} path={m} element={<ModulePlaceholder module={m} />} />
                 ))}
               </Route>
@@ -82,7 +85,8 @@ function App() {
                 <Route path="calendario" element={<ClubCalendar />} />
                 <Route path="partite/:matchId" element={<ClubMatch />} />
                 <Route path="segnalazioni" element={<ClubReports />} />
-                {["documenti", "pagamenti", "profilo"].map((m) => (
+                <Route path="pagamenti" element={<Payments clubMode />} />
+                {["documenti", "profilo"].map((m) => (
                   <Route key={m} path={m} element={<ClubModule module={m} />} />
                 ))}
               </Route>

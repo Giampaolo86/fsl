@@ -16,6 +16,7 @@ export default function Competitions() {
   const canWrite = ["super_admin", "director"].includes(t.my_role) && !t.read_only;
   const patch = async (c, body) => { try { await api.patch(`/tournaments/${t.id}/competitions/${c.id}`, body); reload(); } catch (e) { toast.error(apiError(e)); } };
   const finals = async (c) => { try { const { data: r } = await api.post(`/tournaments/${t.id}/competitions/${c.id}/finals/generate`); toast.success(`${r.round_name}: ${r.count} gare create`); } catch (e) { toast.error(apiError(e)); } };
+  const close = async (c) => { if (!window.confirm(`Chiudere la stagione di ${c.name}? Verranno registrati campione, promosse e retrocesse.`)) return; try { const { data: o } = await api.post(`/tournaments/${t.id}/competitions/${c.id}/close`); toast.success(`Stagione chiusa · Campione: ${o.champion?.name}`); reload(); } catch (e) { toast.error(apiError(e)); } };
   return (
     <div>
       <PageHeader kicker="Stagioni e competizioni" title="Competizioni" subtitle="Un campionato per ogni combinazione categoria × serie. Regole e tie-break sono memorizzati per competizione." />
@@ -36,6 +37,7 @@ export default function Competitions() {
                 <th>Fase finale</th>
                 <th>Zone</th>
                 <th>Tie-break</th>
+                <th>Stagione</th>
               </tr>
             </thead>
             <tbody>
@@ -69,6 +71,7 @@ export default function Competitions() {
                         ))}
                   </td>
                   <td className="text-xs text-fsl-slate">{c.tiebreakers.map((t) => TIEBREAK_LABELS[t] || t).join(" → ")}</td>
+                  <td>{c.status === "closed" ? <span className="text-xs text-fsl-success font-semibold">● Chiusa</span> : canWrite && <button className="btn-ghost h-9 px-2 text-xs" onClick={() => close(c)} data-testid={`competition-close-${c.code}`}>Chiudi stagione</button>}</td>
                 </tr>
               ))}
             </tbody>

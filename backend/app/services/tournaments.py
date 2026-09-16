@@ -85,13 +85,21 @@ def slugify(value: str) -> str:
     return value or "torneo"
 
 
-def compute_slots(day_start: str, day_end: str, duration: int, buffer: int) -> list[str]:
+def compute_slots(day_start: str, day_end: str, duration: int, buffer: int, break_start: Optional[str] = None, break_end: Optional[str] = None) -> list[str]:
     h, m = map(int, day_start.split(":"))
     eh, em = map(int, day_end.split(":"))
     start = datetime(2000, 1, 1, h, m)
     end = datetime(2000, 1, 1, eh, em)
+    brk = None
+    if break_start and break_end and break_start < break_end:
+        bh, bm = map(int, break_start.split(":"))
+        beh, bem = map(int, break_end.split(":"))
+        brk = (datetime(2000, 1, 1, bh, bm), datetime(2000, 1, 1, beh, bem))
     slots = []
-    while start + timedelta(minutes=duration) <= end and len(slots) < 40:
+    while start + timedelta(minutes=duration) <= end and len(slots) < 60:
+        if brk and start + timedelta(minutes=duration) > brk[0] and start < brk[1]:
+            start = brk[1]
+            continue
         slots.append(start.strftime("%H:%M"))
         start += timedelta(minutes=duration + buffer)
     return slots
@@ -203,7 +211,7 @@ async def create_tournament(payload: dict, actor, mode: str = "scratch") -> Tour
             raise not_found("Torneo di origine")
         settings_data = src_settings.model_dump(exclude={"id", "tournament_id", "created_at", "updated_at", "created_by", "updated_by", "deleted_at"})
 
-    settings_data.update({k: v for k, v in (payload.get("settings") or {}).items() if v is not None})
+    settings_data.update({k: v for k, v in (payload.get("settings") or {}).items() if v is not None or k in ("break_start", "break_end")})
     settings_data.setdefault("categories", [])
     settings_data.setdefault("series", ["Girone unico"])
 
@@ -222,7 +230,7 @@ async def create_tournament(payload: dict, actor, mode: str = "scratch") -> Tour
     )
     t = await tournaments.insert(t, actor.id if actor else None)
     s = TournamentSettings(tournament_id=t.id, **settings_data)
-    s.slots = compute_slots(s.day_start, s.day_end, s.match_duration_min, s.buffer_min)
+    s.slots = compute_slots(s.day_start, s.day_end, s.match_duration_min, s.buffer_min, s.break_start, s.break_end)
     await settings_repo.insert(s, actor.id if actor else None)
     await sync_competitions(t, s, actor)
     await ensure_fields(t, s, actor)
@@ -243,7 +251,7 @@ async def update_settings(t: Tournament, patch: dict, actor) -> TournamentSettin
     s = await settings_repo.find_one({"tournament_id": t.id})
     before = s.model_dump(include=set(patch.keys()))
     merged = s.model_copy(update=patch)
-    merged.slots = compute_slots(merged.day_start, merged.day_end, merged.match_duration_min, merged.buffer_min)
+    merged.slots = compute_slots(merged.day_start, merged.day_end, merged.match_duration_min, merged.buffer_min, merged.break_start, merged.break_end)
     if merged.teams_per_series < 2:
         raise bad_request("Servono almeno 2 squadre per serie")
     if merged.fields_count < 1:

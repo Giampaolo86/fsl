@@ -76,6 +76,8 @@ class TournamentSettings(BaseDocument):
     match_days: list[str] = ["sat", "sun"]
     day_start: str = "08:30"
     day_end: str = "13:30"
+    break_start: Optional[str] = None
+    break_end: Optional[str] = None
     match_duration_min: int = 30
     buffer_min: int = 10
     slots: list[str] = []
@@ -163,6 +165,7 @@ class Match(BaseDocument):
     attendance: dict = {}
     events: list[MatchEvent] = []
     checklist: dict = {"teams_present": False, "lists_verified": False, "signatures": False}
+    ratings: dict = {}
     version: int = 1
 
 

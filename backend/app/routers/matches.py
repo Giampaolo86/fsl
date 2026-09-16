@@ -370,6 +370,9 @@ async def _after_official(t_id, m: Match, user):
     c = await scoped("competitions", t_id).get(m.competition_id)
     if c and m.stage == "qualification":
         await engine.snapshot_standings(t_id, c, m.id, user)
+    from .extras import charge_callups
+
+    await charge_callups(t_id, m, user)
 
 
 @router.post("/matches/{match_id}/report")
