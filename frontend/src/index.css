@@ -38,6 +38,24 @@
   ::selection {
     background: rgba(244, 174, 43, 0.35);
   }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(168, 186, 203, 0.35) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(168, 186, 203, 0.35);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(168, 186, 203, 0.6);
+  }
   :focus-visible {
     outline: 2px solid #1778ff;
     outline-offset: 2px;
@@ -91,6 +109,24 @@
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+  .fsl-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(244, 174, 43, 0.45) transparent;
+  }
+  .fsl-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .fsl-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .fsl-scroll::-webkit-scrollbar-thumb {
+    background: rgba(244, 174, 43, 0.45);
+    border-radius: 999px;
+  }
+  .fsl-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(244, 174, 43, 0.8);
   }
   .hero-overlay {
     background: linear-gradient(90deg, rgba(4, 30, 50, 0.92) 0%, rgba(4, 30, 50, 0.6) 45%, rgba(4, 30, 50, 0.2) 100%),

@@ -45,7 +45,7 @@ export default function PublicShell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const nav = NAV(slug);
-  const doLogout = async () => { setOpen(false); await logout(); navigate("/", { replace: true }); };
+  const doLogout = async () => { setOpen(false); navigate("/", { replace: true }); await logout(); };
   return (
     <div className="min-h-screen flex flex-col bg-navy-900">
       <header className="sticky top-0 z-40 h-[76px] bg-navy-900/85 backdrop-blur-md border-b border-white/10">

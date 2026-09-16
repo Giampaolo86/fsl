@@ -1,0 +1,43 @@
+{
+  "summary": "Frontend-only regression testing dei flussi di accesso e navigazione post-fix (PublicShell attorno a /account, ProtectedRoute per-ruolo, Login redirect compatibile). Tutti gli scenari richiesti verificati end-to-end tramite Playwright su REACT_APP_BACKEND_URL. Un unico scostamento minore rilevato sul redirect di logout fan.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Fan logout dal /account", "issue": "Dopo click su public-fan-logout l'URL finale è /login invece di / (anon hub). PublicShell chiama `await logout(); navigate('/', {replace:true})`, ma il render intermedio con user=false attiva la Navigate del ProtectedRoute (/account → /login con from=/account) prima che la navigate('/') si applichi. L'header 'Area Società' non viene mostrato: si atterra sulla schermata di login. Fix suggerito: chiamare navigate('/') PRIMA di logout(), oppure spostare la navigate dentro logout() con un flag, o disattivare ProtectedRoute quando il logout è in corso.", "affected_selectors": ["public-fan-logout"]}
+    ],
+    "design_issues": []
+  },
+  "verified_scenarios": [
+    "Fan login → /account con header pubblico completo (fsl-logo, fan-notifications-button, public-fan-name, public-fan-account-link, public-fan-logout). Contenuto fan-account con titolo 'Ciao Fan, i tuoi preferiti' e pulsante fan-explore presenti. Nessun overlay React di errore.",
+    "Click fan-explore → / (hub) senza tab Home/Tornei (public-nav-home=0), con campanella fan e link 'I miei preferiti' visibili.",
+    "Apertura /tornei/la-serie-a-dei-bambini da fan → nav pubblica torneo (public-nav-home, public-nav-partite) + link account fan visibili. Ritorno a /account tramite public-fan-account-link OK.",
+    "Anon hub /: nessun public-nav-home nell'header (verificato dopo logout).",
+    "Anon /account → redirect a /login OK.",
+    "Super Admin login → /admin. Admin visita /account → redirect a /admin. Admin su /tornei/... vede public-area-societa-link con testo 'La mia area' e NESSUNA fan-notifications-button.",
+    "Società login → /societa; /account → /societa; /admin → /societa.",
+    "Arbitro login → /arbitro; /account → /arbitro.",
+    "Fan su /admin → /account; fan su /societa → /account (nessuna pagina 'Accesso non consentito').",
+    "Regressione admin: anon → /admin/t/6a9b5b045d9e0985643d0a9f/societa → /login → login admin → ritorno all'URL originale OK.",
+    "Regressione fan anon: /account → /login → login fan → /account OK.",
+    "Mobile 390px: hamburger (public-menu-toggle) apre menu con 'I miei preferiti' ed 'Esci' (screenshot verificato)."
+  ],
+  "console_notes": "53 errori console del tipo '401 (Unauthorized)' e alcune PAGEERROR 'Request failed with status code 401' rilevate durante la navigazione, principalmente in caso di chiamate autenticate su rotte pubbliche o dopo logout. Non generano overlay React né bloccano la UI, ma vale la pena sopprimere/gestire meglio queste chiamate per una console pulita.",
+  "test_report_links": [],
+  "action_items": [
+    "MINORE: fix logout fan in PublicShell.doLogout — l'utente atterra su /login invece di / dopo il click su public-fan-logout (race condition tra setUser(false) del context che fa scattare ProtectedRoute e la navigate('/') successiva).",
+    "OPZIONALE: ridurre il rumore delle 401 console (chiamate autenticate su pagine pubbliche / dopo logout)."
+  ],
+  "critical_code_review_comments": [
+    "PublicShell.doLogout ha una race condition: `await logout()` completa il setUser(false) che triggera il rerender di ProtectedRoute su /account → Navigate to /login, PRIMA che la successiva navigate('/', {replace:true}) prenda effetto. Preferibile navigate('/') prima di logout() oppure integrare la redirect direttamente nel logout del context.",
+    "AuthContext.logout non gestisce la redirect di landing: la responsabilità è sparsa tra Logout component (=/login) e PublicShell (=/). Uniformare in un solo posto."
+  ],
+  "updated_files": [],
+  "success_rate": {"frontend": "95%"},
+  "test_credentials": "Vedi /app/memory/test_credentials.md (usati fan.notifiche@test.it, castellani.giampaolo@gmail.com, societa@fsl.demo, arbitro@fsl.demo).",
+  "seed_data_creation": "Nessuna.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Tutti i 7 scenari richiesti nel review sono coperti. Unico miss: dopo public-fan-logout l'URL finale è /login invece di / (hub anonimo). Race condition documentata; fix suggerito nel report. Header, ProtectedRoute per-ruolo e redirect Login 'from' funzionano correttamente per super_admin, club_manager, referee e fan.",
+  "rca of the issue": "PublicShell.doLogout: `await logout()` invoca setUser(false) nel context; poichè la funzione è chiamata da /account (dentro ProtectedRoute roles=['fan']), non appena user diventa falsy il ProtectedRoute renderizza <Navigate to='/login' state={{from:'/account'}}/>. La navigate('/',{replace:true}) chiamata subito dopo viene sovrascritta dalla Navigate del router (o vi arriva prima del prossimo commit). Mitigation: chiamare navigate('/',{replace:true}) prima di await logout() oppure impostare uno stato 'logging_out' che sospende la ProtectedRoute; oppure spostare la redirect in AuthContext.logout stesso."
+}

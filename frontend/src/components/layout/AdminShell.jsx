@@ -42,13 +42,13 @@ function NavItem({ to, label, icon: Icon, end, onClick }) {
       onClick={onClick}
       data-testid={`sidebar-nav-${label.toLowerCase()}`}
       className={({ isActive }) =>
-        `flex items-center gap-3 h-11 px-4 text-[13px] font-semibold uppercase tracking-wide border-l-[3px] transition-colors ${
+        `flex items-center gap-3 min-h-[44px] py-2 pl-4 pr-3 text-[12.5px] leading-tight font-semibold uppercase tracking-wide border-l-[3px] transition-colors ${
           isActive ? "border-fsl-gold text-fsl-gold bg-white/[0.06]" : "border-transparent text-fsl-slate hover:text-fsl-white hover:bg-white/[0.04]"
         }`
       }
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <span className="truncate">{label}</span>
+      <span className="break-words">{label}</span>
     </NavLink>
   );
 }
@@ -70,7 +70,7 @@ export default function AdminShell() {
   const nav = [...HUB_NAV.filter((n) => !n.roles || user.is_super_admin || n.roles.includes(user.role)), ...(scopeId ? TOURNAMENT_NAV(scopeId) : [])];
 
   const sidebar = (
-    <aside className="flex h-full w-[168px] flex-col bg-ink-950 border-r border-white/10">
+    <aside className="flex h-full w-[220px] flex-col bg-ink-950 border-r border-white/10" data-testid="admin-sidebar">
       <div className="px-4 h-[76px] flex items-center border-b border-white/10">
         <Logo to="/admin" compact />
         <span className="ml-2 font-display font-extrabold uppercase text-sm leading-tight">
@@ -79,7 +79,7 @@ export default function AdminShell() {
           Stars
         </span>
       </div>
-      <nav className="flex-1 overflow-y-auto py-3" aria-label="Navigazione amministrativa">
+      <nav className="flex-1 overflow-y-auto py-3 fsl-scroll" aria-label="Navigazione amministrativa">
         <div className="px-4 pb-1 text-[10px] uppercase tracking-widest text-fsl-slate/70">Hub</div>
         {nav.slice(0, HUB_NAV.filter((n) => !n.roles || user.is_super_admin || n.roles.includes(user.role)).length).map((n) => (
           <NavItem key={n.to} {...n} />
