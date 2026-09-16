@@ -66,6 +66,12 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] Media a pagamento (Stripe, sandbox reclamabile, gestione fiscale completa/managed payments con fallback a calcolo tasse): staff carica foto (0,49 €) e video (0,99 €) dal tab «Foto/Video» del workspace gara; portale: sezione «Foto e video della gara» con anteprima sfocata+filigrana, checkout Stripe hosted, `/payment/success` con polling stato e link download riservato (token), `/payment/cancel`; webhook `/api/stripe/webhook`; Control Room «Vendite» (incasso, conteggi, elenco). Catalogo Stripe: lookup_key `fsl_video_099`, `fsl_photo_049` (EUR)
 - [x] Test: 19/19 backend iterazione 5 (`/app/backend/tests/test_iteration5.py`), flussi frontend verificati (`/app/test_reports/iteration_5.json`); pagamento completo con carta test non eseguito automaticamente
 
+## Implementato (2026-06) – Iterazione 6
+- [x] Modulo Rosa Società (Excel): download modulo precompilato (`GET /roster-imports/template`), caricamento e parsing con validazioni per riga (ruolo, maglia duplicata, data, nome), stato in attesa → maschera di conferma admin (righe modificabili, includi/escludi, modalità aggiungi/sostituisci, nota) → «Carica rooster» crea/aggiorna giocatori; respinta con motivo; notifiche alla società. Test 12/12 (`/app/backend/tests/test_roster_imports.py`, `iteration_6.json`)
+- [x] Tabellino: MVP obbligatorio (uno solo, ★ esclusivo, blocco chiusura), clic sul logo società = tutti presenti, layout compatto mobile-first (griglia 7 chip a larghezza fissa senza tagli, riga a 2 livelli su smartphone, singola su desktop), tab con etichette troncate
+- [x] Grafica social: marcatori per squadra, MVP con foto, podio compatto; rimossi i badge (restano sul profilo giocatore)
+- [x] Calendario: pulsante «Prossimi impegni · 7 giorni» (admin e Area Società) con filtro `upcoming_days` e stato vuoto dedicato
+
 ## Backlog prioritizzato
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana
 - P1 (Fase 5): comunicazioni email/SMS (provider da scegliere), segnalazione pubblica con captcha, rimborsi Stripe da Control Room

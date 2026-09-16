@@ -12,12 +12,13 @@ import { api, apiError } from "@/lib/api";
 export function ClubCalendar() {
   const { data, error, membership } = useMyClub();
   const [list, setList] = useState(null);
-  useEffect(() => { if (membership) api.get(`/tournaments/${membership.tournament_id}/matches`).then((r) => setList(r.data)); }, [membership]);
+  const [upcoming, setUpcoming] = useState(false);
+  useEffect(() => { if (membership) api.get(`/tournaments/${membership.tournament_id}/matches`, { params: upcoming ? { upcoming_days: 7 } : {} }).then((r) => setList(r.data)); }, [membership, upcoming]);
   if (error) return <ErrorState message={apiError(error)} />;
   if (!data || !list) return <LoadingState />;
   return (
     <div>
-      <PageHeader kicker={data.tournament.name} title="Calendario" subtitle={`${list.length} gare delle tue squadre. Convoca i giocatori aprendo la gara.`} />
+      <PageHeader kicker={data.tournament.name} title="Calendario" subtitle={upcoming ? `${list.length} gare nei prossimi 7 giorni: prepara le distinte in anticipo.` : `${list.length} gare delle tue squadre. Convoca i giocatori aprendo la gara.`} actions={<button className={upcoming ? "btn-gold" : "btn-ghost"} onClick={() => setUpcoming(!upcoming)} aria-pressed={upcoming} data-testid="club-upcoming-button">Prossimi impegni · 7 giorni</button>} />
       {list.length === 0 ? <EmptyState icon={CalendarDays} title="Nessuna gara programmata" /> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">{list.map((m) => <MatchCard key={m.id} m={m} to={`/societa/partite/${m.id}`} />)}</div>}
     </div>
   );

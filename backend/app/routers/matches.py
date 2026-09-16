@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -242,7 +243,7 @@ async def finals_generate(tournament_id: str, competition_id: str, user: Current
 
 # ---------- matches ----------
 @router.get("/matches")
-async def list_matches(tournament_id: str, competition_id: Optional[str] = None, status: Optional[str] = None, date: Optional[str] = None, team_id: Optional[str] = None, user: CurrentUser = Depends(get_current_user)):
+async def list_matches(tournament_id: str, competition_id: Optional[str] = None, status: Optional[str] = None, date: Optional[str] = None, team_id: Optional[str] = None, upcoming_days: Optional[int] = None, user: CurrentUser = Depends(get_current_user)):
     t, role = await require_tournament(tournament_id, user)
     f = {}
     if competition_id:
@@ -251,6 +252,12 @@ async def list_matches(tournament_id: str, competition_id: Optional[str] = None,
         f["status"] = {"$in": status.split(",")}
     if date:
         f["kickoff_at"] = {"$regex": f"^{date}"}
+    if upcoming_days:
+        from datetime import timedelta
+
+        start = datetime.now(timezone.utc)
+        f["kickoff_at"] = {"$gte": start.strftime("%Y-%m-%dT00:00"), "$lte": (start + timedelta(days=upcoming_days)).strftime("%Y-%m-%dT23:59")}
+        f.setdefault("status", {"$nin": ["cancelled"]})
     if team_id:
         f["$or"] = [{"home_team_id": team_id}, {"away_team_id": team_id}]
     if role == "referee":
@@ -472,6 +479,8 @@ async def save_sheet(tournament_id: str, match_id: str, body: SheetIn, user: Cur
         if v < 4 or v > 10 or (v * 2) != int(v * 2):
             raise bad_request("I voti vanno da 4 a 10 con passo 0,5")
         ratings[pid] = v
+    if sum(1 for st in stats.values() if st.get("mvp")) > 1:
+        raise bad_request("Un solo MVP per partita")
     events = events_from_stats(m, stats)
     m.events = events
     h, a = score_from_events(m)
@@ -489,6 +498,9 @@ async def save_sheet(tournament_id: str, match_id: str, body: SheetIn, user: Cur
         await audit.record(user, "match.sheet", "match", m.id, tournament_id, after={"present": len(present), "score": f"{h}-{a}"})
         return (await _enrich(tournament_id, [m2]))[0]
     problems = sheet_problems(m, attendance)
+    mvps = [pid for pid, st in stats.items() if st.get("mvp")]
+    if len(mvps) != 1:
+        problems.append("seleziona un MVP della partita (uno solo)" if not mvps else "un solo MVP per partita")
     if problems:
         raise conflict("Tabellino incompleto: " + "; ".join(problems))
     if m.stage == "finals" and h == a and (score["home_pen"] is None or score["away_pen"] is None or score["home_pen"] == score["away_pen"]):

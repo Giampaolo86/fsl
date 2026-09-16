@@ -61,6 +61,8 @@ export default function MatchWorkspace({ tournamentId: tidProp, compact = false 
   ["home", "away"].forEach((s) => { if (callups[s].length === 0) problems.push(`Distinta ${m[s].club?.short_name || s} mancante`); else if (!callups[s].some((pid) => sheet.attendance[pid] === "present")) problems.push(`Nessun presente per ${m[s].club?.short_name}`); });
   const pending = [...callups.home, ...callups.away].filter((pid) => !["present", "absent"].includes(sheet.attendance[pid])).length;
   if (pending) problems.push(`${pending} giocatori da confermare`);
+  const mvpCount = Object.values(sheet.stats).filter((s) => s?.mvp).length;
+  if (mvpCount !== 1) problems.push(mvpCount ? "un solo MVP" : "MVP non assegnato (★)");
   const dirty = JSON.stringify(callups) !== JSON.stringify({ home: m.callups.home || [], away: m.callups.away || [] });
 
   const act = async (fn, ok) => { setBusy(true); try { await fn(); toast.success(ok); load(); } catch (e) { toast.error(apiError(e)); throw e; } finally { setBusy(false); } };
@@ -95,7 +97,7 @@ export default function MatchWorkspace({ tournamentId: tidProp, compact = false 
         )}
       </section>
 
-      <div className={`grid ${isStaff ? "grid-cols-4" : "grid-cols-3"} gap-1 fsl-card p-1`} role="tablist">{[["sheet", "Tabellino", ClipboardList], ["social", "Social", Share2], ...(isStaff ? [["media", "Foto/Video", Camera]] : []), ["history", "Storia", History]].map(([k, l, Icon]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`h-11 rounded-md text-xs font-semibold uppercase inline-flex items-center justify-center gap-1.5 ${tab === k ? "bg-fsl-blue" : "text-fsl-slate hover:text-fsl-white"}`} data-testid={`tab-${k}`}><Icon className="h-4 w-4" />{l}</button>)}</div>
+      <div className={`grid ${isStaff ? "grid-cols-4" : "grid-cols-3"} gap-1 fsl-card p-1`} role="tablist">{[["sheet", "Tabellino", ClipboardList], ["social", "Social", Share2], ...(isStaff ? [["media", "Media", Camera]] : []), ["history", "Storia", History]].map(([k, l, Icon]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`h-11 min-w-0 px-1 rounded-md text-[11px] sm:text-xs font-semibold uppercase inline-flex items-center justify-center gap-1.5 ${tab === k ? "bg-fsl-blue" : "text-fsl-slate hover:text-fsl-white"}`} aria-label={l} data-testid={`tab-${k}`}><Icon className="h-4 w-4 shrink-0" /><span className="truncate">{l}</span></button>)}</div>
 
       {tab === "sheet" && (
         <div className="space-y-3">
@@ -104,7 +106,7 @@ export default function MatchWorkspace({ tournamentId: tidProp, compact = false 
               <button onClick={() => setMode("distinta")} className={`h-10 px-4 text-xs font-semibold uppercase inline-flex items-center gap-1.5 ${mode === "distinta" ? "bg-fsl-gold text-ink-950" : "text-fsl-slate hover:text-fsl-white"}`} data-testid="mode-distinta"><Users className="h-4 w-4" /> Prepara distinta</button>
               <button onClick={() => setMode("gara")} className={`h-10 px-4 text-xs font-semibold uppercase inline-flex items-center gap-1.5 ${mode === "gara" ? "bg-fsl-blue" : "text-fsl-slate hover:text-fsl-white"}`} data-testid="mode-gara"><ClipboardList className="h-4 w-4" /> Compila gara</button>
             </div>
-            <p className="text-xs text-fsl-slate flex-1 min-w-[200px]">{mode === "distinta" ? "Tocca il numero per aggiungere o togliere un giocatore dalla distinta." : "Numero: 1° tocco presente (verde), 2° assente (rosso), 3° da confermare. Voto base 6 con −/+; bonus e malus aggiornano il fantavoto e il risultato."}</p>
+            <p className="text-xs text-fsl-slate flex-1 min-w-[200px]">{mode === "distinta" ? "Tocca il numero per aggiungere o togliere un giocatore dalla distinta." : "Logo squadra: tutti presenti. Numero: 1° tocco presente, 2° assente, 3° da confermare. Voto base 6 con −/+; G/A/RP/★MVP (obbligatorio, uno) e AM/ES/AG aggiornano fantavoto e risultato."}</p>
           </div>
 
           <MatchSheet m={m} mode={mode} callups={callups} sheet={sheet} onCallups={setCallups} onSheet={setSheet} canEdit={canEdit} onOpen={setOpenPlayer} />

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { CalendarPlus, Plus, Wand2 } from "lucide-react";
+import { CalendarClock, CalendarPlus, Plus, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { MatchCard, MATCH_STATUS } from "@/components/fsl/MatchCard";
@@ -25,12 +25,13 @@ export default function Matches({ mode = "matches" }) {
   const comp = params.get("comp") || "";
   const status = params.get("status") || (mode === "reports" ? "in_progress,finished,report_submitted,under_review,official,rectified" : "");
   const day = params.get("day") || "";
+  const upcoming = params.get("upcoming") === "1";
 
   const load = () => {
     if (!t) return;
-    api.get(`/tournaments/${t.id}/matches`, { params: { competition_id: comp || undefined, status: status || undefined, date: day || undefined } }).then((r) => setList(r.data)).catch(setError);
+    api.get(`/tournaments/${t.id}/matches`, { params: { competition_id: comp || undefined, status: status || undefined, date: day || undefined, upcoming_days: upcoming ? 7 : undefined } }).then((r) => setList(r.data)).catch(setError);
   };
-  useEffect(load, [t?.id, comp, status, day]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(load, [t?.id, comp, status, day, upcoming]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setP = (k, v) => { const p = new URLSearchParams(params); v ? p.set(k, v) : p.delete(k); setParams(p); };
   const byRound = useMemo(() => {
@@ -77,9 +78,11 @@ export default function Matches({ mode = "matches" }) {
         <select className="fsl-input md:w-64" value={comp} onChange={(e) => setP("comp", e.target.value)} data-testid="matches-filter-competition"><option value="">Tutte le competizioni</option>{comps.data.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         {mode !== "reports" && <select className="fsl-input md:w-48" value={status} onChange={(e) => setP("status", e.target.value)} data-testid="matches-filter-status"><option value="">Tutti gli stati</option>{Object.entries(MATCH_STATUS).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}</select>}
         <input type="date" className="fsl-input md:w-48" value={day} onChange={(e) => setP("day", e.target.value)} data-testid="matches-filter-date" aria-label="Data" />
+        <button type="button" onClick={() => { const p = new URLSearchParams(params); if (upcoming) p.delete("upcoming"); else { p.set("upcoming", "1"); p.delete("day"); } setParams(p); }} className={`${upcoming ? "btn-gold" : "btn-ghost"} md:ml-auto`} aria-pressed={upcoming} data-testid="matches-upcoming-button"><CalendarClock className="h-4 w-4" /> Prossimi impegni · 7 giorni</button>
       </div>
+      {upcoming && <p className="text-xs text-fsl-slate -mt-2 mb-4" data-testid="matches-upcoming-hint">Gare da oggi ai prossimi 7 giorni: assegna arbitri e campi, verifica le distinte e organizza in anticipo.</p>}
       {!list ? <LoadingState /> : list.length === 0 ? (
-        <EmptyState icon={CalendarPlus} title="Nessuna gara" description={canWrite ? "Genera il calendario dalle competizioni con squadre iscritte oppure crea una gara manualmente." : "Il calendario non è ancora stato pubblicato."} action={canWrite && <button className="btn-gold" onClick={() => setGen(true)}>Genera calendario</button>} testId="matches-empty" />
+        <EmptyState icon={CalendarPlus} title={upcoming ? "Nessuna gara nei prossimi 7 giorni" : "Nessuna gara"} description={upcoming ? "Nessun impegno in programma da oggi a 7 giorni: rimuovi il filtro per vedere tutto il calendario." : canWrite ? "Genera il calendario dalle competizioni con squadre iscritte oppure crea una gara manualmente." : "Il calendario non è ancora stato pubblicato."} action={canWrite && !upcoming && <button className="btn-gold" onClick={() => setGen(true)}>Genera calendario</button>} testId="matches-empty" />
       ) : (
         <div className="space-y-6">
           {Object.entries(byRound).map(([round, ms]) => (

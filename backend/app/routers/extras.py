@@ -175,7 +175,14 @@ async def social_payload(tournament_id: str, m, public: bool = True):
         if r and b.code != "mvp" and (r["public_ok"] or not public):
             awards.append({"code": b.code, "label": b.label, "scope": b.scope, "player": name(r), "team_id": b.team_id})
     awards.sort(key=lambda a: (a["code"] == "esordio", a["code"] == "squadra_settimana", a["scope"] == "match"))
-    return {"tournament": t.name if t else "", "payoff": t.payoff if t else "", "competition": comp.name if comp else "", "round_name": m.round_name, "kickoff_at": m.kickoff_at, "status": "ready" if m.status in FINAL else "preview", "score": m.score, "home": team(m.home_team_id), "away": team(m.away_team_id), "mvp": slim(mvp) if mvp else None, "podium": [slim(r) for r in podium], "awards": awards[:8], "generated_at": utcnow().isoformat()}
+    scorers = {"home": [], "away": []}
+    for r in fanta_rows(m, players):
+        g, og = r["events"].get("goal", 0), r["events"].get("own_goal", 0)
+        if g:
+            scorers[r["side"]].append({"name": name(r), "goals": g})
+        if og:
+            scorers["away" if r["side"] == "home" else "home"].append({"name": f"{name(r)} (aut.)", "goals": og})
+    return {"tournament": t.name if t else "", "payoff": t.payoff if t else "", "competition": comp.name if comp else "", "round_name": m.round_name, "kickoff_at": m.kickoff_at, "status": "ready" if m.status in FINAL else "preview", "score": m.score, "home": team(m.home_team_id), "away": team(m.away_team_id), "mvp": slim(mvp) if mvp else None, "podium": [slim(r) for r in podium], "scorers": scorers, "awards": awards[:8], "generated_at": utcnow().isoformat()}
 
 
 @router.get("/matches/{match_id}/social")

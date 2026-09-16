@@ -40,35 +40,44 @@ export function drawSocial(ctx, d, mvpImg = null) {
   ctx.fillStyle = WHITE; ctx.font = font(800, 200); ctx.fillText(score, W / 2, 215);
   if (d.score.home_pen != null) { ctx.font = font(600, 30); ctx.fillStyle = GOLD; ctx.fillText(`(${d.score.home_pen}-${d.score.away_pen} dcr)`, W / 2, 415); }
   ctx.textAlign = "left";
-  let y = 480;
-  if (d.mvp) {
-    roundRect(ctx, 60, y, W - 120, 190, 24, "rgba(255,255,255,0.06)");
-    ctx.fillStyle = GOLD; ctx.fillRect(60, y, 12, 190);
-    ctx.font = font(700, 30); ctx.fillStyle = GOLD; ctx.fillText("MVP DELLA PARTITA", 100, y + 28);
-    ctx.font = font(800, 72); ctx.fillStyle = WHITE; ctx.fillText(fit(ctx, d.mvp.name.toUpperCase(), mvpImg ? 480 : 640), 100, y + 70);
-    ctx.font = font(500, 26, "Inter, Arial, sans-serif"); ctx.fillStyle = SLATE; ctx.fillText(`${d.mvp.role} · ${d.mvp.team_id === d.home.id ? d.home.name : d.away.name}`, 100, y + 148);
-    if (mvpImg) { ctx.save(); ctx.beginPath(); ctx.arc(665, y + 95, 62, 0, Math.PI * 2); ctx.closePath(); ctx.clip(); ctx.drawImage(mvpImg, 603, y + 33, 124, 124); ctx.restore(); ctx.strokeStyle = GOLD; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(665, y + 95, 62, 0, Math.PI * 2); ctx.stroke(); }
-    ctx.textAlign = "right"; ctx.font = font(800, 120); ctx.fillStyle = "#4C8DFF"; ctx.fillText(fmtVote(d.mvp.fanta), W - 100, y + 40);
-    ctx.textAlign = "left"; y += 230;
+  let y = 470;
+  const sc = d.scorers || { home: [], away: [] };
+  if (sc.home.length || sc.away.length) {
+    ctx.font = font(700, 26); ctx.fillStyle = GOLD; ctx.textAlign = "center"; ctx.fillText("MARCATORI", W / 2, y); y += 40;
+    ctx.font = font(500, 30, "Inter, Arial, sans-serif");
+    const lines = Math.min(6, Math.max(sc.home.length, sc.away.length));
+    for (let i = 0; i < lines; i++) {
+      const hm = sc.home[i], aw = sc.away[i];
+      ctx.fillStyle = WHITE;
+      if (hm) { ctx.textAlign = "right"; ctx.fillText(fit(ctx, `${hm.name}${hm.goals > 1 ? ` ×${hm.goals}` : ""}`, 440), W / 2 - 40, y); }
+      if (aw) { ctx.textAlign = "left"; ctx.fillText(fit(ctx, `${aw.name}${aw.goals > 1 ? ` ×${aw.goals}` : ""}`, 440), W / 2 + 40, y); }
+      ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(W / 2, y + 16, 5, 0, Math.PI * 2); ctx.fill();
+      y += 42;
+    }
+    if (Math.max(sc.home.length, sc.away.length) > 6) { ctx.textAlign = "center"; ctx.fillStyle = SLATE; ctx.font = font(500, 24, "Inter, Arial, sans-serif"); ctx.fillText("…", W / 2, y); y += 30; }
+    y += 24;
   }
-  ctx.font = font(700, 30); ctx.fillStyle = GOLD; ctx.fillText("PODIO", 60, y); y += 48;
-  d.podium.forEach((p, i) => {
-    roundRect(ctx, 60, y, W - 120, 92, 18, i === 0 ? "rgba(244,174,43,0.14)" : "rgba(255,255,255,0.05)");
-    ctx.font = font(800, 56); ctx.fillStyle = GOLD; ctx.fillText(String(i + 1), 90, y + 16);
-    ctx.font = font(700, 44); ctx.fillStyle = WHITE; ctx.fillText(fit(ctx, p.name, 560), 150, y + 22);
-    ctx.font = font(500, 24, "Inter, Arial, sans-serif"); ctx.fillStyle = SLATE; ctx.textAlign = "right"; ctx.fillText(p.team_id === d.home.id ? d.home.short_name || d.home.name : d.away.short_name || d.away.name, W - 230, y + 34);
-    ctx.font = font(800, 56); ctx.fillStyle = "#4C8DFF"; ctx.fillText(fmtVote(p.fanta), W - 100, y + 16); ctx.textAlign = "left";
-    y += 104;
-  });
-  if (d.awards.length) {
-    y += 16; ctx.font = font(700, 30); ctx.fillStyle = GOLD; ctx.fillText("PREMI E BADGE", 60, y); y += 48;
-    let x = 60;
-    ctx.font = font(500, 24, "Inter, Arial, sans-serif");
-    d.awards.slice(0, 8).forEach((a) => {
-      const label = `${a.label} · ${a.player}`; const w = ctx.measureText(label).width + 44;
-      if (x + w > W - 60) { x = 60; y += 62; }
-      if (y > H - 150) return;
-      roundRect(ctx, x, y, w, 50, 25, "rgba(255,255,255,0.08)"); ctx.fillStyle = WHITE; ctx.fillText(label, x + 22, y + 13); x += w + 12;
+  ctx.textAlign = "left";
+  if (d.mvp) {
+    roundRect(ctx, 60, y, W - 120, 170, 24, "rgba(255,255,255,0.06)");
+    ctx.fillStyle = GOLD; ctx.fillRect(60, y, 12, 170);
+    ctx.font = font(700, 28); ctx.fillStyle = GOLD; ctx.fillText("MVP DELLA PARTITA", 100, y + 24);
+    ctx.font = font(800, 66); ctx.fillStyle = WHITE; ctx.fillText(fit(ctx, d.mvp.name.toUpperCase(), mvpImg ? 470 : 620), 100, y + 60);
+    ctx.font = font(500, 24, "Inter, Arial, sans-serif"); ctx.fillStyle = SLATE; ctx.fillText(fit(ctx, `${d.mvp.role} · ${d.mvp.team_id === d.home.id ? d.home.name : d.away.name}`, 500), 100, y + 130);
+    if (mvpImg) { ctx.save(); ctx.beginPath(); ctx.arc(665, y + 85, 58, 0, Math.PI * 2); ctx.closePath(); ctx.clip(); ctx.drawImage(mvpImg, 607, y + 27, 116, 116); ctx.restore(); ctx.strokeStyle = GOLD; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(665, y + 85, 58, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.textAlign = "right"; ctx.font = font(800, 110); ctx.fillStyle = "#4C8DFF"; ctx.fillText(fmtVote(d.mvp.fanta), W - 100, y + 30);
+    ctx.textAlign = "left"; y += 200;
+  }
+  if (d.podium?.length) {
+    ctx.font = font(700, 24); ctx.fillStyle = GOLD; ctx.fillText("PODIO", 60, y); y += 36;
+    d.podium.forEach((p, i) => {
+      if (y > H - 190) return;
+      roundRect(ctx, 60, y, W - 120, 56, 14, i === 0 ? "rgba(244,174,43,0.14)" : "rgba(255,255,255,0.05)");
+      ctx.font = font(800, 34); ctx.fillStyle = GOLD; ctx.fillText(String(i + 1), 84, y + 10);
+      ctx.font = font(700, 30); ctx.fillStyle = WHITE; ctx.fillText(fit(ctx, p.name, 560), 130, y + 12);
+      ctx.font = font(500, 20, "Inter, Arial, sans-serif"); ctx.fillStyle = SLATE; ctx.textAlign = "right"; ctx.fillText(fit(ctx, p.team_id === d.home.id ? d.home.short_name || d.home.name : d.away.short_name || d.away.name, 220), W - 190, y + 18);
+      ctx.font = font(800, 34); ctx.fillStyle = "#4C8DFF"; ctx.fillText(fmtVote(p.fanta), W - 90, y + 10); ctx.textAlign = "left";
+      y += 64;
     });
   }
   ctx.fillStyle = GOLD; ctx.fillRect(60, H - 110, W - 120, 2);
@@ -106,13 +115,12 @@ export function SocialCard({ url, version }) {
       <canvas ref={canvas} width={W} height={H} className="w-full max-w-[320px] rounded-xl border border-white/15 shadow-card bg-navy-900" aria-label="Grafica social della partita" data-testid="social-canvas" />
       <div className="space-y-3">
         <div className="flex items-center gap-2"><span className={`h-7 px-3 rounded-full text-[11px] font-bold uppercase inline-flex items-center ${data?.status === "ready" ? "bg-fsl-success text-ink-950" : "bg-fsl-warning text-ink-950"}`} data-testid="social-status">{data ? (data.status === "ready" ? "Pronta da pubblicare" : "Anteprima") : "…"}</span><span className="text-xs text-fsl-slate">1080 × 1350 · formato verticale</span></div>
-        <p className="text-sm text-fsl-slate">Grafica generata automaticamente da risultato, colori delle società, MVP (bonus specifico o miglior fantavoto), podio e premi della gara. Si rigenera a ogni rettifica di risultato, voti o premi.</p>
+        <p className="text-sm text-fsl-slate">Grafica generata automaticamente da risultato, colori delle società, marcatori, MVP e podio della gara. I badge restano sul profilo di ogni giocatore. Si rigenera a ogni rettifica di risultato o voti.</p>
         <div className="flex flex-wrap gap-2">
           <button className="btn-gold" disabled={!data} onClick={download} data-testid="social-download"><Download className="h-4 w-4" /> Scarica PNG</button>
           <button className="btn-primary" disabled={!data} onClick={share} data-testid="social-share"><Share2 className="h-4 w-4" /> Condividi</button>
           <button className="btn-ghost" onClick={load} data-testid="social-regenerate"><RefreshCw className="h-4 w-4" /> Rigenera</button>
         </div>
-        {data?.awards?.length > 0 && <ul className="text-xs text-fsl-slate space-y-1" data-testid="social-awards">{data.awards.map((a, i) => <li key={i}><span className="text-fsl-gold font-semibold">{a.label}</span> · {a.player}</li>)}</ul>}
       </div>
     </div>
   );
