@@ -167,7 +167,7 @@ async def public_match(slug: str, match_id: str):
         by_pid = {}
         for b in earned:
             by_pid.setdefault(b.player_id, []).append({"code": b.code, "label": b.label, "scope": b.scope})
-        d["ratings"] = [{**r, "name": r["public_name"] if r["public_ok"] else "Giocatore", "player_id": r["player_id"] if r["public_ok"] else None, "unlocked": by_pid.get(r["player_id"], [])} for r in rows]
+        d["ratings"] = [{**r, "name": r["public_name"] if r["public_ok"] else "Giocatore", "player_id": r["player_id"] if r["public_ok"] else None, "photo_url": r["photo_url"] if r["public_ok"] else None, "unlocked": by_pid.get(r["player_id"], [])} for r in rows]
         pub = {r["player_id"]: r["public_name"] for r in rows if r["public_ok"]}
         d["badges_unlocked"] = [{"code": b.code, "label": b.label, "scope": b.scope, "player": pub[b.player_id]} for b in earned if b.player_id in pub and (b.scope != "match" or b.code in ("mvp", "doppietta", "tripletta", "porta_inviolata", "para_rigori"))]
     else:

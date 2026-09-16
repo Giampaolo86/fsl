@@ -7,6 +7,7 @@ import { RatingsColumns } from "@/components/fsl/Ratings";
 import { PlayerCardDialog } from "@/components/fsl/PlayerCard";
 import { BadgeChip } from "@/components/fsl/BadgeChips";
 import { SocialCard } from "@/components/fsl/SocialCard";
+import { PublicShop } from "@/components/fsl/Shop";
 import { STAT_META } from "@/lib/fanta";
 import { AwardsBoard, OutcomesList } from "@/pages/admin/Extras";
 import { PageHeader, SectionTitle } from "@/components/fsl/Primitives";
@@ -104,6 +105,7 @@ export function PublicMatchCenter() {
             <div className="flex flex-wrap gap-2">{m.badges_unlocked.map((b, i) => <span key={i} className="inline-flex items-center gap-2 h-9 pl-1 pr-3 rounded-full border border-fsl-gold/40 bg-navy-800 text-sm"><BadgeChip b={b} small /><span className="text-fsl-slate">{b.player}</span></span>)}</div>
           </section>
         )}
+        <PublicShop slug={slug} matchId={matchId} />
         {hasScore && (
           <section className="mt-8" data-testid="match-center-social">
             <SectionTitle right={<span className="text-xs text-fsl-slate">Scarica o condividi su WhatsApp, Instagram, Messaggi</span>}>Social Match Center</SectionTitle>

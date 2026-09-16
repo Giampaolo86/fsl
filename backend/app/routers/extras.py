@@ -98,7 +98,7 @@ def fanta_rows(m, players_by_id):
             if p.role == "Portiere" and present:
                 bonus -= conceded[team_id]
             fanta = round(vote + bonus, 1) if present else None
-            rows.append({"player_id": pid, "team_id": team_id, "side": side, "name": f"{p.first_name} {p.last_name}", "public_name": p.public_name or f"{p.first_name} {p.last_name[:1]}.", "public_ok": p.profile_visibility == "public" and p.media_consent, "role": ROLE_CODE.get(p.role, p.role[:3]), "shirt_number": p.shirt_number, "vote": vote if present else None, "bonus": round(bonus, 1) if present else 0, "fanta": fanta, "events": {k: v for k, v in e.items() if v}, "badges": badges, "present": present, "absent": att == "absent", "pending": att not in ("present", "absent")})
+            rows.append({"player_id": pid, "team_id": team_id, "side": side, "name": f"{p.first_name} {p.last_name}", "public_name": p.public_name or f"{p.first_name} {p.last_name[:1]}.", "public_ok": p.profile_visibility == "public" and p.media_consent, "role": ROLE_CODE.get(p.role, p.role[:3]), "shirt_number": p.shirt_number, "photo_url": p.photo_url, "vote": vote if present else None, "bonus": round(bonus, 1) if present else 0, "fanta": fanta, "events": {k: v for k, v in e.items() if v}, "badges": badges, "present": present, "absent": att == "absent", "pending": att not in ("present", "absent")})
     rated = [r for r in rows if r["fanta"] is not None]
     if rated:
         explicit = [r for r in rated if r["events"].get("mvp")]
@@ -165,7 +165,7 @@ async def social_payload(tournament_id: str, m, public: bool = True):
         c = clubs.get(tm.club_id) if tm else None
         return {"id": tid, "name": c.name if c else (tm.name if tm else "?"), "short_name": c.short_name if c else "", "colors": c.colors if c else {"primary": "#0B57D9", "secondary": "#F4AE2B"}, "crest_url": c.crest_url if c and not c.crest_is_placeholder else None}
 
-    slim = lambda r: {"player_id": r["player_id"] if (r["public_ok"] or not public) else None, "name": name(r), "team_id": r["team_id"], "role": r["role"], "shirt_number": r["shirt_number"], "vote": r["vote"], "fanta": r["fanta"], "events": r["events"]}  # noqa: E731
+    slim = lambda r: {"player_id": r["player_id"] if (r["public_ok"] or not public) else None, "name": name(r), "team_id": r["team_id"], "role": r["role"], "shirt_number": r["shirt_number"], "photo_url": r["photo_url"] if (r["public_ok"] or not public) else None, "vote": r["vote"], "fanta": r["fanta"], "events": r["events"]}  # noqa: E731
     podium = sorted(rows, key=lambda r: -r["fanta"])[:3]
     mvp = next((r for r in rows if "mvp" in r["badges"]), podium[0] if podium else None)
     earned = await scoped("badges", tournament_id).list({"match_id": m.id}, sort=[("scope", 1)], limit=500) if m.status in FINAL else []

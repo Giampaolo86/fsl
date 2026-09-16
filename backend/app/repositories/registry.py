@@ -1,6 +1,10 @@
 from ..models.domain import (
     AuditLog,
     Club,
+    ClubDocument,
+    Notification,
+    PaidMedia,
+    Purchase,
     Competition,
     ErrorReport,
     Field_,
@@ -43,6 +47,10 @@ SCOPED = {
     "badges": ("player_badges", PlayerBadge),
     "posts": ("posts", Post),
     "media": ("media_files", MediaFile),
+    "documents": ("club_documents", ClubDocument),
+    "notifications": ("notifications", Notification),
+    "paid_media": ("paid_media", PaidMedia),
+    "purchases": ("purchases", Purchase),
 }
 
 

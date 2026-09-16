@@ -20,6 +20,8 @@ import Audit from "@/pages/admin/Audit";
 import UsersPage from "@/pages/admin/Users";
 import ModulePlaceholder from "@/pages/admin/ModulePlaceholder";
 import BlogManager from "@/pages/admin/Blog";
+import Documents from "@/pages/club/Documents";
+import { PaymentCancel, PaymentSuccess, Sales } from "@/pages/Payments";
 import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
 import ClubDashboard from "@/pages/club/ClubDashboard";
 import { ClubModule, ClubTeams } from "@/pages/club/ClubModules";
@@ -52,6 +54,8 @@ function App() {
             <Toaster theme="dark" position="top-right" toastOptions={{ className: "bg-navy-800 border border-white/20 text-fsl-white" }} />
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/payment/success" element={<PaymentSuccess />} />
+              <Route path="/payment/cancel" element={<PaymentCancel />} />
               <Route path="/logout" element={<Logout />} />
 
               <Route element={<ProtectedRoute roles={ADMIN_ROLES}><AdminShell /></ProtectedRoute>}>
@@ -76,6 +80,8 @@ function App() {
                 <Route path="premi" element={<Awards />} />
                 <Route path="pagamenti" element={<Payments />} />
                 <Route path="media" element={<BlogManager />} />
+                <Route path="documenti" element={<Documents />} />
+                <Route path="vendite" element={<Sales />} />
                 <Route path="comunicazioni" element={<ModulePlaceholder module="comunicazioni" />} />
               </Route>
 
@@ -88,7 +94,8 @@ function App() {
                 <Route path="segnalazioni" element={<ClubReports />} />
                 <Route path="pagamenti" element={<Payments clubMode />} />
                 <Route path="blog" element={<BlogManager clubMode />} />
-                {["documenti", "profilo"].map((m) => (
+                <Route path="documenti" element={<Documents clubMode />} />
+                {["profilo"].map((m) => (
                   <Route key={m} path={m} element={<ClubModule module={m} />} />
                 ))}
               </Route>

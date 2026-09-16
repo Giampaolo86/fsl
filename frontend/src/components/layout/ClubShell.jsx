@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Bell, CalendarDays, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, LogOut, Newspaper, Shield, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, LogOut, Newspaper, Shield, Users } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { OfflineBanner } from "@/components/fsl/States";
+import { NotificationsBell } from "@/components/fsl/NotificationsBell";
 
 const CLUB_NAV = [
   ["Dashboard", "/societa", LayoutGrid],
@@ -29,9 +30,7 @@ export default function ClubShell() {
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden sm:inline text-fsl-slate" data-testid="club-shell-user">{user.full_name}</span>
-            <button className="h-11 w-11 rounded-md border border-white/20 inline-flex items-center justify-center" aria-label="Notifiche" data-testid="club-notifications-button">
-              <Bell className="h-4 w-4" />
-            </button>
+            <NotificationsBell />
             <button onClick={logout} className="btn-ghost h-11" data-testid="logout-button">
               <LogOut className="h-4 w-4" aria-hidden="true" /> <span className="hidden sm:inline">Esci</span>
             </button>

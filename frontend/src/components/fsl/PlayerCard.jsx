@@ -5,6 +5,7 @@ import { BadgeChips } from "@/components/fsl/BadgeChips";
 import { ROLE_TONE, fmtVote } from "@/lib/fanta";
 import { apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
+import { mediaUrl } from "@/lib/upload";
 
 export function PlayerCardDialog({ playerId, onClose, fetcher }) {
   const [card, setCard] = useState(null);
@@ -17,7 +18,7 @@ export function PlayerCardDialog({ playerId, onClose, fetcher }) {
       <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl max-w-lg max-h-[85vh] overflow-y-auto" data-testid="player-card-dialog">
         <DialogHeader>
           <DialogTitle className="font-display uppercase flex items-center gap-3">
-            {card && <span className={`h-9 w-9 rounded-full inline-flex items-center justify-center text-[10px] font-bold uppercase ${ROLE_TONE[card.role_code] || "bg-navy-700"}`}>{card.role_code || "—"}</span>}
+            {card && (card.photo_url ? <img src={mediaUrl(card.photo_url)} alt="" className="h-12 w-12 rounded-full object-cover border border-fsl-gold/50" data-testid="player-card-photo" /> : <span className={`h-9 w-9 rounded-full inline-flex items-center justify-center text-[10px] font-bold uppercase ${ROLE_TONE[card.role_code] || "bg-navy-700"}`}>{card.role_code || "—"}</span>)}
             <span data-testid="player-card-name">{card ? <><span className="num text-fsl-gold mr-2">{card.shirt_number ?? ""}</span>{card.name}</> : "Scheda giocatore"}</span>
           </DialogTitle>
           <DialogDescription className="text-fsl-slate">{card ? `${card.team}${card.birth_year ? ` · ${card.birth_year}` : ""} · statistiche da gare ufficiali` : error ? apiError(error) : "Caricamento…"}</DialogDescription>

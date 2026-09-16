@@ -243,8 +243,8 @@ async def match_story(tournament_id: str, match_id: str, user: CurrentUser = Dep
 @router.post("/media/uploads", status_code=201)
 async def upload_init(tournament_id: str, body: UploadInit, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user, roles=EDITORS, writable=True)
-    if not (body.content_type.startswith("image/") or body.content_type.startswith("video/")):
-        raise bad_request("Sono ammessi solo immagini e video")
+    if not (body.content_type.startswith("image/") or body.content_type.startswith("video/") or body.content_type == "application/pdf"):
+        raise bad_request("Sono ammessi solo immagini, video e PDF")
     if body.size > MAX_BYTES:
         raise bad_request("File troppo grande (max 300 MB)")
     TMP.mkdir(parents=True, exist_ok=True)

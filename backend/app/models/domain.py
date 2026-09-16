@@ -287,6 +287,61 @@ class MediaFile(BaseDocument):
     club_id: Optional[str] = None
 
 
+class ClubDocument(BaseDocument):
+    tournament_id: str
+    club_id: str
+    player_id: Optional[str] = None
+    kind: str = "altro"
+    title: str
+    media_id: Optional[str] = None
+    file_url: Optional[str] = None
+    expires_at: Optional[str] = None
+    verification: Literal["pending", "verified", "rejected"] = "pending"
+    note: str = ""
+    version: int = 1
+    replaces_id: Optional[str] = None
+
+
+class Notification(BaseDocument):
+    tournament_id: str
+    club_id: str
+    kind: str = "info"
+    title: str
+    body: str = ""
+    link: Optional[str] = None
+    read: bool = False
+    dedupe_key: Optional[str] = None
+
+
+class PaidMedia(BaseDocument):
+    tournament_id: str
+    match_id: str
+    kind: Literal["video", "photo"] = "photo"
+    title: str
+    media_id: str
+    preview_media_id: Optional[str] = None
+    lookup_key: str
+    price_cents: int
+    currency: str = "eur"
+    club_ids: list[str] = []
+    active: bool = True
+    sold: int = 0
+
+
+class Purchase(BaseDocument):
+    tournament_id: str
+    item_id: str
+    session_id: str
+    lookup_key: str
+    amount: float
+    currency: str = "eur"
+    status: str = "initiated"
+    payment_status: str = "pending"
+    stripe_payment_intent_id: Optional[str] = None
+    download_token: str
+    buyer_email: Optional[str] = None
+
+
 class Post(BaseDocument):
     tournament_id: str
     kind: Literal["news", "interview", "gallery", "video", "match_story", "badge"] = "news"

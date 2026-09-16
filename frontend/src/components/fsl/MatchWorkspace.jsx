@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, ClipboardList, History, RotateCcw, Save, Send, Share2, Users } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, ClipboardList, History, RotateCcw, Save, Send, Share2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { MatchSheet } from "@/components/fsl/MatchSheet";
@@ -9,6 +9,7 @@ import { MatchStatusBadge, kickoffLabel } from "@/components/fsl/MatchCard";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
 import { ReasonDialog } from "@/components/fsl/ReasonDialog";
 import { SocialCard } from "@/components/fsl/SocialCard";
+import { ShopManager } from "@/components/fsl/Shop";
 import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -51,6 +52,7 @@ export default function MatchWorkspace({ tournamentId: tidProp, compact = false 
   if (error) return <ErrorState message={apiError(error)} onRetry={load} />;
   if (!m) return <LoadingState />;
   const isRef = user.role === "referee" && !user.is_super_admin;
+  const isStaff = user.is_super_admin || ["director", "secretary"].includes(user.role);
   const isFinal = FINAL.includes(m.status);
   const live = scoreFromStats(sheet.stats, callups);
   const shown = isFinal || m.status === "report_submitted" ? m.score : live;
@@ -93,7 +95,7 @@ export default function MatchWorkspace({ tournamentId: tidProp, compact = false 
         )}
       </section>
 
-      <div className="grid grid-cols-3 gap-1 fsl-card p-1" role="tablist">{[["sheet", "Tabellino", ClipboardList], ["social", "Social", Share2], ["history", "Storia", History]].map(([k, l, Icon]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`h-11 rounded-md text-xs font-semibold uppercase inline-flex items-center justify-center gap-1.5 ${tab === k ? "bg-fsl-blue" : "text-fsl-slate hover:text-fsl-white"}`} data-testid={`tab-${k}`}><Icon className="h-4 w-4" />{l}</button>)}</div>
+      <div className={`grid ${isStaff ? "grid-cols-4" : "grid-cols-3"} gap-1 fsl-card p-1`} role="tablist">{[["sheet", "Tabellino", ClipboardList], ["social", "Social", Share2], ...(isStaff ? [["media", "Foto/Video", Camera]] : []), ["history", "Storia", History]].map(([k, l, Icon]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`h-11 rounded-md text-xs font-semibold uppercase inline-flex items-center justify-center gap-1.5 ${tab === k ? "bg-fsl-blue" : "text-fsl-slate hover:text-fsl-white"}`} data-testid={`tab-${k}`}><Icon className="h-4 w-4" />{l}</button>)}</div>
 
       {tab === "sheet" && (
         <div className="space-y-3">
@@ -125,6 +127,8 @@ export default function MatchWorkspace({ tournamentId: tidProp, compact = false 
           {mode === "gara" && !m.can_fill_sheet && <div className="rounded-md bg-navy-700/50 border border-white/10 p-3 text-xs text-fsl-slate flex items-center gap-2" data-testid="sheet-locked"><CheckCircle2 className="h-4 w-4 text-fsl-success" /> {m.status === "report_submitted" ? "Gara inviata: in attesa di pubblicazione del Direttore." : isFinal ? "Risultato ufficiale: modificabile solo dal Direttore." : "Il tabellino è compilato da arbitro o Direttore."}</div>}
         </div>
       )}
+
+      {tab === "media" && isStaff && <ShopManager tournamentId={tid} matchId={matchId} />}
 
       {tab === "social" && <SocialCard url={`/tournaments/${tid}/matches/${matchId}/social`} version={`${m.status}-${m.version}`} />}
 

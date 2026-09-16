@@ -3,6 +3,7 @@ import { Download, RefreshCw, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { fmtVote } from "@/lib/fanta";
+import { mediaUrl } from "@/lib/upload";
 
 const W = 1080, H = 1350;
 const NAVY = "#041E32", GOLD = "#F4AE2B", WHITE = "#F5F7FA", SLATE = "#9AA8B8";
@@ -18,7 +19,7 @@ function roundRect(ctx, x, y, w, h, r, fill) {
   ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill();
 }
 
-export function drawSocial(ctx, d) {
+export function drawSocial(ctx, d, mvpImg = null) {
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = NAVY; ctx.fillRect(0, 0, W, H);
   ctx.save(); ctx.globalAlpha = 0.9;
@@ -44,8 +45,9 @@ export function drawSocial(ctx, d) {
     roundRect(ctx, 60, y, W - 120, 190, 24, "rgba(255,255,255,0.06)");
     ctx.fillStyle = GOLD; ctx.fillRect(60, y, 12, 190);
     ctx.font = font(700, 30); ctx.fillStyle = GOLD; ctx.fillText("MVP DELLA PARTITA", 100, y + 28);
-    ctx.font = font(800, 72); ctx.fillStyle = WHITE; ctx.fillText(fit(ctx, d.mvp.name.toUpperCase(), 640), 100, y + 70);
+    ctx.font = font(800, 72); ctx.fillStyle = WHITE; ctx.fillText(fit(ctx, d.mvp.name.toUpperCase(), mvpImg ? 480 : 640), 100, y + 70);
     ctx.font = font(500, 26, "Inter, Arial, sans-serif"); ctx.fillStyle = SLATE; ctx.fillText(`${d.mvp.role} · ${d.mvp.team_id === d.home.id ? d.home.name : d.away.name}`, 100, y + 148);
+    if (mvpImg) { ctx.save(); ctx.beginPath(); ctx.arc(665, y + 95, 62, 0, Math.PI * 2); ctx.closePath(); ctx.clip(); ctx.drawImage(mvpImg, 603, y + 33, 124, 124); ctx.restore(); ctx.strokeStyle = GOLD; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(665, y + 95, 62, 0, Math.PI * 2); ctx.stroke(); }
     ctx.textAlign = "right"; ctx.font = font(800, 120); ctx.fillStyle = "#4C8DFF"; ctx.fillText(fmtVote(d.mvp.fanta), W - 100, y + 40);
     ctx.textAlign = "left"; y += 230;
   }
@@ -85,8 +87,10 @@ export function SocialCard({ url, version }) {
   useEffect(() => {
     if (!data || !canvas.current) return;
     const ctx = canvas.current.getContext("2d");
-    const paint = () => drawSocial(ctx, data);
-    if (document.fonts?.load) Promise.all([document.fonts.load('800 100px "Barlow Condensed"'), document.fonts.load('500 20px Inter')]).then(paint, paint); else paint();
+    const paint = (img) => drawSocial(ctx, data, img);
+    const withPhoto = () => new Promise((res) => { if (!data.mvp?.photo_url) return res(null); const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => res(img); img.onerror = () => res(null); img.src = mediaUrl(data.mvp.photo_url); });
+    const fonts = document.fonts?.load ? Promise.all([document.fonts.load('800 100px "Barlow Condensed"'), document.fonts.load('500 20px Inter')]).catch(() => null) : Promise.resolve();
+    Promise.all([fonts, withPhoto()]).then(([, img]) => paint(img));
   }, [data]);
   const blob = () => new Promise((res) => canvas.current.toBlob(res, "image/png"));
   const fileName = () => `fsl-${(data.home.short_name || "casa").toLowerCase()}-${(data.away.short_name || "ospite").toLowerCase()}.png`;

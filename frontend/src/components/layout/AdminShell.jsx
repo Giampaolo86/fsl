@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useParams } from "react-router-dom";
-import { Archive, Award, BarChart3, Calendar, ClipboardList, CreditCard, FileText, Grid3X3, Image, LayoutGrid, LogOut, Menu, Phone, Settings, Shield, Ticket, Trophy, Users, UserCog, X } from "lucide-react";
+import { Archive, Award, BarChart3, Calendar, ClipboardList, CreditCard, FileText, Grid3X3, Image, LayoutGrid, LogOut, Menu, Phone, Settings, Shield, ShoppingBag, Ticket, Trophy, UserCog, Users, X } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { TournamentSwitcher } from "@/components/fsl/TournamentSwitcher";
 import { OfflineBanner } from "@/components/fsl/States";
@@ -29,6 +29,8 @@ const TOURNAMENT_NAV = (id) => [
   { to: `/admin/t/${id}/comunicazioni`, label: "Contatti", icon: Phone },
   { to: `/admin/t/${id}/ticket`, label: "Ticket", icon: Ticket },
   { to: `/admin/t/${id}/media`, label: "Blog e interviste", icon: Image },
+  { to: `/admin/t/${id}/documenti`, label: "Documenti", icon: FileText },
+  { to: `/admin/t/${id}/vendite`, label: "Vendite", icon: ShoppingBag },
   { to: `/admin/t/${id}/audit`, label: "Audit", icon: Archive },
 ];
 
