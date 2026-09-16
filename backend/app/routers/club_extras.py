@@ -240,12 +240,12 @@ class PaidMediaIn(BaseModel):
     media_id: str
 
 
-def _blur_preview(data: bytes) -> bytes:
+def _blur_preview(data: bytes, radius: int = 14) -> bytes:
     from PIL import Image, ImageDraw, ImageFilter
 
     img = Image.open(io.BytesIO(data)).convert("RGB")
     img.thumbnail((640, 640))
-    img = img.filter(ImageFilter.GaussianBlur(14))
+    img = img.filter(ImageFilter.GaussianBlur(radius))
     draw = ImageDraw.Draw(img)
     w, h = img.size
     for y in range(0, h, 90):
@@ -253,6 +253,42 @@ def _blur_preview(data: bytes) -> bytes:
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=70)
     return buf.getvalue()
+
+
+def _video_frame(data: bytes, ext: str = "mp4") -> Optional[bytes]:
+    import subprocess
+    import tempfile
+
+    import imageio_ffmpeg
+
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    with tempfile.TemporaryDirectory() as tmp:
+        src = os.path.join(tmp, f"in.{ext}")
+        out = os.path.join(tmp, "frame.jpg")
+        with open(src, "wb") as fh:
+            fh.write(data)
+        for ts in ("00:00:02", "00:00:00.5"):
+            r = subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", ts, "-i", src, "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", out], capture_output=True, timeout=60)
+            if r.returncode == 0 and os.path.exists(out) and os.path.getsize(out) > 0:
+                with open(out, "rb") as fh:
+                    return fh.read()
+    return None
+
+
+async def _make_preview(t_id: str, kind: str, media: MediaFile, user_id: str) -> Optional[str]:
+    data, _ = await storage.get_object(media.storage_path)
+    if kind == "photo" and media.kind == "image":
+        img = _blur_preview(data)
+    elif kind == "video":
+        ext = media.original_filename.rsplit(".", 1)[-1].lower() if "." in media.original_filename else "mp4"
+        frame = _video_frame(data, ext)
+        if not frame:
+            return None
+        img = _blur_preview(frame, radius=5)
+    else:
+        return None
+    pv = await _store(t_id, img, "image/jpeg", "preview.jpg", user_id)
+    return pv.id
 
 
 async def _items_out(t_id: str, items: list[PaidMedia]) -> list[dict]:
@@ -275,11 +311,7 @@ async def create_item(tournament_id: str, body: PaidMediaIn, user: CurrentUser =
     media = await scoped("media", tournament_id).get(body.media_id)
     if not m or not media:
         raise not_found("Partita o file")
-    preview_id = None
-    if body.kind == "photo" and media.kind == "image":
-        data, _ = await storage.get_object(media.storage_path)
-        pv = await _store(tournament_id, _blur_preview(data), "image/jpeg", "preview.jpg", user.id)
-        preview_id = pv.id
+    preview_id = await _make_preview(tournament_id, body.kind, media, user.id)
     lookup, cents = PRICES[body.kind]
     teams = {tm.id: tm.club_id for tm in await scoped("teams", tournament_id).list({"_id": {"$in": [__import__("bson").ObjectId(m.home_team_id), __import__("bson").ObjectId(m.away_team_id)]}})}
     it = await scoped("paid_media", tournament_id).insert(PaidMedia(tournament_id=tournament_id, match_id=m.id, kind=body.kind, title=body.title.strip() or media.original_filename, media_id=media.id, preview_media_id=preview_id, lookup_key=lookup, price_cents=cents, club_ids=list(set(teams.values()))), user.id)
@@ -301,6 +333,23 @@ async def patch_item(tournament_id: str, item_id: str, body: dict, user: Current
     if not it:
         raise not_found("Contenuto")
     it2 = await repo.update(it.id, {k: v for k, v in body.items() if k in {"title", "active"}}, user.id)
+    return (await _items_out(tournament_id, [it2]))[0]
+
+
+@router.post("/shop/items/{item_id}/preview")
+async def regen_preview(tournament_id: str, item_id: str, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles=STAFF, writable=True)
+    repo = scoped("paid_media", tournament_id)
+    it = await repo.get(item_id)
+    if not it:
+        raise not_found("Contenuto")
+    media = await scoped("media", tournament_id).get(it.media_id)
+    if not media:
+        raise not_found("File originale")
+    pid = await _make_preview(tournament_id, it.kind, media, user.id)
+    if not pid:
+        raise bad_request("Impossibile estrarre un fotogramma dal video")
+    it2 = await repo.update(it.id, {"preview_media_id": pid}, user.id)
     return (await _items_out(tournament_id, [it2]))[0]
 
 
