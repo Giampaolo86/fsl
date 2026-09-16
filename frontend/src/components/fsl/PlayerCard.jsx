@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { ExternalLink } from "lucide-react";
+import { profileLink } from "@/pages/PlayerProfile";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badges, EventIcons } from "@/components/fsl/Ratings";
 import { BadgeChips } from "@/components/fsl/BadgeChips";
@@ -11,6 +14,8 @@ import { mediaUrl } from "@/lib/upload";
 export function PlayerCardDialog({ playerId, onClose, fetcher }) {
   const [card, setCard] = useState(null);
   const [error, setError] = useState(null);
+  const location = useLocation();
+  const full = playerId ? profileLink(location.pathname, playerId) : null;
   useEffect(() => { setCard(null); setError(null); if (playerId) fetcher(playerId).then((r) => setCard(r.data)).catch(setError); }, [playerId, fetcher]);
   const t = card?.totals || {};
   const tiles = [["Presenze", t.presences || 0], ["Gol", t.goal || 0], ["Assist", t.assist || 0], ["Media voto", fmtVote(card?.avg_vote)], ["Media fanta", fmtVote(card?.avg_fanta)], ["MVP", t.mvp || 0]];
@@ -22,7 +27,7 @@ export function PlayerCardDialog({ playerId, onClose, fetcher }) {
             {card && (card.photo_url ? <img src={mediaUrl(card.photo_url)} alt="" className="h-12 w-12 rounded-full object-cover border border-fsl-gold/50" data-testid="player-card-photo" /> : <span className={`h-9 w-9 rounded-full inline-flex items-center justify-center text-[10px] font-bold uppercase ${ROLE_TONE[card.role_code] || "bg-navy-700"}`}>{card.role_code || "—"}</span>)}
             <span data-testid="player-card-name">{card ? <><span className="num text-fsl-gold mr-2">{card.shirt_number ?? ""}</span>{card.name}</> : "Scheda giocatore"}</span>
           </DialogTitle>
-          {card?.public_ok && <div className="pt-1"><FavButton kind="players" id={card.player_id} label="Segui giocatore" small /></div>}
+          <div className="pt-1 flex flex-wrap items-center gap-2">{card?.public_ok && <FavButton kind="players" id={card.player_id} label="Segui giocatore" small />}{full && card && <Link to={full} onClick={onClose} className="btn-gold h-8 px-3 text-xs" data-testid="player-card-open-profile"><ExternalLink className="h-3.5 w-3.5" /> Scheda completa</Link>}</div>
           <DialogDescription className="text-fsl-slate">{card ? `${card.team}${card.birth_year ? ` · ${card.birth_year}` : ""} · statistiche da gare ufficiali` : error ? apiError(error) : "Caricamento…"}</DialogDescription>
         </DialogHeader>
         {card && (

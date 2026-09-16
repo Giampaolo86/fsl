@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Award, CreditCard, Plus, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, SectionTitle } from "@/components/fsl/Primitives";
@@ -17,7 +17,7 @@ const BADGE = { bomber: "Bomber", doppietta: "Doppietta", tripletta: "Tripletta"
 const SORTS = { mvp: ["MVP", (r) => -r.mvp, (r) => -(r.avg_fanta || 0)], avg_fanta: ["Media fantavoto", (r) => -(r.avg_fanta || 0)], goals: ["Gol", (r) => -r.goals], assists: ["Assist", (r) => -r.assists], badges: ["Badge", (r) => -Object.values(r.badges).reduce((a, b) => a + b, 0)], name: ["Nome", (r) => r.name.toLowerCase()], team: ["Squadra", (r) => r.team.toLowerCase(), (r) => r.name.toLowerCase()] };
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-export function AwardsBoard({ rows, testId = "awards-board" }) {
+export function AwardsBoard({ rows, testId = "awards-board", linkFor }) {
   const [sort, setSort] = useState("mvp");
   const [q, setQ] = useState("");
   const [team, setTeam] = useState("");
@@ -35,7 +35,7 @@ export function AwardsBoard({ rows, testId = "awards-board" }) {
       </div>
       <div className="fsl-card overflow-x-auto">
         <table className="w-full table-dark"><thead><tr><th>#</th><th>Giocatore</th><th>Ruolo</th><th className="text-right">MVP</th><th className="text-right">Media fantavoto</th><th className="text-right">Gol</th><th className="text-right">Assist</th><th>Badge</th></tr></thead>
-          <tbody>{view.map((r, i) => <tr key={r.player_id || `${r.name}-${r.team}`} data-testid={`award-row-${i}`}><td className="num font-display font-extrabold text-xl text-fsl-gold">{i + 1}</td><td><div className="font-semibold">{r.name}</div><div className="text-xs text-fsl-slate">{r.team}</div></td><td className="text-xs">{r.role}</td><td className="num text-right font-display font-extrabold text-2xl">{r.mvp}</td><td className="num text-right text-fsl-blue-light font-semibold">{r.avg_fanta ?? "–"}</td><td className="num text-right">{r.goals}</td><td className="num text-right">{r.assists}</td><td className="text-xs">{Object.entries(r.badges).map(([b, n]) => <span key={b} className="inline-flex h-6 px-2 mr-1 rounded-full border border-fsl-gold/40 items-center gap-1">{BADGE[b] || b} <span className="num text-fsl-gold">×{n}</span></span>)}</td></tr>)}</tbody></table>
+          <tbody>{view.map((r, i) => <tr key={r.player_id || `${r.name}-${r.team}`} data-testid={`award-row-${i}`}><td className="num font-display font-extrabold text-xl text-fsl-gold">{i + 1}</td><td>{linkFor && r.player_id ? <Link to={linkFor(r.player_id)} className="font-semibold hover:text-fsl-gold" data-testid={`award-player-${r.player_id}`}>{r.name}</Link> : <div className="font-semibold">{r.name}</div>}<div className="text-xs text-fsl-slate">{r.team}</div></td><td className="text-xs">{r.role}</td><td className="num text-right font-display font-extrabold text-2xl">{r.mvp}</td><td className="num text-right text-fsl-blue-light font-semibold">{r.avg_fanta ?? "–"}</td><td className="num text-right">{r.goals}</td><td className="num text-right">{r.assists}</td><td className="text-xs">{Object.entries(r.badges).map(([b, n]) => <span key={b} className="inline-flex h-6 px-2 mr-1 rounded-full border border-fsl-gold/40 items-center gap-1">{BADGE[b] || b} <span className="num text-fsl-gold">×{n}</span></span>)}</td></tr>)}</tbody></table>
         {view.length === 0 && <p className="p-6 text-center text-sm text-fsl-slate">Nessun giocatore corrisponde ai filtri.</p>}
       </div>
     </div>
@@ -69,7 +69,7 @@ export function Awards() {
   return (
     <div className="space-y-8">
       <PageHeader kicker="Pagelle, premi e nomination" title="Premi" subtitle="Classifica MVP e badge calcolati dalle pagelle stile fantacalcio delle gare ufficiali." />
-      <AwardsBoard rows={rows} />
+      <AwardsBoard rows={rows} linkFor={(pid) => `/admin/t/${tournamentId}/giocatori/${pid}`} />
       <BadgesAdmin tournamentId={tournamentId} canManage={user.is_super_admin || user.role === "director"} />
       {outcomes.length > 0 && <section><SectionTitle>Esiti stagione</SectionTitle><OutcomesList outcomes={outcomes} /></section>}
     </div>

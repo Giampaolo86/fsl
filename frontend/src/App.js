@@ -24,6 +24,7 @@ import Documents from "@/pages/club/Documents";
 import { PaymentCancel, PaymentSuccess, Sales } from "@/pages/Payments";
 import Register, { AuthCallback } from "@/pages/Register";
 import FanAccount from "@/pages/FanAccount";
+import PlayerProfile from "@/pages/PlayerProfile";
 import ClubHomeEditor from "@/pages/club/ClubHomeEditor";
 import PublicClubHome from "@/pages/public/PublicClubHome";
 import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
@@ -86,6 +87,7 @@ function AppRoutes() {
                 <Route path="competizioni" element={<Competitions />} />
                 <Route path="societa" element={<Clubs />} />
                 <Route path="societa/:clubId" element={<ClubHomeEditor adminMode />} />
+                <Route path="giocatori/:playerId" element={<PlayerProfile mode="admin" />} />
                 <Route path="campi" element={<Venues />} />
                 <Route path="audit" element={<Audit />} />
                 <Route path="calendario" element={<Matches />} />
@@ -114,6 +116,7 @@ function AppRoutes() {
                 <Route path="blog" element={<BlogManager clubMode />} />
                 <Route path="documenti" element={<Documents clubMode />} />
                 <Route path="profilo" element={<ClubHomeEditor />} />
+                <Route path="giocatori/:playerId" element={<PlayerProfile mode="club" />} />
                 {[].map((m) => (
                   <Route key={m} path={m} element={<ClubModule module={m} />} />
                 ))}
@@ -136,6 +139,7 @@ function AppRoutes() {
                 <Route index element={<TournamentHome />} />
                 <Route path="squadre" element={<PublicClubs />} />
                 <Route path="squadre/:clubSlug" element={<PublicClubHome />} />
+                <Route path="giocatori/:playerId" element={<PlayerProfile mode="public" />} />
                 <Route path="classifiche" element={<PublicStandingsLive />} />
                 <Route path="regolamento" element={<PublicRules />} />
                 <Route path="partite" element={<PublicMatches />} />

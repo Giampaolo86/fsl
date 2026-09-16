@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { profileLink } from "@/pages/PlayerProfile";
 import { Plus, Ticket, Users } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
@@ -64,6 +65,7 @@ export function Tickets() {
 
 export function Rosters({ clubMode = false }) {
   const params = useParams();
+  const location = useLocation();
   const { user } = useAuth();
   const membership = user.memberships.find((m) => m.role === "club_manager");
   const tid = clubMode ? membership?.tournament_id : params.tournamentId;
@@ -93,7 +95,7 @@ export function Rosters({ clubMode = false }) {
       {clubMode ? <RosterImportClub tid={tid} teamId={teamId} /> : <RosterImportAdmin tid={tid} onImported={() => api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data))} />}
       {!players ? <LoadingState /> : players.length === 0 ? <EmptyState icon={Users} title="Rosa vuota" description="Aggiungi i giocatori per abilitare convocazioni ed eventi." /> : (
         <div className="fsl-card overflow-x-auto"><table className="w-full table-dark" data-testid="roster-table"><thead><tr><th>N.</th><th>Foto</th><th>Giocatore</th><th>Ruolo</th><th>Anno</th><th>Badge</th><th>Stato</th><th>Consenso immagine</th></tr></thead><tbody>
-          {players.map((p) => <tr key={p.id} data-testid={`player-row-${p.id}`}><td className="num font-display font-bold text-lg text-fsl-gold">{p.shirt_number ?? "–"}</td><td><label className="relative h-10 w-10 rounded-full overflow-hidden border border-white/20 bg-navy-700 inline-flex items-center justify-center cursor-pointer hover:border-fsl-gold/70 group" title="Carica foto">{p.photo_url ? <img src={mediaUrl(p.photo_url)} alt="" className="h-full w-full object-cover" /> : <span className="text-[10px] font-bold text-fsl-slate">{p.first_name[0]}{p.last_name[0]}</span>}<input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files[0] && uploadPhoto(p, e.target.files[0])} data-testid={`photo-input-${p.id}`} /></label></td><td className="font-semibold"><button onClick={() => setOpenPlayer(p.id)} className="hover:text-fsl-gold transition-colors text-left" data-testid={`open-player-${p.id}`}>{p.first_name} {p.last_name}</button></td><td className="text-fsl-slate">{p.role}</td><td className="num text-fsl-slate">{p.birth_year ?? "—"}</td><td><BadgeChips list={badges[p.id] || []} max={4} /></td><td className="text-xs"><span className={p.status === "active" ? "text-fsl-success" : "text-fsl-warning"}>● {p.status === "active" ? "Idoneo" : p.status}</span></td>
+          {players.map((p) => <tr key={p.id} data-testid={`player-row-${p.id}`}><td className="num font-display font-bold text-lg text-fsl-gold">{p.shirt_number ?? "–"}</td><td><label className="relative h-10 w-10 rounded-full overflow-hidden border border-white/20 bg-navy-700 inline-flex items-center justify-center cursor-pointer hover:border-fsl-gold/70 group" title="Carica foto">{p.photo_url ? <img src={mediaUrl(p.photo_url)} alt="" className="h-full w-full object-cover" /> : <span className="text-[10px] font-bold text-fsl-slate">{p.first_name[0]}{p.last_name[0]}</span>}<input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files[0] && uploadPhoto(p, e.target.files[0])} data-testid={`photo-input-${p.id}`} /></label></td><td className="font-semibold"><button onClick={() => setOpenPlayer(p.id)} className="hover:text-fsl-gold transition-colors text-left" data-testid={`open-player-${p.id}`}>{p.first_name} {p.last_name}</button><Link to={profileLink(location.pathname, p.id) || "#"} className="ml-2 text-[10px] uppercase text-fsl-gold hover:underline" data-testid={`player-profile-link-${p.id}`}>Scheda</Link></td><td className="text-fsl-slate">{p.role}</td><td className="num text-fsl-slate">{p.birth_year ?? "—"}</td><td><BadgeChips list={badges[p.id] || []} max={4} /></td><td className="text-xs"><span className={p.status === "active" ? "text-fsl-success" : "text-fsl-warning"}>● {p.status === "active" ? "Idoneo" : p.status}</span></td>
             <td><button onClick={() => toggleConsent(p)} className={`h-8 px-3 rounded-full border text-xs font-semibold ${p.media_consent ? "border-fsl-success/50 text-fsl-success" : "border-white/20 text-fsl-slate"}`} data-testid={`consent-${p.id}`}>{p.media_consent ? "Pubblicabile" : "Privato"}</button></td></tr>)}
         </tbody></table></div>
       )}
