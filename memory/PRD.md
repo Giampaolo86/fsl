@@ -91,7 +91,14 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 ## Implementato (2026-06) – Iterazione 9
 - [x] Anteprima video shop: alla messa in vendita di un video il backend estrae un fotogramma (ffmpeg via `imageio-ffmpeg`, 2s con fallback 0,5s, in thread), lo sfoca leggermente e appone la filigrana → `preview_media_id`; vetrina pubblica (home, Match Center, homepage società) mostra il fotogramma; pulsante «Genera anteprima» (`POST /shop/items/{id}/preview`) per i video già in vendita senza miniatura. Test 7/7 (`test_iteration9.py`, `iteration_9.json`)
 
+## Implementato (2026-06) – Iterazione 10-12
+- [x] Flussi di accesso separati: `/account` dentro la PublicShell (genitore naviga liberamente; header con campanella, «I miei preferiti», «Esci»), nav hub senza tab inutili, `ProtectedRoute` reindirizza per ruolo (SA non entra più nell'area fan), Login ignora `from` incompatibile col ruolo; rimosso errore `<a>` annidato in FanAccount
+- [x] Sidebar Control Room: 220px, etichette complete, scrollbar sottile tematica (`fsl-scroll` + regole globali)
+- [x] Notifiche fan: motivo esplicito nel testo («segui SPO» / «con Luca»), nessun media antecedente alla registrazione; homepage società: contatore badge compatto nelle rose
+- [x] Scheda Giocatore (`pages/PlayerProfile.jsx`, rotte pubblica `/tornei/:slug/giocatori/:id`, admin `/admin/t/:tid/giocatori/:id`, società `/societa/giocatori/:id`): hero, «Mi presento» (altezza, peso, piede, soprannome, idolo, squadra del cuore, citazione), «Dicono di me», statistiche, badge, media taggati (post `player_ids` + shop `player_ids`), storico gare. Modifica (`PUT /players/{id}/profile`) per staff, società del giocatore e genitore abbinato via `guardian_emails` (impostabili solo da staff/società); `GET /me/children` + sezione «I miei bambini» in /account. Privacy: pubblico e altre società vedono solo la vista con consenso («Giocatore» senza foto/profilo). Nomi cliccabili: Premi, marcatori, Rose («Scheda»), popup «Scheda completa». Tag giocatori nel gestore foto/video shop. Test 12/12 (`test_iteration12.py`, `iteration_12.json`)
+
 ## Backlog prioritizzato
+- P1 Registrazione società: (a) invito con codice generato dall'admin → `/registrati-societa`; (b) richiesta libera con approvazione admin. Base attuale: creazione da Control Room → Utenti
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana
 - P1 (Fase 5): comunicazioni email/SMS (provider da scegliere), segnalazione pubblica con captcha, rimborsi Stripe da Control Room
 - P1 (Fase 6): sponsor, personalizzazione visiva società con approvazione, anteprima video (thumbnail) per lo shop, pacchetti foto scontati

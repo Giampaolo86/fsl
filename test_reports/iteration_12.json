@@ -1,0 +1,31 @@
+{
+  "summary": "Iteration 12 – Scheda Giocatore end-to-end. Backend 11/12 pytest passing (test_iteration12.py). All key flows verified: admin/guardian/club/public GETs; guardian PUT correctly ignores guardian_emails; /api/me/children returns Luca Mariani for guardian and [] for unlinked fan; public player without media_consent returns 200 with name='Giocatore', photo_url=null, profile={} (no more 404); shop item PATCH player_ids works and reflects in card media.shop; fan.reason notifications include reason '· segui SPO' and NO pre-registration TEST_iter5/Highlights test items. Frontend: public /tornei/../giocatori/:id renders player-profile-name/quote/presentation/media/history and NO edit for anon; guardian flow (fan.notifiche@test.it) → /account fan-children → fan-child-...7532 → profile page shows edit + 'Sei abbinato come genitore/tutore', dialog player-profile-editor without pp-guardians field, saving idol=Totti toasts 'Scheda aggiornata' and updates card, then restored to Barella; admin Premi shows award-player-{id} links; admin Rose shows player-profile-link-{id} per row, clicking name (open-player-{id}) opens player-card-dialog with player-card-open-profile which navigates to admin profile route; Match Center pagelle click on rating-row → same popup + open-profile OK; society homepage /squadre/sporting-eur uses club-player-badges-{id} compact counter with zero horizontal overflow.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/tournaments/{tid}/players/{pid}/card", "issue": "Club manager from a DIFFERENT club receives 200 with FULL private card (photo, profile, guardian_emails visible) instead of the expected 403. Root cause in /app/backend/app/routers/extras.py get_player_card(): the guard `if user.role_in(tournament_id) is None and not editor: raise forbidden()` lets any club_manager through even for players of other clubs, and player_card() is called with public=False so private data (real name, photo_url, full profile, guardian_emails at top level) is exposed. Review request explicitly required 403 for cross-club access.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration12.py", "/app/test_reports/pytest/iter12.xml"],
+  "action_items": [
+    "Fix cross-club privacy leak in extras.get_player_card: return 403 (or a minimal public payload) when the caller is a club_manager whose club_id != player.club_id and no other editor role applies. Guardian_emails top-level field should also be stripped from that response."
+  ],
+  "critical_code_review_comments": [
+    "extras.player_card returns guardian_emails at TOP LEVEL of the card payload (line 146). Any endpoint consumer with public=False sees full guardian_emails list. Consider moving to profile or restricting to staff/club-of-player only.",
+    "extras.get_player_card branch that overrides d['name']/d['photo_url']/d['profile'] for editor=='guardian' is fine, but similar override for cross-club club_manager is missing – hence the privacy leak.",
+    "PROFILE_FIELDS constant (line 149) is defined AFTER first use in player_card (line 145). Works because it is only evaluated when the function is called, but ordering is fragile; move constant above helper."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration12.py"],
+  "success_rate": {"backend": "92% (11/12)", "frontend": "100% (all reviewed testids present)"},
+  "test_credentials": "As per /app/memory/test_credentials.md - all worked.",
+  "seed_data_creation": "None (cleanup: reverted admin height_cm to 138, guardian idol to Barella, shop item player_ids to []).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Only remaining gap is backend cross-club card access (returns 200 with full data instead of 403). All other Scheda Giocatore features verified. Player 6aaa5ce2cfb606f5c0fb7532 (Luca Mariani, Sporting Eur 2014) is the canonical test player with guardian_emails=[fan.notifiche@test.it]. The public list of players hides pid for players without consent (null), use admin GET /api/tournaments/{tid}/players?limit=500 to find them. Match Center rating-row-* contains an 'open-player-{id}' child button that opens the player-card-dialog with player-card-open-profile CTA – reuse this pattern.",
+  "rca of the issue": "Cross-club card exposure: get_player_card() denies only when user.role_in(tid) is None AND not editor. Club managers always have role_in='club_manager' so they bypass the forbidden branch; can_edit_player returns None for other clubs; player_card is then invoked with public=False, returning full private payload. Fix: raise forbidden when editor is None and user is not staff (or downgrade to public projection)."
+}

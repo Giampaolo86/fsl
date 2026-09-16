@@ -166,9 +166,11 @@ async def get_player_card(tournament_id: str, player_id: str, user: CurrentUser 
     if not p:
         raise not_found("Giocatore")
     editor = await can_edit_player(user, tournament_id, p)
-    if user.role_in(tournament_id) is None and not editor:
+    role = user.role_in(tournament_id)
+    if role is None and not editor:
         raise forbidden()
-    d = await player_card(tournament_id, p, public=editor == "guardian" and user.role_in(tournament_id) is None)
+    limited = editor == "guardian" and role is None or (not editor and role not in STAFF)
+    d = await player_card(tournament_id, p, public=limited)
     if editor == "guardian":
         d["name"] = f"{p.first_name} {p.last_name}"
         d["photo_url"] = p.photo_url
