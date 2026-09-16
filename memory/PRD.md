@@ -43,6 +43,13 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] Area Arbitro mobile (gare assegnate → live → referto) e Area Società (calendario, convocazioni, rose, segnalazioni)
 - [x] Test: 36/36 engine + 26/26 base (backend), flussi frontend verificati (`/app/test_reports/iteration_2.json`)
 
+## Implementato (2026-06) – Iterazione 3
+- [x] Pagelle stile fantacalcio (voto 4–10, bonus/malus, fantavoto, badge MVP/Bomber/Assistman/Muro) per staff e arbitro; pubbliche nel Match Center (nomi solo con consenso); pagina Premi + sezione Premi nelle Statistiche pubbliche
+- [x] Esiti stagione: chiusura competizione (solo se tutte le gare ufficiali) con campione, promosse, retrocesse, playoff/playout; esiti pubblici
+- [x] Pagamenti a convocazione: quota `fees.callup_fee` per torneo, addebito automatico idempotente all'ufficializzazione, registrazione pagamenti con ricevuta RIC-YYYY-NNNN, saldi società (staff) e ledger società
+- [x] Cronaca live pubblica: punteggio live da eventi per gare in corso, Match Center con polling 5s e indicatore LIVE
+- [x] Orari torneo: fine giornata fino a sera, pausa opzionale (es. pranzo), preset Mattina/Pomeriggio/Giornata intera/Fino a sera
+
 ## Backlog prioritizzato
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana
 - P0 (Fase 4 residuo): pagelle/fantasy rating, premi e nomination, esiti stagione (promosse/retrocesse), grafiche post-partita (dalla v39)

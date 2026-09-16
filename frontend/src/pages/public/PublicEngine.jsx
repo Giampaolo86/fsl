@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { CalendarDays, Target } from "lucide-react";
+import { Award, CalendarDays, Target } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { MatchCard, MatchStatusBadge, kickoffLabel } from "@/components/fsl/MatchCard";
+import { RatingRow } from "@/components/fsl/Ratings";
+import { AwardsBoard, OutcomesList } from "@/pages/admin/Extras";
 import { PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { StandingsTable } from "@/components/fsl/StandingsTable";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
@@ -16,8 +18,9 @@ function useSlugData(path, params) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const key = JSON.stringify(params || {});
-  useEffect(() => { setData(null); api.get(`/public/tournaments/${slug}${path}`, { params }).then((r) => setData(r.data)).catch(setError); }, [slug, path, key]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { slug, data, error };
+  const reload = useCallback(() => api.get(`/public/tournaments/${slug}${path}`, { params }).then((r) => setData(r.data)).catch(setError), [slug, path, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setData(null); reload(); }, [reload]);
+  return { slug, data, error, reload };
 }
 
 export function PublicMatches() {
@@ -40,9 +43,15 @@ export function PublicMatches() {
 
 export function PublicMatchCenter() {
   const { matchId } = useParams();
-  const { slug, data: m, error } = useSlugData(`/matches/${matchId}`);
+  const { slug, data: m, error, reload } = useSlugData(`/matches/${matchId}`);
+  useEffect(() => {
+    if (!m || m.status !== "in_progress") return undefined;
+    const id = setInterval(reload, 5000);
+    return () => clearInterval(id);
+  }, [m, reload]);
   if (error) return <Wrap><ErrorState message={apiError(error)} /></Wrap>;
   if (!m) return <LoadingState full />;
+  const live = m.status === "in_progress";
   const hasScore = m.score.home !== null;
   const teamName = (id) => (id === m.home_team_id ? m.home.club?.name : m.away.club?.name);
   const LABEL = { goal: "Gol", own_goal: "Autogol", yellow_card: "Ammonizione", red_card: "Espulsione", substitution: "Sostituzione", injury: "Infortunio", mvp: "MVP" };
@@ -53,7 +62,7 @@ export function PublicMatchCenter() {
           <div className="flex items-center justify-between text-xs text-fsl-slate mb-4"><span className="fsl-kicker">{m.competition_name} · {m.round_name}</span><MatchStatusBadge status={m.status} label={m.display_status} /></div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
             <Link to={`/tornei/${slug}/squadre/${m.home.club?.slug}`} className="flex flex-col items-center text-center gap-3"><ClubCrest club={m.home.club} size={96} /><span className="font-display font-extrabold uppercase text-xl leading-none">{m.home.club?.name}</span></Link>
-            <div className="text-center"><div className="font-display font-extrabold text-6xl sm:text-8xl num leading-none" data-testid="match-center-score">{hasScore ? `${m.score.home} - ${m.score.away}` : m.kickoff_at.slice(11, 16)}</div><div className="text-xs uppercase tracking-wider text-fsl-gold mt-2">{m.display_status}</div></div>
+            <div className="text-center"><div className="font-display font-extrabold text-6xl sm:text-8xl num leading-none" data-testid="match-center-score">{hasScore ? `${m.score.home} - ${m.score.away}` : m.kickoff_at.slice(11, 16)}</div><div className={`text-xs uppercase tracking-wider mt-2 inline-flex items-center gap-2 ${live ? "text-fsl-danger" : "text-fsl-gold"}`} data-testid="match-center-status">{live && <span className="h-2 w-2 rounded-full bg-fsl-danger animate-pulse" />}{live ? "Live · aggiornamento automatico" : m.display_status}</div></div>
             <Link to={`/tornei/${slug}/squadre/${m.away.club?.slug}`} className="flex flex-col items-center text-center gap-3"><ClubCrest club={m.away.club} size={96} /><span className="font-display font-extrabold uppercase text-xl leading-none">{m.away.club?.name}</span></Link>
           </div>
           <div className="mt-6 flex flex-wrap justify-center gap-5 text-sm text-fsl-slate num"><span>{kickoffLabel(m.kickoff_at)}</span><span>{m.venue_name} · {m.field_name}</span>{m.referee_name && <span>Arbitro {m.referee_name}</span>}</div>
@@ -72,6 +81,15 @@ export function PublicMatchCenter() {
           </div>
           <div><SectionTitle>Classifica</SectionTitle>{m.standings.length > 0 ? <StandingsTable competition={{ name: m.competition_name, code: m.competition_id, zones: {} }} rows={m.standings} clubBase={`/tornei/${slug}/squadre`} /> : <p className="text-sm text-fsl-slate">Classifica non disponibile per la fase finale.</p>}</div>
         </div>
+        {m.ratings?.length > 0 && (
+          <section className="mt-8" data-testid="match-center-ratings">
+            <SectionTitle right={<span className="text-xs text-fsl-slate">Fantavoto = voto + bonus · MVP al miglior fantavoto</span>}>Pagelle</SectionTitle>
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="space-y-2">{m.ratings.filter((r) => r.side === "home").map((r, i) => <RatingRow key={i} r={r} />)}</div>
+              <div className="space-y-2">{m.ratings.filter((r) => r.side === "away").map((r, i) => <RatingRow key={i} r={r} right />)}</div>
+            </div>
+          </section>
+        )}
       </Wrap>
     </div>
   );
@@ -103,6 +121,8 @@ export function PublicStats() {
       <div className="grid grid-cols-3 gap-3 mb-8">{[[data.matches_official, "Gare ufficiali"], [data.goals, "Gol"], [data.avg_goals, "Media gol/gara"]].map(([v, l]) => <div key={l} className="fsl-card p-5"><div className="font-display font-extrabold text-4xl num">{v}</div><div className="text-[11px] uppercase tracking-wider text-fsl-slate">{l}</div></div>)}</div>
       <SectionTitle>Marcatori</SectionTitle>
       {data.top_scorers.length === 0 ? <EmptyState icon={Target} title="Nessun marcatore" description="La classifica marcatori si popola con i gol delle gare ufficiali." /> : <div className="fsl-card divide-y divide-white/[0.06]" data-testid="public-top-scorers">{data.top_scorers.map((s, i) => <div key={i} className="flex items-center gap-4 px-4 h-14"><span className="num font-display font-extrabold text-2xl text-fsl-gold w-8">{i + 1}</span><div className="flex-1"><div className="font-semibold">{s.name}</div><div className="text-xs text-fsl-slate">{s.team}</div></div><span className="num font-display font-extrabold text-3xl">{s.goals}</span></div>)}</div>}
+      <div className="mt-10"><SectionTitle right={<span className="text-xs text-fsl-slate inline-flex items-center gap-1"><Award className="h-4 w-4 text-fsl-gold" /> Dalle pagelle delle gare ufficiali</span>}>Premi e MVP</SectionTitle><AwardsBoard rows={data.awards} testId="public-awards" /></div>
+      {data.outcomes?.length > 0 && <div className="mt-10"><SectionTitle>Esiti stagione</SectionTitle><OutcomesList outcomes={data.outcomes} testId="public-outcomes" /></div>}
     </Wrap>
   );
 }

@@ -42,6 +42,12 @@ async def _public_matches(t_id: str, ms) -> list[dict]:
         d.pop("referee_user_id", None)
         if d["status"] in ("in_progress", "finished", "report_submitted", "under_review"):
             d["display_status"] = "Fine gara - in verifica" if d["status"] != "in_progress" else "In corso"
+            if d["status"] == "in_progress":
+                from ..routers.matches import score_from_events
+
+                m_obj = next(x for x in ms if x.id == d["id"])
+                h, a = score_from_events(m_obj)
+                d["score"] = {"home": h, "away": a, "home_pen": None, "away_pen": None}
         elif pub:
             d["display_status"] = "Ufficiale" if d["status"] == "official" else "Rettificato"
         else:
