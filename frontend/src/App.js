@@ -71,7 +71,6 @@ function AppRoutes() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/registrati" element={<Register />} />
-              <Route path="/account" element={<ProtectedRoute roles={["fan"]}><FanAccount /></ProtectedRoute>} />
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/payment/cancel" element={<PaymentCancel />} />
               <Route path="/logout" element={<Logout />} />
@@ -131,6 +130,7 @@ function AppRoutes() {
               <Route element={<PublicShell />}>
                 <Route path="/" element={<PublicHub />} />
                 <Route path="/tornei" element={<PublicHub />} />
+                <Route path="/account" element={<ProtectedRoute roles={["fan"]}><FanAccount /></ProtectedRoute>} />
               </Route>
               <Route path="/tornei/:slug" element={<PublicShell />}>
                 <Route index element={<TournamentHome />} />

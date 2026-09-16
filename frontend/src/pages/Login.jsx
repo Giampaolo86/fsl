@@ -5,6 +5,7 @@ import { Logo } from "@/components/fsl/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { GoogleButton } from "@/components/fsl/GoogleButton";
 import { apiError } from "@/lib/api";
+import { isPathAllowed } from "@/routes/ProtectedRoute";
 
 const HERO = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?crop=entropy&cs=srgb&fm=jpg&q=80&w=1800";
 
@@ -18,7 +19,8 @@ export default function Login() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (user) return <Navigate to={location.state?.from || landing} replace />;
+  const target = (u, fallback) => { const from = location.state?.from; return from && from !== "/login" && from !== "/registrati" && isPathAllowed(u, from) ? from : fallback; };
+  if (user) return <Navigate to={target(user, landing)} replace />;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -26,7 +28,7 @@ export default function Login() {
     setError("");
     try {
       const data = await login(email, password);
-      navigate(location.state?.from || data.landing, { replace: true });
+      navigate(target(data.user, data.landing), { replace: true });
     } catch (err) {
       setError(apiError(err));
     } finally {
