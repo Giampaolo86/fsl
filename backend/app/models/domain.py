@@ -342,6 +342,25 @@ class Purchase(BaseDocument):
     buyer_email: Optional[str] = None
 
 
+class RosterImport(BaseDocument):
+    tournament_id: str
+    club_id: str
+    team_id: str
+    media_id: Optional[str] = None
+    file_url: Optional[str] = None
+    filename: str = ""
+    team_name: str = ""
+    coach: str = ""
+    contact: str = ""
+    phone: str = ""
+    rows: list[dict] = []
+    status: Literal["submitted", "approved", "rejected"] = "submitted"
+    note: str = ""
+    submitted_by: Optional[str] = None
+    reviewed_by: Optional[str] = None
+    imported_count: int = 0
+
+
 class Post(BaseDocument):
     tournament_id: str
     kind: Literal["news", "interview", "gallery", "video", "match_story", "badge"] = "news"

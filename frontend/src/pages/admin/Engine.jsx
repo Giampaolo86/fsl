@@ -12,6 +12,7 @@ import { api, apiError } from "@/lib/api";
 import { PlayerCardDialog } from "@/components/fsl/PlayerCard";
 import { BadgeChips } from "@/components/fsl/BadgeChips";
 import { mediaUrl } from "@/lib/upload";
+import { RosterImportAdmin, RosterImportClub } from "@/components/fsl/RosterImport";
 import { fmtDate } from "@/lib/format";
 
 export function Standings() {
@@ -89,6 +90,7 @@ export function Rosters({ clubMode = false }) {
   return (
     <div>
       <PageHeader kicker="Rose, documenti e idoneità" title="Rose" subtitle="Anagrafica privata (anno di nascita mai pubblico). Nome e foto compaiono sul sito solo con consenso immagine attivo." actions={<><select className="fsl-input w-64" value={teamId} onChange={(e) => setTeamId(e.target.value)} data-testid="roster-team-select">{teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}</select>{teamId && <button className="btn-primary" onClick={() => setOpen(true)} data-testid="roster-add-button"><Plus className="h-4 w-4" /> Giocatore</button>}</>} />
+      {clubMode ? <RosterImportClub tid={tid} teamId={teamId} /> : <RosterImportAdmin tid={tid} onImported={() => api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data))} />}
       {!players ? <LoadingState /> : players.length === 0 ? <EmptyState icon={Users} title="Rosa vuota" description="Aggiungi i giocatori per abilitare convocazioni ed eventi." /> : (
         <div className="fsl-card overflow-x-auto"><table className="w-full table-dark" data-testid="roster-table"><thead><tr><th>N.</th><th>Foto</th><th>Giocatore</th><th>Ruolo</th><th>Anno</th><th>Badge</th><th>Stato</th><th>Consenso immagine</th></tr></thead><tbody>
           {players.map((p) => <tr key={p.id} data-testid={`player-row-${p.id}`}><td className="num font-display font-bold text-lg text-fsl-gold">{p.shirt_number ?? "–"}</td><td><label className="relative h-10 w-10 rounded-full overflow-hidden border border-white/20 bg-navy-700 inline-flex items-center justify-center cursor-pointer hover:border-fsl-gold/70 group" title="Carica foto">{p.photo_url ? <img src={mediaUrl(p.photo_url)} alt="" className="h-full w-full object-cover" /> : <span className="text-[10px] font-bold text-fsl-slate">{p.first_name[0]}{p.last_name[0]}</span>}<input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files[0] && uploadPhoto(p, e.target.files[0])} data-testid={`photo-input-${p.id}`} /></label></td><td className="font-semibold"><button onClick={() => setOpenPlayer(p.id)} className="hover:text-fsl-gold transition-colors text-left" data-testid={`open-player-${p.id}`}>{p.first_name} {p.last_name}</button></td><td className="text-fsl-slate">{p.role}</td><td className="num text-fsl-slate">{p.birth_year ?? "—"}</td><td><BadgeChips list={badges[p.id] || []} max={4} /></td><td className="text-xs"><span className={p.status === "active" ? "text-fsl-success" : "text-fsl-warning"}>● {p.status === "active" ? "Idoneo" : p.status}</span></td>
