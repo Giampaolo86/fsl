@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badges, EventIcons } from "@/components/fsl/Ratings";
 import { BadgeChips } from "@/components/fsl/BadgeChips";
+import { FavButton } from "@/components/fsl/FavButton";
 import { ROLE_TONE, fmtVote } from "@/lib/fanta";
 import { apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -21,6 +22,7 @@ export function PlayerCardDialog({ playerId, onClose, fetcher }) {
             {card && (card.photo_url ? <img src={mediaUrl(card.photo_url)} alt="" className="h-12 w-12 rounded-full object-cover border border-fsl-gold/50" data-testid="player-card-photo" /> : <span className={`h-9 w-9 rounded-full inline-flex items-center justify-center text-[10px] font-bold uppercase ${ROLE_TONE[card.role_code] || "bg-navy-700"}`}>{card.role_code || "—"}</span>)}
             <span data-testid="player-card-name">{card ? <><span className="num text-fsl-gold mr-2">{card.shirt_number ?? ""}</span>{card.name}</> : "Scheda giocatore"}</span>
           </DialogTitle>
+          {card?.public_ok && <div className="pt-1"><FavButton kind="players" id={card.player_id} label="Segui giocatore" small /></div>}
           <DialogDescription className="text-fsl-slate">{card ? `${card.team}${card.birth_year ? ` · ${card.birth_year}` : ""} · statistiche da gare ufficiali` : error ? apiError(error) : "Caricamento…"}</DialogDescription>
         </DialogHeader>
         {card && (

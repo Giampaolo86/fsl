@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from .base import BaseDocument
 
-Role = Literal["super_admin", "director", "secretary", "referee", "club_manager"]
+Role = Literal["super_admin", "director", "secretary", "referee", "club_manager", "fan"]
 TournamentStatus = Literal["draft", "active", "completed", "archived"]
 
 ROLE_LABELS = {
@@ -26,6 +26,9 @@ class User(BaseDocument):
     status: Literal["active", "disabled"] = "active"
     mfa_required: bool = False
     last_login_at: Optional[datetime] = None
+    picture: Optional[str] = None
+    auth_provider: str = "password"
+    favorites: dict = {"tournaments": [], "teams": [], "players": []}
 
 
 class TournamentMembership(BaseDocument):
@@ -248,6 +251,9 @@ class Club(BaseDocument):
     contacts: list[ClubContact] = []
     approval_status: Literal["approved", "pending_review", "rejected"] = "approved"
     founded_year: Optional[int] = None
+    profile: dict = {}
+    profile_draft: Optional[dict] = None
+    review_note: str = ""
 
 
 class Team(BaseDocument):
@@ -340,6 +346,7 @@ class Purchase(BaseDocument):
     stripe_payment_intent_id: Optional[str] = None
     download_token: str
     buyer_email: Optional[str] = None
+    buyer_user_id: Optional[str] = None
 
 
 class RosterImport(BaseDocument):

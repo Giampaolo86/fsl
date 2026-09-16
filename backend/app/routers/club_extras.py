@@ -338,7 +338,10 @@ async def _find_item(item_id: str):
 
 
 @pay_router.post("/payments/checkout")
-async def checkout(body: CheckoutIn):
+async def checkout(body: CheckoutIn, request: Request):
+    from .fans import optional_user
+
+    buyer = await optional_user(request)
     it = await _find_item(body.item_id)
     if not it or not it.active:
         raise not_found("Contenuto")
@@ -355,13 +358,13 @@ async def checkout(body: CheckoutIn):
             session = stripe.checkout.Session.create(**kwargs, automatic_tax={"enabled": True}, billing_address_collection="required")
         else:
             raise
-    await scoped("purchases", it.tournament_id).insert(Purchase(tournament_id=it.tournament_id, item_id=it.id, session_id=session.id, lookup_key=it.lookup_key, amount=(price.unit_amount or 0) / 100, currency=price.currency, download_token=secrets.token_urlsafe(24)))
+    await scoped("purchases", it.tournament_id).insert(Purchase(tournament_id=it.tournament_id, item_id=it.id, session_id=session.id, lookup_key=it.lookup_key, amount=(price.unit_amount or 0) / 100, currency=price.currency, download_token=secrets.token_urlsafe(24), buyer_user_id=buyer.id if buyer else None, buyer_email=buyer.email if buyer else None))
     return {"checkout_url": session.url, "session_id": session.id}
 
 
 async def _mark_paid(p: Purchase, pi=None, email=None):
     repo = Repository("purchases", Purchase)
-    res = await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id), "payment_status": {"$ne": "paid"}}, {"$set": {"status": "completed", "payment_status": "paid", "stripe_payment_intent_id": pi, "buyer_email": email, "updated_at": datetime.now(timezone.utc)}})
+    res = await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id), "payment_status": {"$ne": "paid"}}, {"$set": {"status": "completed", "payment_status": "paid", "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": datetime.now(timezone.utc)}})
     if res.modified_count:
         await Repository("paid_media", PaidMedia).col.update_one({"_id": __import__("bson").ObjectId(p.item_id)}, {"$inc": {"sold": 1}})
 

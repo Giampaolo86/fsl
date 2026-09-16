@@ -19,6 +19,8 @@ class CurrentUser:
     role: str
     is_super_admin: bool
     memberships: list = field(default_factory=list)
+    picture: Optional[str] = None
+    favorites: dict = field(default_factory=lambda: {"tournaments": [], "teams": [], "players": []})
 
     def role_in(self, tournament_id: str) -> Optional[str]:
         if self.is_super_admin:
@@ -45,6 +47,8 @@ class CurrentUser:
             "role": self.role,
             "is_super_admin": self.is_super_admin,
             "memberships": self.memberships,
+            "picture": self.picture,
+            "favorites": self.favorites,
         }
 
 
@@ -57,6 +61,8 @@ async def load_current_user(user_id: str) -> Optional[CurrentUser]:
         id=user.id,
         email=user.email,
         full_name=user.full_name,
+        picture=user.picture,
+        favorites=user.favorites or {"tournaments": [], "teams": [], "players": []},
         role=user.role,
         is_super_admin=user.is_super_admin,
         memberships=[{"tournament_id": m.tournament_id, "role": m.role, "club_id": m.club_id} for m in ms],

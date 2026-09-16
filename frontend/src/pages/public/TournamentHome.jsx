@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, BarChart3, CalendarDays, Grid3X3, Shield, Trophy, Users, Volleyball } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { PostCard } from "@/components/fsl/Article";
+import { FavButton } from "@/components/fsl/FavButton";
 import { MatchCard } from "@/components/fsl/MatchCard";
 import { SectionTitle } from "@/components/fsl/Primitives";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
@@ -40,6 +41,7 @@ export default function TournamentHome() {
             <CategorySelector categories={s.categories} value={category} onChange={changeCat} />
           </div>
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[0.9] max-w-3xl" data-testid="public-tournament-title">{t.name}</h1>
+            <div className="mt-3"><FavButton kind="tournaments" id={slug} label="Segui il torneo" /></div>
           <p className="mt-4 text-fsl-white/90 text-base md:text-lg num">{fmtNum(summary.teams_capacity)} squadre. {s.categories.length} categorie. Una sola ambizione.</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to={`/tornei/${slug}/squadre`} className="btn-gold" data-testid="public-hero-cta-teams">Scopri le squadre <ArrowRight className="h-4 w-4" /></Link>

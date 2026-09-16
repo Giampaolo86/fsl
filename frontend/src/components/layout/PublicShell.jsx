@@ -46,9 +46,14 @@ export default function PublicShell() {
             ))}
           </nav>
           <div className="flex items-center gap-2">
-            <Link to={user ? landing : "/login"} className="btn-ghost hidden sm:inline-flex" data-testid="public-area-societa-link">
-              <UserCircle2 className="h-4 w-4" aria-hidden="true" /> {user ? "La mia area" : "Area Società"}
-            </Link>
+            {user ? (
+              <Link to={landing} className="btn-ghost hidden sm:inline-flex" data-testid="public-area-societa-link"><UserCircle2 className="h-4 w-4" aria-hidden="true" /> {user.role === "fan" ? "I miei preferiti" : "La mia area"}</Link>
+            ) : (
+              <>
+                <Link to="/login" className="btn-ghost hidden sm:inline-flex" data-testid="public-area-societa-link"><UserCircle2 className="h-4 w-4" aria-hidden="true" /> Area Società</Link>
+                <Link to="/registrati" className="btn-gold hidden sm:inline-flex" data-testid="public-fan-register-link">Genitori e tifosi</Link>
+              </>
+            )}
             <button className="lg:hidden h-11 w-11 rounded-md border border-white/20 inline-flex items-center justify-center" onClick={() => setOpen((v) => !v)} aria-label="Menu" data-testid="public-menu-toggle">
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -62,8 +67,9 @@ export default function PublicShell() {
               </NavLink>
             ))}
             <Link to={user ? landing : "/login"} onClick={() => setOpen(false)} className="h-11 flex items-center text-sm font-medium text-fsl-gold">
-              {user ? "La mia area" : "Area Società"}
+              {user ? (user.role === "fan" ? "I miei preferiti" : "La mia area") : "Area Società"}
             </Link>
+            {!user && <Link to="/registrati" onClick={() => setOpen(false)} className="h-11 flex items-center text-sm font-medium text-fsl-gold">Genitori e tifosi · Registrati</Link>}
           </div>
         )}
       </header>

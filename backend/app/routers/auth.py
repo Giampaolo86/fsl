@@ -27,6 +27,8 @@ def _landing(user: CurrentUser) -> str:
         return "/admin"
     if user.role == "referee":
         return "/arbitro"
+    if user.role == "fan":
+        return "/account"
     return "/societa"
 
 
@@ -53,6 +55,72 @@ async def login(body: LoginIn, request: Request, response: Response):
     set_auth_cookies(response, access, refresh)
     await audit.record(current, "auth.login", "user", user.id, ip=request.client.host if request.client else None)
     return {"user": current.to_public(), "access_token": access, "landing": _landing(current)}
+
+
+class RegisterIn(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    privacy_accepted: bool = False
+
+
+def _issue(response: Response, current: CurrentUser):
+    access = create_access_token(current.id, current.email)
+    set_auth_cookies(response, access, create_refresh_token(current.id))
+    return {"user": current.to_public(), "access_token": access, "landing": _landing(current)}
+
+
+@router.post("/register", status_code=201)
+async def register(body: RegisterIn, request: Request, response: Response):
+    from ..core.security import hash_password
+    from ..models.domain import User
+
+    if not body.privacy_accepted:
+        raise ApiError(400, "PRIVACY", "Accetta l'informativa privacy per continuare")
+    if len(body.password) < 8:
+        raise ApiError(400, "WEAK_PASSWORD", "La password deve avere almeno 8 caratteri")
+    if len(body.full_name.strip()) < 2:
+        raise ApiError(400, "NAME", "Inserisci nome e cognome")
+    email = body.email.lower()
+    if await users.find_one({"email": email}):
+        raise ApiError(409, "EMAIL_TAKEN", "Esiste già un account con questa email: accedi")
+    u = await users.insert(User(email=email, password_hash=hash_password(body.password), full_name=body.full_name.strip(), role="fan"))
+    current = await load_current_user(u.id)
+    await audit.record(current, "auth.register", "user", u.id, ip=request.client.host if request.client else None)
+    return _issue(response, current)
+
+
+class GoogleSessionIn(BaseModel):
+    session_id: str
+
+
+@router.post("/google/session")
+async def google_session(body: GoogleSessionIn, request: Request, response: Response):
+    import secrets
+
+    import httpx
+
+    from ..core.security import hash_password
+    from ..models.domain import User
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get("https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data", headers={"X-Session-ID": body.session_id})
+    if r.status_code != 200:
+        raise ApiError(401, "GOOGLE_SESSION", "Sessione Google non valida o scaduta")
+    data = r.json()
+    email = (data.get("email") or "").lower()
+    if not email:
+        raise ApiError(401, "GOOGLE_SESSION", "Email Google non disponibile")
+    user = await users.find_one({"email": email})
+    if not user:
+        user = await users.insert(User(email=email, password_hash=hash_password(secrets.token_urlsafe(24)), full_name=data.get("name") or email.split("@")[0], role="fan", picture=data.get("picture"), auth_provider="google"))
+    else:
+        await users.update(user.id, {"picture": data.get("picture") or user.picture, "last_login_at": utcnow()})
+    if user.status != "active":
+        raise ApiError(403, "DISABLED", "Account disabilitato")
+    current = await load_current_user(user.id)
+    await audit.record(current, "auth.google", "user", user.id, ip=request.client.host if request.client else None)
+    return _issue(response, current)
 
 
 @router.post("/refresh")

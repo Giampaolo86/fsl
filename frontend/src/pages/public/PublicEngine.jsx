@@ -8,6 +8,7 @@ import { PlayerCardDialog } from "@/components/fsl/PlayerCard";
 import { BadgeChip } from "@/components/fsl/BadgeChips";
 import { SocialCard } from "@/components/fsl/SocialCard";
 import { PublicShop } from "@/components/fsl/Shop";
+import { FanReport } from "@/components/fsl/FanReport";
 import { STAT_META } from "@/lib/fanta";
 import { AwardsBoard, OutcomesList } from "@/pages/admin/Extras";
 import { PageHeader, SectionTitle } from "@/components/fsl/Primitives";
@@ -106,6 +107,7 @@ export function PublicMatchCenter() {
           </section>
         )}
         <PublicShop slug={slug} matchId={matchId} />
+        <FanReport slug={slug} matchId={matchId} />
         {hasScore && (
           <section className="mt-8" data-testid="match-center-social">
             <SectionTitle right={<span className="text-xs text-fsl-slate">Scarica o condividi su WhatsApp, Instagram, Messaggi</span>}>Social Match Center</SectionTitle>

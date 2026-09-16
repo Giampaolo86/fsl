@@ -1,5 +1,5 @@
 import "@/App.css";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { TournamentProvider } from "@/context/TournamentContext";
@@ -22,13 +22,17 @@ import ModulePlaceholder from "@/pages/admin/ModulePlaceholder";
 import BlogManager from "@/pages/admin/Blog";
 import Documents from "@/pages/club/Documents";
 import { PaymentCancel, PaymentSuccess, Sales } from "@/pages/Payments";
+import Register, { AuthCallback } from "@/pages/Register";
+import FanAccount from "@/pages/FanAccount";
+import ClubHomeEditor from "@/pages/club/ClubHomeEditor";
+import PublicClubHome from "@/pages/public/PublicClubHome";
 import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
 import ClubDashboard from "@/pages/club/ClubDashboard";
 import { ClubModule, ClubTeams } from "@/pages/club/ClubModules";
 import RefereeMatches, { RefereeModule } from "@/pages/referee/RefereeMatches";
 import PublicHub from "@/pages/public/PublicHub";
 import TournamentHome from "@/pages/public/TournamentHome";
-import { PublicClubPage, PublicClubs, PublicModule, PublicRules } from "@/pages/public/PublicPages";
+import { PublicClubs, PublicModule, PublicRules } from "@/pages/public/PublicPages";
 import { PublicMatchCenter, PublicMatches, PublicStandingsLive, PublicStats } from "@/pages/public/PublicEngine";
 import Matches from "@/pages/admin/Matches";
 import MatchWorkspace from "@/components/fsl/MatchWorkspace";
@@ -52,8 +56,22 @@ function App() {
         <AuthProvider>
           <TournamentProvider>
             <Toaster theme="dark" position="top-right" toastOptions={{ className: "bg-navy-800 border border-white/20 text-fsl-white" }} />
+            <AppRoutes />
+          </TournamentProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </div>
+  );
+}
+
+function AppRoutes() {
+  const location = useLocation();
+  if (location.hash?.includes("session_id=")) return <AuthCallback />;
+  return (
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/registrati" element={<Register />} />
+              <Route path="/account" element={<ProtectedRoute roles={["fan"]}><FanAccount /></ProtectedRoute>} />
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/payment/cancel" element={<PaymentCancel />} />
               <Route path="/logout" element={<Logout />} />
@@ -95,7 +113,8 @@ function App() {
                 <Route path="pagamenti" element={<Payments clubMode />} />
                 <Route path="blog" element={<BlogManager clubMode />} />
                 <Route path="documenti" element={<Documents clubMode />} />
-                {["profilo"].map((m) => (
+                <Route path="profilo" element={<ClubHomeEditor />} />
+                {[].map((m) => (
                   <Route key={m} path={m} element={<ClubModule module={m} />} />
                 ))}
               </Route>
@@ -115,7 +134,7 @@ function App() {
               <Route path="/tornei/:slug" element={<PublicShell />}>
                 <Route index element={<TournamentHome />} />
                 <Route path="squadre" element={<PublicClubs />} />
-                <Route path="squadre/:clubSlug" element={<PublicClubPage />} />
+                <Route path="squadre/:clubSlug" element={<PublicClubHome />} />
                 <Route path="classifiche" element={<PublicStandingsLive />} />
                 <Route path="regolamento" element={<PublicRules />} />
                 <Route path="partite" element={<PublicMatches />} />
@@ -127,10 +146,6 @@ function App() {
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-          </TournamentProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </div>
   );
 }
 

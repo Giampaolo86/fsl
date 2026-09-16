@@ -228,4 +228,21 @@ async def club_page(slug: str, club_slug: str):
     venue = await scoped("venues", t.id).get(club.venue_id) if club.venue_id else None
     ids = [tm.id for tm in teams]
     upcoming = await scoped("matches", t.id).list({"$or": [{"home_team_id": {"$in": ids}}, {"away_team_id": {"$in": ids}}], "status": {"$in": ["scheduled", "confirmed"]}}, sort=[("kickoff_at", 1)], limit=6)
-    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": venue.public() if venue else None, "upcoming_matches": await _public_matches(t.id, upcoming)}
+    comps = {c.id: c for c in await scoped("competitions", t.id).list()}
+    players = await scoped("players", t.id).list({"club_id": club.id, "status": {"$ne": "inactive"}}, sort=[("shirt_number", 1)], limit=1000)
+    from ..services import badges as badge_svc
+
+    bmap = await badge_svc.for_players(t.id, [p.id for p in players])
+    rosters = []
+    for tm in teams:
+        ps = [p for p in players if p.team_id == tm.id]
+        rows = [{"id": p.id, "name": _pname(p), "role": p.role, "shirt_number": p.shirt_number, "photo_url": p.photo_url, "badges": bmap.get(p.id, [])[:6]} if (p.profile_visibility == "public" and p.media_consent) else {"id": None, "name": "Giocatore", "role": p.role, "shirt_number": p.shirt_number, "photo_url": None, "badges": []} for p in ps]
+        rosters.append({"team": tm.public(), "competition": comps[tm.competition_id].name if tm.competition_id in comps else "", "players": rows, "count": len(ps)})
+    recent = await scoped("matches", t.id).list({"$or": [{"home_team_id": {"$in": ids}}, {"away_team_id": {"$in": ids}}], "status": {"$in": FINAL}}, sort=[("kickoff_at", -1)], limit=5)
+    from .posts import public_posts
+
+    posts = await public_posts(t.id, "news,interview,gallery,video,match_story", club.id, limit=8)
+    match_ids = [m.id for m in await scoped("matches", t.id).list({"$or": [{"home_team_id": {"$in": ids}}, {"away_team_id": {"$in": ids}}]}, limit=2000)]
+    shop = await scoped("paid_media", t.id).list({"match_id": {"$in": match_ids}, "active": True}, sort=[("created_at", -1)], limit=8)
+    others = [{"slug": o.slug, "name": o.name, "season": o.season_label} for o in await __import__("app.repositories.registry", fromlist=["tournaments"]).tournaments.list({"published": True}) if o.id != t.id and await scoped("clubs", o.id).find_one({"slug": club.slug})]
+    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": venue.public() if venue else None, "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others}

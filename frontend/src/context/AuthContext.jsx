@@ -9,6 +9,8 @@ export function AuthProvider({ children }) {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    // Emergent OAuth callback: AuthCallback exchanges the session_id first
+    if (window.location.hash?.includes("session_id=")) { setChecking(false); return; }
     api
       .get("/auth/me")
       .then(({ data }) => {
@@ -27,6 +29,11 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  const adopt = useCallback((data) => { localStorage.setItem("fsl_token", data.access_token); setUser(data.user); setLanding(data.landing); }, []);
+  const register = useCallback(async (body) => { const { data } = await api.post("/auth/register", body); adopt(data); return data; }, [adopt]);
+  const googleSession = useCallback(async (sessionId) => { const { data } = await api.post("/auth/google/session", { session_id: sessionId }); adopt(data); return data; }, [adopt]);
+  const updateUser = useCallback((patch) => setUser((u) => ({ ...u, ...patch })), []);
+
   const logout = useCallback(async () => {
     try {
       await api.post("/auth/logout");
@@ -37,7 +44,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  return <AuthContext.Provider value={{ user, landing, checking, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, landing, checking, login, logout, register, googleSession, updateUser }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => useContext(AuthContext);

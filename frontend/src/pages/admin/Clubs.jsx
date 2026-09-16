@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Shield, Users } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
+import { ProfileReviews } from "@/components/fsl/ProfileReviews";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -62,7 +63,8 @@ export default function Clubs() {
         actions={
           canWrite && (
             <button className="btn-primary" onClick={() => setOpen("new")} data-testid="clubs-create-button">
-              <Plus className="h-4 w-4" aria-hidden="true" /> Nuova società
+              <Plus className="h-4 w-4" aria-hidden="true" />
+      {t && <ProfileReviews tid={t.id} />} Nuova società
             </button>
           )
         }

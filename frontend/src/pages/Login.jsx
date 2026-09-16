@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { useAuth } from "@/context/AuthContext";
+import { GoogleButton } from "@/components/fsl/GoogleButton";
 import { apiError } from "@/lib/api";
 
 const HERO = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?crop=entropy&cs=srgb&fm=jpg&q=80&w=1800";
@@ -82,7 +83,12 @@ export default function Login() {
               <LogIn className="h-4 w-4" aria-hidden="true" /> {busy ? "Accesso in corso…" : "Accedi"}
             </button>
           </div>
-          <p className="mt-8 text-xs text-fsl-slate">Accesso riservato a Super Admin, Direttore Torneo, Segreteria, Arbitri e Responsabili Società autorizzati. Il pubblico consulta il portale senza login.</p>
+          <div className="mt-6 space-y-3">
+            <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-fsl-slate"><span className="h-px flex-1 bg-white/10" />Genitori e tifosi<span className="h-px flex-1 bg-white/10" /></div>
+            <GoogleButton />
+            <Link to="/registrati" className="btn-ghost w-full" data-testid="login-register-link">Crea un account genitore/tifoso</Link>
+          </div>
+          <p className="mt-6 text-xs text-fsl-slate">Admin, Direttore, Segreteria, Arbitri e Società usano le credenziali ricevute. Genitori e tifosi si registrano liberamente: vedono tutto, segnalano errori e acquistano foto e video.</p>
         </form>
       </section>
     </div>
