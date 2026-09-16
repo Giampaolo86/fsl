@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
@@ -127,6 +127,80 @@ async def my_reports(user: CurrentUser = Depends(get_current_user)):
     return out
 
 
+# ---------- notifiche genitori / fan ----------
+def _fmt_kick(iso: str) -> str:
+    try:
+        dt = datetime.fromisoformat(iso)
+        return dt.strftime("%d/%m %H:%M")
+    except ValueError:
+        return iso
+
+
+async def _fan_notify(t_id: str, uid: str, kind: str, title: str, body: str, link: str, key: str):
+    from ..models.domain import Notification
+
+    repo = Repository("notifications", Notification)
+    if await repo.find_one({"dedupe_key": key}):
+        return
+    await repo.insert(Notification(tournament_id=t_id, user_id=uid, kind=kind, title=title, body=body, link=link, dedupe_key=key))
+
+
+async def _fan_generate(user: CurrentUser):
+    fav = user.favorites or {}
+    if not (fav.get("teams") or fav.get("players")):
+        return
+    from bson import ObjectId
+
+    now = datetime.now(timezone.utc)
+    horizon = (now + timedelta(hours=48)).strftime("%Y-%m-%dT%H:%M")
+    since = now - timedelta(days=30)
+    pids = [ObjectId(x) for x in fav.get("players", []) if len(x) == 24]
+    for t in await tournaments.list({"published": True}):
+        team_ids = set(fav.get("teams", []))
+        if pids:
+            team_ids |= {p.team_id for p in await scoped("players", t.id).list({"_id": {"$in": pids}})}
+        teams = {tm.id: tm for tm in await scoped("teams", t.id).list()}
+        team_ids = {x for x in team_ids if x in teams}
+        if not team_ids:
+            continue
+        clubs = {c.id: c for c in await scoped("clubs", t.id).list()}
+        q = {"$or": [{"home_team_id": {"$in": list(team_ids)}}, {"away_team_id": {"$in": list(team_ids)}}]}
+        def name(tid, teams=teams, clubs=clubs):
+            tm = teams.get(tid)
+            c = clubs.get(tm.club_id) if tm else None
+            return (c.short_name or c.name) if c else "?"
+
+        for m in await scoped("matches", t.id).list({**q, "status": {"$in": ["scheduled", "confirmed"]}, "kickoff_at": {"$gte": now.strftime("%Y-%m-%dT%H:%M"), "$lte": horizon}}, sort=[("kickoff_at", 1)], limit=20):
+            await _fan_notify(t.id, user.id, "match", f"Prossima partita: {name(m.home_team_id)} – {name(m.away_team_id)}", f"{_fmt_kick(m.kickoff_at)}{' · ' + m.field_name if m.field_name else ''} · {m.round_name or t.name}", f"/tornei/{t.slug}/partite/{m.id}", f"fan:{user.id}:match:{m.id}")
+        mids = [m.id for m in await scoped("matches", t.id).list(q, limit=2000)]
+        for it in await scoped("paid_media", t.id).list({"match_id": {"$in": mids}, "active": True, "created_at": {"$gte": since}}, sort=[("created_at", -1)], limit=20):
+            m = await scoped("matches", t.id).get(it.match_id)
+            label = f"{name(m.home_team_id)} – {name(m.away_team_id)}" if m else t.name
+            await _fan_notify(t.id, user.id, "media", f"{'Nuovo video' if it.kind == 'video' else 'Nuova foto'} in vendita: {label}", f"{it.title} · {it.price_cents / 100:.2f} €".replace(".", ","), f"/tornei/{t.slug}/partite/{it.match_id}", f"fan:{user.id}:media:{it.id}")
+
+
+@router.get("/me/notifications")
+async def fan_notifications(user: CurrentUser = Depends(get_current_user)):
+    from ..models.domain import Notification
+
+    await _fan_generate(user)
+    rows = await Repository("notifications", Notification).list({"user_id": user.id}, sort=[("created_at", -1)], limit=100)
+    return {"unread": sum(1 for n in rows if not n.read), "items": [n.public() for n in rows]}
+
+
+@router.post("/me/notifications/read")
+async def fan_notifications_read(body: dict = None, user: CurrentUser = Depends(get_current_user)):
+    from ..models.domain import Notification
+
+    repo = Repository("notifications", Notification)
+    f = {"user_id": user.id, "read": False}
+    ids = (body or {}).get("ids")
+    if ids:
+        f["_id"] = {"$in": [__import__("bson").ObjectId(i) for i in ids if len(i) == 24]}
+    await repo.col.update_many(repo._base_filter(f), {"$set": {"read": True, "updated_at": datetime.now(timezone.utc)}})
+    return {"ok": True}
+
+
 # ---------- profilo società (homepage) ----------
 PROFILE_KEYS = {"motto", "description", "colors", "crest_url", "cover_url", "founded_year", "website", "phone", "whatsapp", "email", "instagram", "facebook", "address", "hours_office", "hours_field", "directions", "services", "manager", "gallery_urls"}
 
@@ -167,7 +241,11 @@ async def put_profile(tournament_id: str, club_id: str, body: dict, user: Curren
         c2 = await repo.update(c.id, {"profile_draft": {**(c.profile_draft or {}), **data}, "approval_status": "pending_review", "review_note": ""}, user.id)
         await audit.record(user, "club.profile_draft", "club", c.id, tournament_id, after={"fields": list(data)})
         return {"approval_status": c2.approval_status, "draft": c2.profile_draft}
-    c2 = await repo.update(c.id, _apply(c, data), user.id)
+    patch = _apply(c, data)
+    for k in ("name", "city", "short_name"):
+        if isinstance(body.get(k), str) and body[k].strip():
+            patch[k] = body[k].strip()
+    c2 = await repo.update(c.id, patch, user.id)
     await audit.record(user, "club.profile_update", "club", c.id, tournament_id, after={"fields": list(data)})
     return {"approval_status": c2.approval_status, "profile": c2.profile}
 

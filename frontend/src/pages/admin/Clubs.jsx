@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Plus, Shield, Users } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ExternalLink, Pencil, Plus, Shield, Users } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { ProfileReviews } from "@/components/fsl/ProfileReviews";
@@ -59,16 +60,17 @@ export default function Clubs() {
       <PageHeader
         kicker="Società, squadre e inviti"
         title="Società"
-        subtitle={`${clubs.data.length} società nel torneo. Gli stemmi mostrati sono segnaposto finché la società non carica il proprio materiale ufficiale.`}
+        subtitle={`${clubs.data.length} società nel torneo. Clicca sul nome per aprire la homepage pubblica della società. Gli stemmi mostrati sono segnaposto finché la società non carica il proprio materiale ufficiale.`}
         actions={
           canWrite && (
             <button className="btn-primary" onClick={() => setOpen("new")} data-testid="clubs-create-button">
-              <Plus className="h-4 w-4" aria-hidden="true" />
-      {t && <ProfileReviews tid={t.id} />} Nuova società
+              <Plus className="h-4 w-4" aria-hidden="true" /> Nuova società
             </button>
           )
         }
       />
+      <ProfileReviews tid={t.id} onDone={clubs.reload} />
+      {!t.published && <p className="mb-4 text-xs text-fsl-warning" data-testid="clubs-unpublished-note">Il torneo non è ancora pubblicato: le homepage pubbliche delle società saranno raggiungibili dopo la pubblicazione.</p>}
       {clubs.data.length === 0 ? (
         <EmptyState icon={Shield} title="Nessuna società" description="Aggiungi le società invitate dall'organizzazione per iniziare a comporre le serie." action={canWrite && <button className="btn-gold" onClick={() => setOpen("new")}>Nuova società</button>} />
       ) : (
@@ -81,6 +83,7 @@ export default function Clubs() {
                 <th>Motto</th>
                 <th className="text-right">Squadre</th>
                 <th>Stemma</th>
+                <th className="text-right">Homepage</th>
                 {canWrite && <th className="text-right">Azioni</th>}
               </tr>
             </thead>
@@ -88,15 +91,23 @@ export default function Clubs() {
               {clubs.data.map((c) => (
                 <tr key={c.id} data-testid={`club-row-${c.slug}`}>
                   <td>
-                    <div className="flex items-center gap-3">
+                    <Link to={`/tornei/${t.slug}/squadre/${c.slug}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-fsl-gold" data-testid={`club-name-link-${c.slug}`}>
                       <ClubCrest club={c} size={32} />
                       <span className="font-semibold">{c.name}</span>
-                    </div>
+                    </Link>
                   </td>
                   <td className="text-fsl-slate">{c.city || "—"}</td>
                   <td className="text-fsl-slate text-xs">{c.motto || "—"}</td>
                   <td className="num text-right">{c.teams_count}</td>
                   <td className="text-xs">{c.crest_is_placeholder ? <span className="text-fsl-warning">Segnaposto</span> : <span className="text-fsl-success">Ufficiale</span>}</td>
+                  <td className="text-right">
+                    <div className="inline-flex gap-1">
+                      {canWrite && <Link to={`/admin/t/${t.id}/societa/${c.id}`} className="btn-ghost h-9" data-testid={`club-edit-${c.slug}`}><Pencil className="h-4 w-4" aria-hidden="true" /> Modifica</Link>}
+                      <Link to={`/tornei/${t.slug}/squadre/${c.slug}`} target="_blank" rel="noreferrer" className="btn-ghost h-9" data-testid={`club-homepage-${c.slug}`}>
+                        <ExternalLink className="h-4 w-4" aria-hidden="true" /> Apri
+                      </Link>
+                    </div>
+                  </td>
                   {canWrite && (
                     <td className="text-right">
                       <button className="btn-ghost h-9" onClick={() => { setOpen(c); setTeamForm({ competition_id: comps.data?.[0]?.id || "" }); }} data-testid={`club-add-team-${c.slug}`}>

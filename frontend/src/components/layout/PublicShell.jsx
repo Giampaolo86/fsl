@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useParams } from "react-router-dom";
 import { Menu, UserCircle2, X } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
+import { NotificationsBell } from "@/components/fsl/NotificationsBell";
 import { useAuth } from "@/context/AuthContext";
 
 const NAV = (slug) =>
@@ -47,7 +48,10 @@ export default function PublicShell() {
           </nav>
           <div className="flex items-center gap-2">
             {user ? (
-              <Link to={landing} className="btn-ghost hidden sm:inline-flex" data-testid="public-area-societa-link"><UserCircle2 className="h-4 w-4" aria-hidden="true" /> {user.role === "fan" ? "I miei preferiti" : "La mia area"}</Link>
+              <>
+                {user.role === "fan" && <NotificationsBell fan />}
+                <Link to={landing} className="btn-ghost hidden sm:inline-flex" data-testid="public-area-societa-link"><UserCircle2 className="h-4 w-4" aria-hidden="true" /> {user.role === "fan" ? "I miei preferiti" : "La mia area"}</Link>
+              </>
             ) : (
               <>
                 <Link to="/login" className="btn-ghost hidden sm:inline-flex" data-testid="public-area-societa-link"><UserCircle2 className="h-4 w-4" aria-hidden="true" /> Area Società</Link>

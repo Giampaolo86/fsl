@@ -1,149 +1,118 @@
 {
-  "theme": "dark",
-  "brand": "Future Stars League",
-  "payoff": "La Serie A del futuro",
-  "language": "Italian",
-  "colors": {
-    "background": {
-      "max": "#03131F",
-      "main": "#041E32",
-      "card_elevated": "#072B47"
+  "theme": {
+    "colors": {
+      "background": "#03131F",
+      "surface": "#041E32",
+      "surface_elevated": "#072B47",
+      "primary": "#0B57D9",
+      "accent": "#F4AE2B",
+      "text_primary": "#F5F7FA",
+      "text_secondary": "#A8BACB"
     },
-    "primary": {
-      "action": "#0B57D9",
-      "hover_focus_data": "#1778FF"
+    "fonts": {
+      "display": "Barlow Condensed",
+      "body": "Inter"
     },
-    "premium": {
-      "cta_highlights": "#F4AE2B",
-      "hover": "#D88913"
-    },
-    "text": {
-      "primary": "#F5F7FA",
-      "secondary": "#A8BACB"
-    },
-    "status": {
-      "success": "#66B847",
-      "warning": "#F0A31A",
-      "danger": "#E54835"
-    },
-    "borders": {
-      "gold": "rgba(244, 174, 43, 0.2)",
-      "white": "rgba(245, 247, 250, 0.2)"
-    },
-    "tailwind_config_extensions": {
-      "ink": { "950": "#03131F" },
-      "navy": { "900": "#041E32", "800": "#072B47" },
-      "blue": { "600": "#0B57D9", "500": "#1778FF" },
-      "gold": { "500": "#F4AE2B", "600": "#D88913" },
-      "white": { "50": "#F5F7FA" },
-      "slate": { "300": "#A8BACB" },
-      "success": { "500": "#66B847" },
-      "warning": { "500": "#F0A31A" },
-      "danger": { "500": "#E54835" }
+    "tokens": {
+      "cards": "fsl-card, fsl-card-gold",
+      "typography": "fsl-kicker, fsl-section-title, num",
+      "buttons": "btn-gold, btn-ghost, btn-primary",
+      "effects": "grain, hero-overlay"
     }
   },
   "typography": {
-    "fonts": {
-      "hero_numbers": "Barlow Condensed, sans-serif",
-      "ui_text": "Inter, sans-serif"
-    },
-    "rules": {
-      "hero_titles": "Barlow Condensed ExtraBold, uppercase, tracking -1% to 1%",
-      "section_titles": "Barlow Condensed Bold",
-      "interface": "Inter Regular/Medium/Semibold",
-      "numbers": "Always use tabular-nums utility for data, tables, and sports numbers.",
-      "restrictions": "Do NOT use any other font families."
-    }
+    "h1_hero": "text-5xl md:text-6xl lg:text-7xl uppercase font-extrabold font-barlow tracking-tighter text-[#F5F7FA]",
+    "h2_section": "text-3xl md:text-4xl uppercase font-bold font-barlow tracking-tight text-[#F5F7FA] fsl-section-title",
+    "h3_card": "text-xl md:text-2xl uppercase font-bold font-barlow text-[#F5F7FA]",
+    "kicker": "text-sm md:text-base text-[#F4AE2B] font-barlow tracking-[0.2em] uppercase fsl-kicker",
+    "body": "text-sm md:text-base font-inter text-[#A8BACB] leading-relaxed",
+    "numbers": "text-2xl md:text-3xl font-extrabold font-barlow text-[#F5F7FA] num"
   },
   "layouts": {
-    "breakpoints": ["360px", "390px", "768px", "1024px", "1280px", "1536px"],
-    "container": {
-      "desktop_base": "1536px",
-      "public_max": "1488px",
-      "margins": "24px padding on sides for main container"
-    },
-    "grid": {
-      "columns": 12,
-      "gap": "16-24px (gap-4 to gap-6 in Tailwind)"
-    },
-    "dimensions": {
-      "sidebar": "144px to 168px on desktop, collapsible under 1280px breakpoint",
-      "header_public": "72px to 80px fixed/sticky height"
-    },
-    "spacing_scale": [4, 8, 12, 16, 24, 32, 48, 64],
-    "border_radius": {
-      "controls": "8px (rounded-lg)",
-      "cards": "12px (rounded-xl)",
-      "modals_hero": "16px (rounded-2xl)"
-    }
-  },
-  "visual_enhancers": {
-    "shadows": "Light blue-black shadows. Avoid excessive glows.",
-    "borders": "1px gold or white at 20-35% opacity (e.g. border-white/20, border-gold-500/30).",
-    "focus_rings": "Always visible on interactive elements: light blue or gold, must meet AA contrast.",
-    "hero_overlay": "Editorial realistic photos must have a navy overlay (e.g., bg-navy-900/60 to bg-navy-900/80) to seamlessly integrate text and maintain legibility."
-  },
-  "components": {
-    "buttons": {
-      "primary": "Blue (#0B57D9). Hover: #1778FF.",
-      "premium": "Gold (#F4AE2B). Use strictly for high-relevance actions, marketing CTAs, or publishing. Hover: #D88913.",
-      "destructive": "Red (#E54835) ONLY for errors, critical expirations, or destructive actions."
-    },
-    "tables": {
-      "style": "Dark themes, rows 48-56px height.",
-      "header": "Sticky headers.",
-      "filters": "Persistent filter bars.",
-      "density": "High data density but readable, utilizing tabular-nums."
-    },
-    "status_badges": {
-      "pattern": "Always combination of: Color + Icon + Text. E.g., Green dot/icon + 'Attivo'."
-    },
-    "empty_loading_states": {
-      "style": "Cinematic and data-rich. Avoid generic spinners if possible; use skeleton loaders styled with navy-800. Empty states should feel like a sports dashboard waiting for data."
-    }
-  },
-  "media": {
-    "photography": "Editorial realistic youth soccer, natural light or evening stadium lights. NO smiling posed stock photos.",
-    "logos": "Generate SVG placeholders for club badges if real ones aren't available.",
-    "image_urls": [
+    "blueprint": [
       {
-        "category": "Hero Background / Evening Lights",
-        "url": "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwxfHx5b3V0aCUyMHNvY2NlciUyMGdhbWUlMjBuaWdodHxlbnwwfHx8fDE3ODg1NjU4NjR8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Stadium evening lights, youth soccer match feel"
+        "section": "Hero",
+        "order": 1,
+        "grid_structure": "flex flex-col relative min-h-[60vh] md:min-h-[70vh] justify-end pb-12",
+        "instructions": "Cover image with hero-overlay. Main H1 title, Category selector, and Follow button stacked. At the bottom, overlap the numbers strip.",
+        "micro_interactions": "Parallax effect on background image if possible, staggered fade-in up for text."
       },
       {
-        "category": "Action / Match",
-        "url": "https://images.unsplash.com/photo-1598880513655-d1c6d4b2dfbf?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwzfHx5b3V0aCUyMHNvY2NlciUyMGdhbWUlMjBuaWdodHxlbnwwfHx8fDE3ODg1NjU4NjR8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Youth soccer action on pitch during day/evening"
+        "section": "Numbers Strip",
+        "order": 2,
+        "grid_structure": "grid grid-cols-2 md:grid-cols-4 gap-4 -mt-8 relative z-10 mx-4 md:mx-8",
+        "instructions": "Use fsl-card style with backdrop-blur. Each stat has a small label (text-xs text-[#A8BACB] uppercase) and a large number (num).",
+        "micro_interactions": "Hover slight translateY (-translate-y-1)."
+      },
+      {
+        "section": "Prossime Partite",
+        "order": 3,
+        "grid_structure": "flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible",
+        "instructions": "Horizontal scroll on mobile, grid on desktop. Match cards using fsl-card.",
+        "micro_interactions": "Card hover scale-102 transition."
+      },
+      {
+        "section": "Blog & News (Featured + Secondary)",
+        "order": 4,
+        "grid_structure": "grid grid-cols-1 lg:grid-cols-12 gap-6",
+        "instructions": "Make it bold and editorial. The Featured article spans lg:col-span-8 (asymmetric split), with a large cover image, oversized kicker, title, excerpt, and CTA. Secondary posts span lg:col-span-4 as a vertical stack (flex flex-col gap-4) with thumbnail on the left and title on the right.",
+        "micro_interactions": "group-hover:scale-105 on the featured image wrapper. The image must have overflow-hidden. Text remains static."
+      },
+      {
+        "section": "Interviste",
+        "order": 5,
+        "grid_structure": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+        "instructions": "Darker cards (bg-[#03131F]) inside a slightly elevated section wrapper. Thick gold left border (border-l-4 border-[#F4AE2B]). Quote style layout with interviewee chip.",
+        "micro_interactions": "Hover border width expands or glow effect on the gold rail."
+      },
+      {
+        "section": "Foto e Video in Vendita",
+        "order": 6,
+        "grid_structure": "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6",
+        "instructions": "Strong section header accompanied by 'Video 0,99 € · Foto 0,49 €' in gold (text-[#F4AE2B] font-barlow tracking-wider). ShopItemCard: Blurred image (backdrop-blur-sm) to simulate a locked preview, lock icon absolute center. kind badge (Foto/Video) absolute top-left. Bottom area contains title and a btn-gold.",
+        "micro_interactions": "group-hover:blur-none transition-all duration-300 on the image preview. Button subtle bounce."
+      },
+      {
+        "section": "Risultati, Classifica, Marcatori",
+        "order": 7,
+        "grid_structure": "grid grid-cols-1 lg:grid-cols-3 gap-6",
+        "instructions": "Dense Dashboard Grid style. Left: Last Results (stack). Center: Mini Classifica (dense table layout, text-sm). Right: Top Scorers (list with avatars and gold fsl-kicker numbers).",
+        "micro_interactions": "Row hover effects (bg-white/5) on table and lists."
+      },
+      {
+        "section": "Clubs Grid",
+        "order": 8,
+        "grid_structure": "grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4",
+        "instructions": "Simple grid of club crests. Minimal UI to close the page.",
+        "micro_interactions": "opacity-70 hover:opacity-100 transition-opacity."
       }
     ]
   },
-  "accessibility": {
-    "standard": "WCAG 2.2 AA",
-    "focus": "Focus ring always visible on keyboard navigation",
-    "contrast": "Text must meet 4.5:1 ratio against dark navy backgrounds. Use white-50 for primary text."
+  "micro_interactions": {
+    "hover_card": "transition-transform duration-300 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-black/20",
+    "hover_image_zoom": "overflow-hidden group, internal img has transition-transform duration-500 group-hover:scale-105",
+    "focus_states": "focus:outline-none focus:ring-2 focus:ring-[#F4AE2B] focus:ring-offset-2 focus:ring-offset-[#03131F]"
+  },
+  "image_urls": {
+    "featured_match": "https://images.unsplash.com/photo-1626248801379-51a0748a5f96?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHwxfHx5b3V0aCUyMGZvb3RiYWxsJTIwbWF0Y2glMjBhY3Rpb258ZW58MHx8fHwxNzg5NTYzNDk3fDA&ixlib=rb-4.1.0&q=85",
+    "interview_portrait": "https://images.unsplash.com/photo-1516224498413-84ecf3a1e7fd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzN8MHwxfHNlYXJjaHwxfHxzcG9ydHMlMjBpbnRlcnZpZXclMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODk1NjM1MDF8MA&ixlib=rb-4.1.0&q=85",
+    "shop_photographer": "https://images.pexels.com/photos/31847342/pexels-photo-31847342.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
   },
   "instructions_to_main_agent": [
-    "Ensure all text is in Italian.",
-    "Configure Tailwind CSS to use the exact specified colors and fonts. Do not deviate.",
-    "Build the application as a Hybrid Fullstack app (Sports League Management Platform + Public Sports Portal).",
-    "Implement the 'Hub Tornei' with tournament cards and an Active/Archive selector drawer.",
-    "Implement the 'Crea nuovo torneo' wizard (Start from scratch, Use template, Duplicate).",
-    "Implement the 'Control Room' overview with stat cards and fields grid.",
-    "Implement 'Impostazioni torneo' with tabs for categories, series, fields, slots, formula, scoring.",
-    "Implement the Public Portal: hero section, upcoming matches, mini standings, teams, tournament stats.",
-    "Implement 'Area Società' dashboard and 'Area Arbitro' mobile view.",
-    "Ensure the UI is completely dark-themed, cinematic, emotional, and data-rich.",
-    "DO NOT use a generic SaaS look. Follow the highly specific sports layout provided.",
-    "Make sure all interactive and key informational elements have a `data-testid` attribute.",
-    "Use Javascript (.js/.jsx) instead of TypeScript.",
-    "No completely transparent backgrounds on headers or overlays that have content under them."
+    "You are redesigning TournamentHome.jsx inside /app/frontend/src/pages/public/.",
+    "Do NOT introduce new colors. STRICTLY use the defined dark navy, gold, and primary blue palette.",
+    "Do NOT introduce new fonts. STRICTLY use Barlow Condensed and Inter.",
+    "Use standard HTML+Tailwind for complex editorial layouts to allow for high customization rather than relying on strict rigid UI components.",
+    "Ensure 'Interviste' uses a bold quote-style with a thick gold left border.",
+    "Ensure 'Vetrina Foto/Video in vendita' correctly visualizes locked digital products with a blurred preview image until hovered.",
+    "Apply the class 'fsl-card' for general surfacing, and 'btn-gold' / 'btn-primary' for CTAs as predefined in the problem statement.",
+    "Add 'data-testid' to all interactive elements."
   ],
-  "universal_guidelines": {
-    "aesthetic": "Avoid 'AI slop'. Create deep, layered interfaces with z-index hierarchy.",
-    "transitions": "DO NOT use 'transition: all'. Apply specific transitions (e.g. 'transition-colors', 'transition-transform').",
-    "alignment": "Do NOT center align the app container. Respect natural reading flows.",
-    "icons": "Use lucide-react for standard icons, but prefer @phosphor-icons/react or @heroicons/react for more specific sports/dashboard needs. NO emojis as icons.",
-    "toasts": "Use 'sonner' for toast notifications."
-  }
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic outputs. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "NEVER use generic placeholder text if you can use contextual wording.",
+    "DO NOT use transparent backgrounds under text that rests over images. Always use hero-overlay or bg-black/50.",
+    "Ensure interactive elements have explicit hover/focus state overrides."
+  ]
 }

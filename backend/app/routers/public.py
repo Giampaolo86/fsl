@@ -1,3 +1,4 @@
+import zlib
 from collections import defaultdict
 from typing import Optional
 
@@ -12,9 +13,26 @@ router = APIRouter(prefix="/public", tags=["public"])
 FINAL = ["official", "rectified"]
 
 
+DEFAULT_COVERS = 6
+DEFAULT_GALLERY = 4
+
+
+def _default_images(slug: str) -> tuple[str, list[str]]:
+    n = zlib.crc32(slug.encode())
+    cover = f"/brand/covers/cover-{n % DEFAULT_COVERS + 1}.jpg"
+    gallery = [f"/brand/covers/gallery-{(n + i) % DEFAULT_GALLERY + 1}.jpg" for i in range(3)] + [f"/brand/covers/cover-{(n + 3) % DEFAULT_COVERS + 1}.jpg"]
+    return cover, gallery
+
+
 def _public_club(c) -> dict:
     d = c.public()
     d["contacts"] = [ct for ct in d.get("contacts", []) if ct.get("is_public")]
+    cover, gallery = _default_images(c.slug)
+    d["cover_is_default"] = not bool(c.cover_url)
+    d["cover_url"] = c.cover_url or cover
+    own = [u for u in (c.profile or {}).get("gallery_urls") or [] if u]
+    d["gallery_is_default"] = not own
+    d["gallery"] = own or gallery
     return d
 
 
@@ -131,8 +149,43 @@ async def tournament_home(slug: str, category: Optional[str] = None):
         "recent_results": await _public_matches(t.id, recent),
         "standings": mini,
         "top_scorers": await _top_scorers(t.id, all_matches, 8),
-        "news": await __import__("app.routers.posts", fromlist=["public_posts"]).public_posts(t.id, limit=4),
+        "news": await _home_news(t.id),
+        "interviews": await __import__("app.routers.posts", fromlist=["public_posts"]).public_posts(t.id, "interview", limit=3),
+        "shop": await _home_shop(t.id, all_matches, clubs),
     }
+
+
+async def _home_news(t_id: str) -> list[dict]:
+    from .posts import public_posts
+
+    rows = await public_posts(t_id, "news,gallery,video,match_story", limit=5)
+    if len(rows) < 5:
+        rows += (await public_posts(t_id, "badge", limit=5))[: 5 - len(rows)]
+    return rows
+
+
+async def _home_shop(t_id: str, all_matches, clubs) -> list[dict]:
+    from .club_extras import _items_out
+
+    items = await scoped("paid_media", t_id).list({"active": True}, sort=[("created_at", -1)], limit=8)
+    if not items:
+        return []
+    matches = {m.id: m for m in all_matches}
+    teams = {tm.id: tm for tm in await scoped("teams", t_id).list()}
+    by_club = {c.id: c for c in clubs}
+    out = []
+    for d in await _items_out(t_id, items):
+        m = matches.get(d["match_id"])
+        names = []
+        if m:
+            for tid in (m.home_team_id, m.away_team_id):
+                tm = teams.get(tid)
+                c = by_club.get(tm.club_id) if tm else None
+                names.append(c.short_name or c.name if c else "?")
+        d["match_label"] = " – ".join(names) if names else ""
+        d["kickoff_at"] = m.kickoff_at if m else None
+        out.append(d)
+    return out
 
 
 @router.get("/tournaments/{slug}/matches")

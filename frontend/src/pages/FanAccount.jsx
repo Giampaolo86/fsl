@@ -4,6 +4,7 @@ import { Download, Flag, Heart, LogOut, Trophy, Users } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
 import { Logo } from "@/components/fsl/Logo";
+import { NotificationsBell } from "@/components/fsl/NotificationsBell";
 import { LoadingState } from "@/components/fsl/States";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
@@ -32,7 +33,7 @@ export default function FanAccount() {
   const empty = !sc.tournaments.length && !sc.teams.length && !sc.players.length;
   return (
     <div className="min-h-screen bg-navy-900 text-fsl-white">
-      <header className="border-b border-white/10 bg-navy-800"><div className="mx-auto max-w-[1200px] px-6 h-16 flex items-center justify-between"><Link to="/"><Logo /></Link><div className="flex items-center gap-3">{user.picture && <img src={user.picture} alt="" className="h-9 w-9 rounded-full" />}<span className="text-sm font-semibold hidden sm:inline" data-testid="fan-name">{user.full_name}</span><button className="btn-ghost h-9" onClick={logout} data-testid="fan-logout"><LogOut className="h-4 w-4" /> Esci</button></div></div></header>
+      <header className="border-b border-white/10 bg-navy-800"><div className="mx-auto max-w-[1200px] px-6 h-16 flex items-center justify-between"><Link to="/"><Logo /></Link><div className="flex items-center gap-3"><NotificationsBell fan />{user.picture && <img src={user.picture} alt="" className="h-9 w-9 rounded-full" />}<span className="text-sm font-semibold hidden sm:inline" data-testid="fan-name">{user.full_name}</span><button className="btn-ghost h-9" onClick={logout} data-testid="fan-logout"><LogOut className="h-4 w-4" /> Esci</button></div></div></header>
       <main className="mx-auto max-w-[1200px] px-6 py-8 space-y-8" data-testid="fan-account">
         <div><div className="fsl-kicker">Area genitori e tifosi</div><h1 className="text-4xl sm:text-5xl font-extrabold leading-[0.95]">I tuoi preferiti</h1><p className="mt-2 text-sm text-fsl-slate max-w-2xl">Scorciatoie immediate alle prossime partite di tornei, squadre e giocatori che segui. Aggiungi preferiti con il cuore ♥ dalle pagine del portale.</p></div>
         {empty && <div className="fsl-card-gold p-6 text-center space-y-3" data-testid="fan-empty"><Heart className="h-8 w-8 mx-auto text-fsl-gold" /><p className="text-sm">Non segui ancora nulla. Apri un torneo, una società o la scheda di un giocatore e tocca «Segui».</p><Link to="/" className="btn-gold">Esplora i tornei</Link></div>}

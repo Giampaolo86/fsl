@@ -18,7 +18,9 @@ export function BadgesAdmin({ tournamentId, canManage }) {
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => api.get(`/tournaments/${tournamentId}/badges`, { params: scope ? { scope } : {} }).then((r) => setList(r.data)), [tournamentId, scope]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (canManage) api.get(`/tournaments/${tournamentId}/players`).then((r) => setPlayers(r.data)).catch(() => {}); }, [tournamentId, canManage]);
+  useEffect(() => { if (canManage) Promise.all([api.get(`/tournaments/${tournamentId}/players`), api.get(`/tournaments/${tournamentId}/teams`)]).then(([p, t]) => { const tn = Object.fromEntries(t.data.map((x) => [x.id, x.name])); const seen = new Set(); const out = []; for (const x of p.data) { const key = `${x.first_name}|${x.last_name}|${x.team_id}`.toLowerCase(); if (seen.has(key)) continue; seen.add(key); out.push({ id: x.id, label: `${x.last_name} ${x.first_name}`, team: tn[x.team_id] || "", shirt: x.shirt_number }); } out.sort((a, b) => a.label.localeCompare(b.label) || a.team.localeCompare(b.team)); setPlayers(out); }).catch(() => {}); }, [tournamentId, canManage]);
+  const [pq, setPq] = useState("");
+  const options = players.filter((p) => !pq || `${p.label} ${p.team}`.toLowerCase().includes(pq.toLowerCase()));
   const fetchCard = useCallback((pid) => api.get(`/tournaments/${tournamentId}/players/${pid}/card`), [tournamentId]);
   const act = async (fn, ok) => { setBusy(true); try { await fn(); toast.success(ok); load(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); } };
   const recompute = () => act(async () => { const r = await api.post(`/tournaments/${tournamentId}/badges/recompute`); toast.message(`+${r.data.added} / −${r.data.removed} · ${r.data.total} badge attivi`); }, "Badge ricalcolati dai dati ufficiali");
@@ -50,7 +52,8 @@ export function BadgesAdmin({ tournamentId, canManage }) {
       <Dialog open={open} onOpenChange={setOpen}><DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl" aria-describedby={undefined} data-testid="manual-badge-dialog">
         <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Premio speciale</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <select className="fsl-input" value={form.player_id} onChange={(e) => setForm({ ...form, player_id: e.target.value })} data-testid="manual-badge-player"><option value="">Giocatore…</option>{players.map((p) => <option key={p.id} value={p.id}>{p.shirt_number ?? ""} {p.first_name} {p.last_name}</option>)}</select>
+          <input className="fsl-input" placeholder="Cerca giocatore o squadra…" value={pq} onChange={(e) => setPq(e.target.value)} data-testid="manual-badge-search" />
+          <select className="fsl-input" value={form.player_id} onChange={(e) => setForm({ ...form, player_id: e.target.value })} data-testid="manual-badge-player"><option value="">Giocatore… ({options.length})</option>{options.map((p) => <option key={p.id} value={p.id}>{p.label} · {p.team}{p.shirt != null ? ` · n. ${p.shirt}` : ""}</option>)}</select>
           <input className="fsl-input" placeholder="Nome del premio (es. Fair Play del Direttore)" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} data-testid="manual-badge-label" />
           <input className="fsl-input" placeholder="Motivazione (opzionale)" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} data-testid="manual-badge-note" />
         </div>

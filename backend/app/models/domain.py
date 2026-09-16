@@ -310,7 +310,8 @@ class ClubDocument(BaseDocument):
 
 class Notification(BaseDocument):
     tournament_id: str
-    club_id: str
+    club_id: Optional[str] = None
+    user_id: Optional[str] = None
     kind: str = "info"
     title: str
     body: str = ""

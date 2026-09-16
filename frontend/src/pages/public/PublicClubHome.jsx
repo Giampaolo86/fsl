@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Bus, CalendarDays, Clock, Globe, Instagram, Mail, MapPin, MessageCircle, Phone, ShieldCheck, Trophy, Users } from "lucide-react";
+import { Bus, CalendarDays, Camera, Clock, Globe, Instagram, Mail, MapPin, MessageCircle, Phone, ShieldCheck, Trophy, Users } from "lucide-react";
 import { PostCard } from "@/components/fsl/Article";
 import { BadgeChips } from "@/components/fsl/BadgeChips";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
@@ -13,8 +13,6 @@ import { ROLE_CODE, ROLE_TONE } from "@/lib/fanta";
 import { api, apiError } from "@/lib/api";
 import { mediaUrl } from "@/lib/upload";
 import { toast } from "sonner";
-
-const COVER = "https://images.unsplash.com/photo-1459865264687-595d652de67e?auto=format&fit=crop&w=1800&q=70";
 
 function Block({ title, icon: Icon, children, className = "", testId }) {
   return <section className={`fsl-card p-5 ${className}`} data-testid={testId}><h2 className="fsl-kicker mb-3 flex items-center gap-2">{Icon && <Icon className="h-4 w-4 text-fsl-gold" />}{title}</h2>{children}</section>;
@@ -37,7 +35,7 @@ export default function PublicClubHome() {
   return (
     <div data-testid="club-home">
       <section className="relative min-h-[420px] flex items-end overflow-hidden" style={{ background: `linear-gradient(120deg, ${primary} 0%, #041E32 70%)` }}>
-        <img src={mediaUrl(c.cover_url) || COVER} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45 mix-blend-luminosity" />
+        <img src={mediaUrl(c.cover_url)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45 mix-blend-luminosity" data-testid={c.cover_is_default ? "club-cover-default" : "club-cover-own"} />
         <div className="absolute inset-0 bg-gradient-to-t from-navy-900 via-navy-900/40 to-transparent" />
         <div className="relative mx-auto max-w-[1488px] w-full px-6 pb-10 pt-24 flex flex-col md:flex-row md:items-end gap-6">
           <div className="shrink-0 drop-shadow-2xl"><ClubCrest club={c} size={140} /></div>
@@ -53,6 +51,18 @@ export default function PublicClubHome() {
 
       <div className="mx-auto max-w-[1488px] px-6 py-10 space-y-8">
         {c.description && <p className="text-base md:text-lg text-fsl-slate max-w-3xl">{c.description}</p>}
+
+        <section data-testid="club-home-gallery">
+          <div className="flex items-end justify-between mb-3"><h2 className="fsl-section-title flex items-center gap-2"><Camera className="h-5 w-5 text-fsl-gold" /> La società in immagini</h2>{c.gallery_is_default && <span className="text-[10px] uppercase tracking-wider text-fsl-slate" data-testid="club-gallery-default-note">Immagini FSL · in attesa delle foto della società</span>}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {c.gallery.slice(0, 4).map((u, i) => (
+              <div key={u + i} className={`group relative overflow-hidden rounded-xl border border-white/10 ${i === 0 ? "col-span-2 row-span-2 aspect-square md:aspect-auto" : "aspect-square"}`} data-testid={`club-gallery-${i}`}>
+                <img src={mediaUrl(u)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-gradient-to-t from-navy-900/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section data-testid="club-home-rosters">
           <h2 className="fsl-section-title mb-1 flex items-center gap-2"><Users className="h-5 w-5 text-fsl-gold" /> Le nostre squadre</h2>

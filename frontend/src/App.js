@@ -86,6 +86,7 @@ function AppRoutes() {
                 <Route path="impostazioni" element={<Settings />} />
                 <Route path="competizioni" element={<Competitions />} />
                 <Route path="societa" element={<Clubs />} />
+                <Route path="societa/:clubId" element={<ClubHomeEditor adminMode />} />
                 <Route path="campi" element={<Venues />} />
                 <Route path="audit" element={<Audit />} />
                 <Route path="calendario" element={<Matches />} />
