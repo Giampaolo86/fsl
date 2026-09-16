@@ -136,16 +136,76 @@ async def player_card(tournament_id: str, p, public: bool = False):
     name = (p.public_name or f"{p.first_name} {p.last_name[:1]}.") if public else f"{p.first_name} {p.last_name}"
     if public and not ok:
         name = "Giocatore"
-    return {"player_id": p.id, "name": name, "role": p.role, "role_code": ROLE_CODE.get(p.role, ""), "shirt_number": p.shirt_number, "birth_year": None if public else p.birth_year, "team": teams[p.team_id].name if p.team_id in teams else "", "team_id": p.team_id, "photo_url": p.photo_url if (ok or not public) else None, "public_ok": ok, "totals": dict(tot), "avg_vote": round(sum(votes) / len(votes), 2) if votes else None, "avg_fanta": round(sum(fantas) / len(fantas), 2) if fantas else None, "history": list(reversed(history)), "badges": (await badges.for_players(tournament_id, [p.id])).get(p.id, [])}
+    show = ok or not public
+    from .club_extras import _items_out
+    from .posts import public_posts
+
+    posts = await public_posts(tournament_id, None, limit=30, player_id=p.id) if show else []
+    shop = await _items_out(tournament_id, await scoped("paid_media", tournament_id).list({"player_ids": p.id, "active": True}, sort=[("created_at", -1)], limit=30)) if show else []
+    prof = {k: v for k, v in (p.profile or {}).items() if k in PROFILE_FIELDS} if show else {}
+    return {"player_id": p.id, "name": name, "role": p.role, "role_code": ROLE_CODE.get(p.role, ""), "shirt_number": p.shirt_number, "birth_year": None if public else p.birth_year, "team": teams[p.team_id].name if p.team_id in teams else "", "team_id": p.team_id, "club_id": p.club_id, "photo_url": p.photo_url if show else None, "public_ok": ok, "profile": prof, "guardian_emails": [] if public else p.guardian_emails, "media": {"posts": posts, "shop": shop}, "totals": dict(tot), "avg_vote": round(sum(votes) / len(votes), 2) if votes else None, "avg_fanta": round(sum(fantas) / len(fantas), 2) if fantas else None, "history": list(reversed(history)), "badges": (await badges.for_players(tournament_id, [p.id])).get(p.id, [])}
+
+
+PROFILE_FIELDS = {"height_cm", "weight_kg", "foot", "quote", "testimonials", "nickname", "idol", "favorite_team"}
+
+
+async def can_edit_player(user: CurrentUser, tournament_id: str, p) -> Optional[str]:
+    role = user.role_in(tournament_id)
+    if role in STAFF:
+        return "staff"
+    if role == "club_manager" and user.club_in(tournament_id) == p.club_id:
+        return "club"
+    if user.email.lower() in [e.lower() for e in p.guardian_emails]:
+        return "guardian"
+    return None
 
 
 @router.get("/players/{player_id}/card")
 async def get_player_card(tournament_id: str, player_id: str, user: CurrentUser = Depends(get_current_user)):
-    await require_tournament(tournament_id, user)
     p = await scoped("players", tournament_id).get(player_id)
     if not p:
         raise not_found("Giocatore")
-    return await player_card(tournament_id, p)
+    editor = await can_edit_player(user, tournament_id, p)
+    if user.role_in(tournament_id) is None and not editor:
+        raise forbidden()
+    d = await player_card(tournament_id, p, public=editor == "guardian" and user.role_in(tournament_id) is None)
+    if editor == "guardian":
+        d["name"] = f"{p.first_name} {p.last_name}"
+        d["photo_url"] = p.photo_url
+        d["profile"] = {k: v for k, v in (p.profile or {}).items() if k in PROFILE_FIELDS}
+    d["can_edit"] = editor
+    return d
+
+
+@router.put("/players/{player_id}/profile")
+async def put_player_profile(tournament_id: str, player_id: str, body: dict, user: CurrentUser = Depends(get_current_user)):
+    repo = scoped("players", tournament_id)
+    p = await repo.get(player_id)
+    if not p:
+        raise not_found("Giocatore")
+    editor = await can_edit_player(user, tournament_id, p)
+    if not editor:
+        raise forbidden("Non puoi modificare questa scheda")
+    prof = {**(p.profile or {})}
+    for k in PROFILE_FIELDS:
+        if k in body:
+            v = body[k]
+            if k in ("height_cm", "weight_kg"):
+                v = int(v) if v not in (None, "") else None
+            elif k == "testimonials":
+                v = [{"author": str(x.get("author", "")).strip()[:60], "text": str(x.get("text", "")).strip()[:300]} for x in (v or []) if isinstance(x, dict) and str(x.get("text", "")).strip()][:8]
+            elif k == "foot":
+                v = v if v in ("destro", "sinistro", "ambidestro", None, "") else None
+            else:
+                v = str(v).strip()[:300] if v is not None else ""
+            prof[k] = v
+    patch = {"profile": prof}
+    if editor in ("staff", "club") and isinstance(body.get("guardian_emails"), list):
+        patch["guardian_emails"] = sorted({str(e).strip().lower() for e in body["guardian_emails"] if "@" in str(e)})[:4]
+    await repo.update(p.id, patch, user.id)
+    await audit.record(user, "player.profile_update", "player", p.id, tournament_id, after={"fields": [k for k in body if k in PROFILE_FIELDS or k == "guardian_emails"], "editor": editor})
+    return {"ok": True, "profile": prof, "guardian_emails": patch.get("guardian_emails", p.guardian_emails)}
+
 
 
 # ---------- social match center ----------

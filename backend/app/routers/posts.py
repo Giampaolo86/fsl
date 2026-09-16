@@ -335,7 +335,7 @@ async def _published_t(slug: str):
     return t
 
 
-async def public_posts(t_id: str, kind: Optional[str] = None, club_id: Optional[str] = None, match_id: Optional[str] = None, limit: int = 50):
+async def public_posts(t_id: str, kind: Optional[str] = None, club_id: Optional[str] = None, match_id: Optional[str] = None, limit: int = 50, player_id: Optional[str] = None):
     f = {"$or": [{"status": "published"}, {"status": "scheduled", "publish_at": {"$lte": now_iso()}}]}
     if kind:
         f["kind"] = {"$in": kind.split(",")}
@@ -343,6 +343,8 @@ async def public_posts(t_id: str, kind: Optional[str] = None, club_id: Optional[
         f["club_ids"] = club_id
     if match_id:
         f["match_id"] = match_id
+    if player_id:
+        f["player_ids"] = player_id
     posts = await scoped("posts", t_id).list(f, sort=[("publish_at", -1)], limit=limit)
     return await _decorate(t_id, posts, public=True)
 

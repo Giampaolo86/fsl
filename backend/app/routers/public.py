@@ -246,7 +246,7 @@ async def public_social(slug: str, match_id: str):
 async def public_player(slug: str, player_id: str):
     t = await _published(slug)
     p = await scoped("players", t.id).get(player_id)
-    if not p or p.profile_visibility != "public" or not p.media_consent:
+    if not p:
         raise not_found("Giocatore")
     from .extras import player_card
 

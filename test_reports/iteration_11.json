@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend-only retest for AdminShell sidebar redesign (220px width, no truncation, thin gold themed scrollbar) and PublicShell fan logout regression. All criteria met: sidebar exactly 220px, all 20 nav items present with full labels (CALENDARIO/CLASSIFICHE etc.), no ellipsis/overflow, nav has fsl-scroll class with scrollbarWidth='thin'. Mobile drawer at 390px shows complete labels, scrollable (958 > 671), thin themed scrollbar (visually confirmed via screenshot - no gray system bar with arrows). Fan logout from /account now lands on / (public hub) with anonymous header (public-area-societa-link + public-fan-register-link visible, no fan-notifications-button) and stays anonymous after reload. Regression: anon /account → /login OK; fan re-login → /account with public-fan-account-link and fan-notifications-button visible.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminShell renders the same <aside data-testid='admin-sidebar'> twice at <xl breakpoints (one inside 'hidden xl:block' desktop container, another inside the mobile drawer). Both carry the same data-testid, causing duplicate nodes for every sidebar-nav-* testid. Automated tests picking the first match hit the display:none copy. Consider giving the mobile drawer copy a distinct data-testid (e.g. admin-sidebar-drawer) or rendering only one instance conditionally to keep testids unique."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "Admin castellani.giampaolo@gmail.com / FSL-Admin-2026! and Fan fan.notifiche@test.it / Password123 both worked.",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Sidebar redesign and fan logout fix verified end-to-end. Only cosmetic code-review note: duplicated data-testids on admin-sidebar and sidebar-nav-* between desktop container and mobile drawer - functional but affects automated selection precision.",
+  "rca of the issue": "N/A - all reported fixes verified"
+}

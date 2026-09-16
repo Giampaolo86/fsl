@@ -239,6 +239,7 @@ class PaidMediaIn(BaseModel):
     kind: str
     title: str
     media_id: str
+    player_ids: list[str] = []
 
 
 def _blur_preview(data: bytes, radius: int = 14) -> bytes:
@@ -315,7 +316,7 @@ async def create_item(tournament_id: str, body: PaidMediaIn, user: CurrentUser =
     preview_id = await _make_preview(tournament_id, body.kind, media, user.id)
     lookup, cents = PRICES[body.kind]
     teams = {tm.id: tm.club_id for tm in await scoped("teams", tournament_id).list({"_id": {"$in": [__import__("bson").ObjectId(m.home_team_id), __import__("bson").ObjectId(m.away_team_id)]}})}
-    it = await scoped("paid_media", tournament_id).insert(PaidMedia(tournament_id=tournament_id, match_id=m.id, kind=body.kind, title=body.title.strip() or media.original_filename, media_id=media.id, preview_media_id=preview_id, lookup_key=lookup, price_cents=cents, club_ids=list(set(teams.values()))), user.id)
+    it = await scoped("paid_media", tournament_id).insert(PaidMedia(tournament_id=tournament_id, match_id=m.id, kind=body.kind, title=body.title.strip() or media.original_filename, media_id=media.id, preview_media_id=preview_id, lookup_key=lookup, price_cents=cents, club_ids=list(set(teams.values())), player_ids=body.player_ids[:30]), user.id)
     await audit.record(user, "shop.item_create", "paid_media", it.id, tournament_id, after={"kind": it.kind, "title": it.title, "price": cents})
     return (await _items_out(tournament_id, [it]))[0]
 
@@ -333,7 +334,7 @@ async def patch_item(tournament_id: str, item_id: str, body: dict, user: Current
     it = await repo.get(item_id)
     if not it:
         raise not_found("Contenuto")
-    it2 = await repo.update(it.id, {k: v for k, v in body.items() if k in {"title", "active"}}, user.id)
+    it2 = await repo.update(it.id, {k: v for k, v in body.items() if k in {"title", "active", "player_ids"}}, user.id)
     return (await _items_out(tournament_id, [it2]))[0]
 
 

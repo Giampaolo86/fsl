@@ -81,6 +81,18 @@ async def shortcuts(user: CurrentUser = Depends(get_current_user)):
     return out
 
 
+# ---------- figli abbinati (email del genitore) ----------
+@router.get("/me/children")
+async def my_children(user: CurrentUser = Depends(get_current_user)):
+    out = []
+    for t in await tournaments.list({"published": True}):
+        for p in await scoped("players", t.id).list({"guardian_emails": user.email.lower()}, limit=20):
+            tm = await scoped("teams", t.id).get(p.team_id)
+            c = await scoped("clubs", t.id).get(p.club_id)
+            out.append({"id": p.id, "tournament_id": t.id, "tournament_slug": t.slug, "tournament_name": t.name, "name": f"{p.first_name} {p.last_name}", "shirt_number": p.shirt_number, "role": p.role, "photo_url": p.photo_url, "team": tm.name if tm else "", "club": {"name": c.name, "slug": c.slug, "colors": c.colors, "crest_url": c.crest_url if not c.crest_is_placeholder else None} if c else None, "media_consent": p.media_consent, "public_ok": p.profile_visibility == "public" and p.media_consent})
+    return out
+
+
 # ---------- acquisti ----------
 @router.get("/me/purchases")
 async def my_purchases(user: CurrentUser = Depends(get_current_user)):
@@ -153,12 +165,16 @@ async def _fan_generate(user: CurrentUser):
 
     now = datetime.now(timezone.utc)
     horizon = (now + timedelta(hours=48)).strftime("%Y-%m-%dT%H:%M")
-    since = now - timedelta(days=30)
+    udoc = await users.get(user.id)
+    since = max(now - timedelta(days=30), udoc.created_at.replace(tzinfo=timezone.utc) if udoc and udoc.created_at.tzinfo is None else (udoc.created_at if udoc else now))
     pids = [ObjectId(x) for x in fav.get("players", []) if len(x) == 24]
+    fav_players = {}
     for t in await tournaments.list({"published": True}):
         team_ids = set(fav.get("teams", []))
         if pids:
-            team_ids |= {p.team_id for p in await scoped("players", t.id).list({"_id": {"$in": pids}})}
+            for p in await scoped("players", t.id).list({"_id": {"$in": pids}}):
+                team_ids.add(p.team_id)
+                fav_players[p.id] = p
         teams = {tm.id: tm for tm in await scoped("teams", t.id).list()}
         team_ids = {x for x in team_ids if x in teams}
         if not team_ids:
@@ -170,13 +186,22 @@ async def _fan_generate(user: CurrentUser):
             c = clubs.get(tm.club_id) if tm else None
             return (c.short_name or c.name) if c else "?"
 
+        def why(m):
+            fol = [tid for tid in (m.home_team_id, m.away_team_id) if tid in team_ids]
+            pl = [p for p in fav_players.values() if p.team_id in fol]
+            if pl:
+                return "segui " + ", ".join((p.public_name or p.first_name) for p in pl[:2])
+            return "segui " + ", ".join(name(tid) for tid in fol) if fol else ""
+
         for m in await scoped("matches", t.id).list({**q, "status": {"$in": ["scheduled", "confirmed"]}, "kickoff_at": {"$gte": now.strftime("%Y-%m-%dT%H:%M"), "$lte": horizon}}, sort=[("kickoff_at", 1)], limit=20):
-            await _fan_notify(t.id, user.id, "match", f"Prossima partita: {name(m.home_team_id)} – {name(m.away_team_id)}", f"{_fmt_kick(m.kickoff_at)}{' · ' + m.field_name if m.field_name else ''} · {m.round_name or t.name}", f"/tornei/{t.slug}/partite/{m.id}", f"fan:{user.id}:match:{m.id}:{m.kickoff_at}")
+            await _fan_notify(t.id, user.id, "match", f"Prossima partita: {name(m.home_team_id)} – {name(m.away_team_id)}", f"{_fmt_kick(m.kickoff_at)}{' · ' + m.field_name if m.field_name else ''} · {m.round_name or t.name} · {why(m)}", f"/tornei/{t.slug}/partite/{m.id}", f"fan:{user.id}:match:{m.id}:{m.kickoff_at}")
         mids = [m.id for m in await scoped("matches", t.id).list(q, limit=2000)]
         for it in await scoped("paid_media", t.id).list({"match_id": {"$in": mids}, "active": True, "created_at": {"$gte": since}}, sort=[("created_at", -1)], limit=20):
             m = await scoped("matches", t.id).get(it.match_id)
             label = f"{name(m.home_team_id)} – {name(m.away_team_id)}" if m else t.name
-            await _fan_notify(t.id, user.id, "media", f"{'Nuovo video' if it.kind == 'video' else 'Nuova foto'} in vendita: {label}", f"{it.title} · {it.price_cents / 100:.2f} €".replace(".", ","), f"/tornei/{t.slug}/partite/{it.match_id}", f"fan:{user.id}:media:{it.id}")
+            tagged = [fav_players[x] for x in it.player_ids if x in fav_players]
+            reason = ("con " + ", ".join((p.public_name or p.first_name) for p in tagged[:2])) if tagged else (why(m) if m else "")
+            await _fan_notify(t.id, user.id, "media", f"{'Nuovo video' if it.kind == 'video' else 'Nuova foto'} in vendita: {label}", f"{it.title} · {it.price_cents / 100:.2f} € · {reason}".replace(".", ",", 1), f"/tornei/{t.slug}/partite/{it.match_id}", f"fan:{user.id}:media:{it.id}")
 
 
 @router.get("/me/notifications")

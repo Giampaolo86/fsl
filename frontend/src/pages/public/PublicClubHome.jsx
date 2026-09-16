@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Bus, CalendarDays, Camera, Clock, Globe, Instagram, Mail, MapPin, MessageCircle, Phone, ShieldCheck, Trophy, Users } from "lucide-react";
+import { Award, Bus, CalendarDays, Camera, Clock, Globe, Instagram, Mail, MapPin, MessageCircle, Phone, ShieldCheck, Trophy, Users } from "lucide-react";
 import { PostCard } from "@/components/fsl/Article";
-import { BadgeChips } from "@/components/fsl/BadgeChips";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
 import { MatchCard } from "@/components/fsl/MatchCard";
@@ -75,7 +74,7 @@ export default function PublicClubHome() {
                   {r.players.map((pl, i) => (
                     <button key={i} type="button" disabled={!pl.id} onClick={() => pl.id && setOpenPlayer(pl.id)} className="h-16 px-3 flex items-center gap-2 text-left enabled:hover:bg-white/[0.04] disabled:cursor-default" data-testid={pl.id ? `club-player-${pl.id}` : undefined}>
                       {pl.photo_url ? <img src={mediaUrl(pl.photo_url)} alt="" className="h-10 w-10 rounded-full object-cover border border-white/20 shrink-0" /> : <span className={`h-10 w-10 rounded-full inline-flex items-center justify-center text-[10px] font-bold uppercase shrink-0 ${ROLE_TONE[ROLE_CODE[pl.role]] || "bg-navy-700"}`}>{ROLE_CODE[pl.role] || "—"}</span>}
-                      <span className="min-w-0"><span className="block text-sm font-semibold truncate"><span className="num text-fsl-gold mr-1">{pl.shirt_number ?? ""}</span>{pl.name}</span>{pl.badges.length > 0 && <span className="block"><BadgeChips list={pl.badges} max={2} /></span>}</span>
+                      <span className="min-w-0 flex-1 flex items-center gap-2"><span className="block text-sm font-semibold truncate"><span className="num text-fsl-gold mr-1">{pl.shirt_number ?? ""}</span>{pl.name}</span>{pl.badges.length > 0 && <span className="ml-auto shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-full border border-fsl-gold/50 text-fsl-gold text-[10px] font-bold num" title={`${pl.badges.length} badge`} data-testid={pl.id ? `club-player-badges-${pl.id}` : undefined}><Award className="h-3 w-3" />{pl.badges.length}</span>}</span>
                     </button>
                   ))}
                   {r.players.length === 0 && <p className="col-span-3 p-4 text-xs text-fsl-slate">Rosa non ancora pubblicata.</p>}

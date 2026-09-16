@@ -129,6 +129,8 @@ class Player(BaseDocument):
     profile_visibility: Literal["private", "team", "public"] = "private"
     media_consent: bool = False
     photo_url: Optional[str] = None
+    profile: dict = {}
+    guardian_emails: list[str] = []
 
 
 MatchStatus = Literal["draft", "scheduled", "confirmed", "in_progress", "finished", "report_submitted", "official", "under_review", "rectified", "postponed", "cancelled"]
@@ -331,6 +333,7 @@ class PaidMedia(BaseDocument):
     price_cents: int
     currency: str = "eur"
     club_ids: list[str] = []
+    player_ids: list[str] = []
     active: bool = True
     sold: int = 0
 
