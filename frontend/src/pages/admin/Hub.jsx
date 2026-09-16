@@ -12,7 +12,8 @@ import { fmtNum, fmtPeriod } from "@/lib/format";
 const HERO = "https://images.unsplash.com/photo-1551958219-acbc608c6377?crop=entropy&cs=srgb&fm=jpg&q=80&w=1800";
 
 export default function Hub() {
-  const { tournaments, stats, loading } = useTournaments();
+  const { tournaments, stats, loading, currentId } = useTournaments();
+  const current = currentId || tournaments.find((t) => t.status === "active")?.id || tournaments[0]?.id;
   const { user } = useAuth();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
@@ -50,10 +51,10 @@ export default function Hub() {
 
       {stats && (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          <KpiTile icon={Trophy} value={stats.active} label="Tornei attivi" hint={`${stats.draft} in bozza · ${stats.completed} terminati`} testId="hub-kpi-active" />
-          <KpiTile icon={Users} value={fmtNum(stats.teams_capacity)} label="Squadre previste" hint={`${fmtNum(stats.teams_total)} già iscritte`} testId="hub-kpi-teams" />
-          <KpiTile icon={Volleyball} value={fmtNum(stats.matches_total)} label="Partite programmate" hint="Calendari in Fase 3" testId="hub-kpi-matches" />
-          <KpiTile icon={Grid3X3} value={stats.fields_total} label="Campi in uso" hint={`In ${stats.venues_total} strutture`} testId="hub-kpi-fields" />
+          <KpiTile icon={Trophy} value={stats.active} label="Tornei attivi" hint={`${stats.draft} in bozza · ${stats.completed} terminati`} testId="hub-kpi-active" to="/admin/tornei" />
+          <KpiTile icon={Users} value={fmtNum(stats.teams_capacity)} label="Squadre previste" hint={`${fmtNum(stats.teams_total)} già iscritte`} testId="hub-kpi-teams" to={current ? `/admin/t/${current}/societa` : "/admin/tornei"} />
+          <KpiTile icon={Volleyball} value={fmtNum(stats.matches_total)} label="Partite programmate" hint="Calendari generati" testId="hub-kpi-matches" to={current ? `/admin/t/${current}/calendario` : "/admin/tornei"} />
+          <KpiTile icon={Grid3X3} value={stats.fields_total} label="Campi in uso" hint={`In ${stats.venues_total} strutture`} testId="hub-kpi-fields" to={current ? `/admin/t/${current}/campi` : "/admin/tornei"} />
         </div>
       )}
 

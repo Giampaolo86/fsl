@@ -72,6 +72,14 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] Grafica social: marcatori per squadra, MVP con foto, podio compatto; rimossi i badge (restano sul profilo giocatore)
 - [x] Calendario: pulsante «Prossimi impegni · 7 giorni» (admin e Area Società) con filtro `upcoming_days` e stato vuoto dedicato
 
+## Implementato (2026-06) – Iterazione 7
+- [x] Homepage società pubblica ridisegnata (`PublicClubHome.jsx`, stile mockup 03): hero con stemma/copertina/colori, KPI reali, rose separate per squadra/torneo (nomi e foto solo con consenso, badge), sede/orari/come arrivare/servizi, contatti e social, responsabile, prossime partite e ultimi risultati, blog e foto/video in vendita; link alle rose in altri tornei FSL
+- [x] Area Società «La mia homepage» (`/societa/profilo`): identità, immagini (upload), contatti, responsabile, sede, servizi → bozza in approvazione admin (`profile_draft`, `approval_status`), approvazione/rifiuto in Control Room «Società» (`ProfileReviews`), notifiche alla società
+- [x] Ruolo `fan` (genitori/tifosi): registrazione libera `/registrati` (email+password, consenso privacy) e Google (Emergent-managed, `/api/auth/google/session`, callback `#session_id` su `/account`); area `/account` con preferiti (torneo, squadra, giocatore) e scorciatoie alla prossima partita/ultimo risultato, «I miei acquisti» (download riservati), «Le mie segnalazioni»; cuore «Segui» su torneo, squadra e scheda giocatore; segnalazione errori dal Match Center → ticket al Direttore; acquisti collegati all'utente
+- [x] Accessi differenziati: landing per ruolo (admin/direttore/segreteria → Control Room, società → Area Società, arbitro → area arbitro, fan → /account); header pubblico con «Area Società» e «Genitori e tifosi»
+- [x] Logo ufficiale FSL (asset `/brand/logo.png`, icone PWA 192/512, favicon); KPI dell'Hub e dell'Overview cliccabili verso le sezioni dedicate
+- [x] Test: 13/13 backend iterazione 7 (`test_iteration7.py`), flussi frontend verificati (`iteration_7.json`)
+
 ## Backlog prioritizzato
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana
 - P1 (Fase 5): comunicazioni email/SMS (provider da scegliere), segnalazione pubblica con captcha, rimborsi Stripe da Control Room

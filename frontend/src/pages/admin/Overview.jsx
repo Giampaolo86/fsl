@@ -96,10 +96,10 @@ export default function Overview() {
       </PageHeader>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <KpiTile icon={Trophy} value={t.counts.competitions} label="Campionati" hint={`${s.categories.length} categorie · ${s.series.length} serie`} testId="overview-kpi-competitions" />
-        <KpiTile icon={Users} value={`${t.counts.teams}/${t.summary.teams_capacity}`} label="Squadre iscritte" hint={`${t.counts.clubs} società`} testId="overview-kpi-teams" />
-        <KpiTile icon={Volleyball} value={fmtNum(t.summary.matches_total)} label="Gare previste" hint={`${t.summary.rounds} giornate · ${t.summary.weekends_needed ?? "—"} weekend`} testId="overview-kpi-matches" />
-        <KpiTile icon={Grid3X3} value={t.counts.fields} label="Campi" hint={`${s.slots.length} slot/giorno · ${t.summary.matches_per_day} gare/giorno`} testId="overview-kpi-fields" />
+        <KpiTile icon={Trophy} value={t.counts.competitions} label="Campionati" hint={`${s.categories.length} categorie · ${s.series.length} serie`} testId="overview-kpi-competitions" to={`/admin/t/${t.id}/competizioni`} />
+        <KpiTile icon={Users} value={`${t.counts.teams}/${t.summary.teams_capacity}`} label="Squadre iscritte" hint={`${t.counts.clubs} società`} testId="overview-kpi-teams" to={`/admin/t/${t.id}/societa`} />
+        <KpiTile icon={Volleyball} value={fmtNum(t.summary.matches_total)} label="Gare previste" hint={`${t.summary.rounds} giornate · ${t.summary.weekends_needed ?? "—"} weekend`} testId="overview-kpi-matches" to={`/admin/t/${t.id}/calendario`} />
+        <KpiTile icon={Grid3X3} value={t.counts.fields} label="Campi" hint={`${s.slots.length} slot/giorno · ${t.summary.matches_per_day} gare/giorno`} testId="overview-kpi-fields" to={`/admin/t/${t.id}/campi`} />
       </div>
 
       <section>
