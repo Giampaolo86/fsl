@@ -171,7 +171,7 @@ async def _fan_generate(user: CurrentUser):
             return (c.short_name or c.name) if c else "?"
 
         for m in await scoped("matches", t.id).list({**q, "status": {"$in": ["scheduled", "confirmed"]}, "kickoff_at": {"$gte": now.strftime("%Y-%m-%dT%H:%M"), "$lte": horizon}}, sort=[("kickoff_at", 1)], limit=20):
-            await _fan_notify(t.id, user.id, "match", f"Prossima partita: {name(m.home_team_id)} – {name(m.away_team_id)}", f"{_fmt_kick(m.kickoff_at)}{' · ' + m.field_name if m.field_name else ''} · {m.round_name or t.name}", f"/tornei/{t.slug}/partite/{m.id}", f"fan:{user.id}:match:{m.id}")
+            await _fan_notify(t.id, user.id, "match", f"Prossima partita: {name(m.home_team_id)} – {name(m.away_team_id)}", f"{_fmt_kick(m.kickoff_at)}{' · ' + m.field_name if m.field_name else ''} · {m.round_name or t.name}", f"/tornei/{t.slug}/partite/{m.id}", f"fan:{user.id}:match:{m.id}:{m.kickoff_at}")
         mids = [m.id for m in await scoped("matches", t.id).list(q, limit=2000)]
         for it in await scoped("paid_media", t.id).list({"match_id": {"$in": mids}, "active": True, "created_at": {"$gte": since}}, sort=[("created_at", -1)], limit=20):
             m = await scoped("matches", t.id).get(it.match_id)

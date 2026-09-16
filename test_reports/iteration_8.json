@@ -1,0 +1,28 @@
+{
+  "summary": "Iteration 8 – Full test of: (1) public tournament home redesign (hero, numbers, upcoming, news, interviews, shop, dashboard, club grid) with defaults for cover/gallery; (2) fan in-app notifications (match 48h + media on-sale) with dedupe & mark-as-read; (3) admin Control Room → Società bug fix (public link on club name + Apri button + Modifica button) and admin PUT club profile that publishes immediately without approval; (4) Premi board with sort/search/filter and Premio speciale dialog with dedupe on (name+team). Backend suite /app/backend/tests/test_iteration8.py: 6/6 PASS. Frontend Playwright: all critical selectors present and interactions working end-to-end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Control Room · Società header", "issues": ["'Nuova società' button has an icon child (svg) – text is only 'Nuova società' so the previously reported bug of a full component inside the button is FIXED; noting that button still contains an SVG icon which is intentional/fine"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration8.py", "/app/test_reports/pytest/iteration8.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "public.py:_default_images – rotation on 6 covers uses stable hash of club_id/slug (OK); if a new gallery upload has fewer than 4 items, homepage should still fill remaining slots with defaults (verify _public_club merges own+default rather than all-or-nothing).",
+    "fans.py:_fan_generate – dedupe key for match notifications should include the match id AND a version (e.g., kickoff time). If a match is rescheduled twice within 48h, current dedupe by (kind,match_id) will NOT notify again. Consider adding kickoff_at into the dedupe key.",
+    "fans.py POST /me/notifications/read – accepts empty body and marks ALL as read. Consider supporting selective mark-read by ids for future.",
+    "Extras.jsx (Premi) – note: badge list in the UI only shows rows with delete permission (my manual badge produced 1 row with delete button). Auto-generated badges are not listed with delete – confirm this is intentional (readonly for auto-generated).",
+    "Badges.jsx dedupe key uses (name+team). This is correct per spec. However, 'Bassi Simone' appears 3 times in the select with different team suffixes; if two players named 'Bassi Simone' actually belong to the SAME team (rare but possible), they'd be deduped and only one would be assignable. Consider fallback to jersey number when duplicates within same team exist."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration8.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (home layout, mobile no-overflow, club defaults, admin club table w/ link+Apri+Modifica, admin editor save+public reflect, fan bell+panel+navigate, public header bell for logged-in fan, club area still has bell+gallery editor, awards sorts+search+count, manual badge dialog with correct format+dedupe+assign+delete)"},
+  "test_credentials": "unchanged: /app/memory/test_credentials.md. During test created a TEST_fan{ts}@test.it new fan (empty favorites) via /api/auth/register.",
+  "seed_data_creation": "Temporarily changed Academy Tuscolana motto to 'QA MOTTO {ts}' via admin editor and restored to original 'Formare persone, non solo giocatori.'; briefly PUT Roma Nord motto='Test admin QA' city='Roma Test QA' via API and restored. Assigned+removed a manual badge 'Test QA' to Simone Bassi (Academy Tuscolana).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Regression files: /app/backend/tests/test_iteration8.py (6 tests, ~4s), plus previous test_iteration7.py. La Serie A dei Bambini tid=6a9b5b045d9e0985643d0a9f. Fan with notifications: fan.notifiche@test.it/Password123 → 4 notifications currently (match+media). Admin editor URL pattern: /admin/t/{tid}/societa/{clubId} with adminMode → immediate publish (approval_status=approved). Public tournament home testids verified: public-tournament-title, public-numbers-strip, home-upcoming-section, home-featured-news, home-featured-post, home-news-all, home-interviews (+home-interviews-empty), home-shop (+home-shop-item-*, home-shop-buy-*), home-dashboard (+public-results, public-mini-standings, public-top-scorers-home), public-club-grid. Public club home: club-cover-default/own, club-home-gallery, club-gallery-0..3, club-gallery-default-note. Editor: club-home-editor, club-home-name/short-name/city/motto/gallery-editor/save/preview/back. Admin table: club-name-link-{slug}, club-homepage-{slug} (both target=_blank), club-edit-{slug}, profile-reviews (shown only when pending drafts exist). Fan: fan-notifications-button/-unread/-panel with notification-{id}. Awards: awards-controls/search/team-filter/count/sort-{mvp|avg_fanta|goals|assists|badges|name|team}, badges-manual-open, manual-badge-search, manual-badge-player (options 'Cognome Nome · Squadra · n. X', no (name,team) dupes; placeholder text 'Giocatore… (N)' matches option count), badge-delete-{id}.",
+  "rca of the issue": "N/A – no bugs found"
+}

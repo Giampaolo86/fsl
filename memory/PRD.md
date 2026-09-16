@@ -80,6 +80,14 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] Logo ufficiale FSL (asset `/brand/logo.png`, icone PWA 192/512, favicon); KPI dell'Hub e dell'Overview cliccabili verso le sezioni dedicate
 - [x] Test: 13/13 backend iterazione 7 (`test_iteration7.py`), flussi frontend verificati (`iteration_7.json`)
 
+## Implementato (2026-06) – Iterazione 8
+- [x] Immagini base società: 6 copertine + 4 foto gallery FSL generate (`/frontend/public/brand/covers/`), assegnate a rotazione (crc32 dello slug) come `cover_url`/`gallery` di default nella risposta pubblica (`cover_is_default`, `gallery_is_default`); gallery società (fino a 4 foto) caricabile dall'editor homepage, slot mancanti riempiti con le immagini di default; sezione «La società in immagini» nella homepage pubblica
+- [x] Notifiche genitori/fan (solo in-app): `GET /api/me/notifications` genera on-demand «Prossima partita» (48h prima, squadre/giocatori seguiti, dedupe per gara+orario) e «Nuova foto/video in vendita» (media degli ultimi 30 giorni sulle gare delle squadre seguite); `POST /api/me/notifications/read`; campanella `NotificationsBell fan` in /account e nell'header pubblico; modello `Notification` con `user_id` opzionale
+- [x] Homepage torneo ridisegnata (blueprint design_agent in `design_guidelines.json`): hero, striscia numeri, prossime partite (scroll orizzontale mobile), Blog e news con articolo in evidenza (post non-badge prioritari, copertina fallback FSL), blocco Interviste (stile citazione, stato vuoto editoriale), vetrina Foto e video (anteprima sfocata → nitida in hover, acquisto Stripe, stato vuoto promozionale), dashboard Risultati/Classifica/Marcatori, griglia squadre. Backend home: `news`, `interviews`, `shop` (con `match_label`)
+- [x] Bug fix Control Room → Società: `ProfileReviews` era finito dentro il pulsante «Nuova società»; ora nome società = link alla homepage pubblica + pulsante «Apri» + pulsante «Modifica» → `/admin/t/:tid/societa/:clubId` (`ClubHomeEditor adminMode`: nome, nome breve, città, motto, immagini, gallery, contatti, sede; pubblicazione immediata senza approvazione; `PUT /profile` accetta name/city/short_name per lo staff)
+- [x] Premi: tabella con ricerca, filtro squadra e ordinamento (MVP, media fantavoto, gol, assist, badge, nome, squadra) + conteggio; dialog «Premio speciale» con ricerca e select giocatori senza ripetizioni (nome+squadra), formato «Cognome Nome · Squadra · n. X»
+- [x] Test: 6/6 backend iterazione 8 (`test_iteration8.py`), flussi frontend verificati (`iteration_8.json`)
+
 ## Backlog prioritizzato
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana
 - P1 (Fase 5): comunicazioni email/SMS (provider da scegliere), segnalazione pubblica con captcha, rimborsi Stripe da Control Room

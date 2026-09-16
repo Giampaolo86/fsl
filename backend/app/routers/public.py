@@ -32,7 +32,7 @@ def _public_club(c) -> dict:
     d["cover_url"] = c.cover_url or cover
     own = [u for u in (c.profile or {}).get("gallery_urls") or [] if u]
     d["gallery_is_default"] = not own
-    d["gallery"] = own or gallery
+    d["gallery"] = (own + [g for g in gallery if g not in own])[:4]
     return d
 
 
