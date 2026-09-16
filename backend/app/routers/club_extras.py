@@ -1,3 +1,4 @@
+import asyncio
 import io
 import os
 import secrets
@@ -268,7 +269,7 @@ def _video_frame(data: bytes, ext: str = "mp4") -> Optional[bytes]:
         with open(src, "wb") as fh:
             fh.write(data)
         for ts in ("00:00:02", "00:00:00.5"):
-            r = subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", ts, "-i", src, "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", out], capture_output=True, timeout=60)
+            r = subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", ts, "-i", src, "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", out], capture_output=True, timeout=25)
             if r.returncode == 0 and os.path.exists(out) and os.path.getsize(out) > 0:
                 with open(out, "rb") as fh:
                     return fh.read()
@@ -281,7 +282,7 @@ async def _make_preview(t_id: str, kind: str, media: MediaFile, user_id: str) ->
         img = _blur_preview(data)
     elif kind == "video":
         ext = media.original_filename.rsplit(".", 1)[-1].lower() if "." in media.original_filename else "mp4"
-        frame = _video_frame(data, ext)
+        frame = await asyncio.to_thread(_video_frame, data, ext)
         if not frame:
             return None
         img = _blur_preview(frame, radius=5)

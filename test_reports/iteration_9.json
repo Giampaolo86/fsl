@@ -1,0 +1,25 @@
+{
+  "summary": "Iteration 9 – Anteprima Video Shop. Backend: generated a 3s testsrc mp4 via imageio-ffmpeg, chunked-uploaded it, created a shop item (kind=video) and verified preview_url is populated and serves an image/jpeg via GET /api/media/{id}. Regen POST /shop/items/{id}/preview returns 200 with a NEW preview_media_id; unknown id → 404; club_manager → 403. Public endpoints (/api/public/tournaments/{slug}/matches/{mid}/shop and /api/public/tournaments/{slug}) both include the video item with preview_url. Frontend: public tournament home /tornei/la-serie-a-dei-bambini renders home-shop cards with <img> for existing video item 6aaa9ce13e4ac1597866ce92; Match Center match-center-shop renders 4 <img> thumbnails (photos+video). Admin MEDIA tab of match 6aaa5ce2cfb606f5c0fb7560 shows shop-row-* with shop-row-preview-* thumbnails for items that have a preview and shop-preview-regen-* ONLY on items without preview (the two pre-existing TEST_iter5_video rows). Suspended the freshly created TEST_QA video item via PATCH active:false to keep the workspace clean; Highlights test and legacy items untouched. All 7 pytest tests PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration9.py", "/app/test_reports/pytest/iteration9.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "club_extras.py:_video_frame – ffmpeg subprocess runs synchronously inside async request handler, blocking the event loop for up to 60s twice (2s + 0.5s fallback). Consider offloading to a thread (asyncio.to_thread) or a background job; preview generation currently blocks the API response of POST /shop/items (observed ~2s latency on a tiny 3s clip; will grow for real videos).",
+    "club_extras.py:create_item – if _make_preview returns None (extraction fails), the item is still created with preview_media_id=None. That is fine (Genera anteprima button covers it in the UI), but there is no error signalling to the caller. Consider returning a warning flag in the response payload so the client can surface a hint.",
+    "club_extras.py:regen_preview – on regeneration success, the old preview MediaFile is not deleted (orphaned in storage). Consider best-effort cleanup of the previous preview_media_id.",
+    "club_extras.py: ffmpeg timeout=60 with two attempts means worst-case 120s per request, exceeding typical ingress timeouts. Cap total elapsed time (single subprocess run with a `-ss ... -itsoffset` fallback via ffmpeg-lavfi select filter, or a shorter timeout)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration9.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (home-shop image, match-center-shop images, admin shop-row thumbnails + regen-only-on-missing)"},
+  "test_credentials": "unchanged (/app/memory/test_credentials.md)",
+  "seed_data_creation": "Created a shop item 'TEST_QA video preview' (video) on match 6aaa5ce2cfb606f5c0fb7560 (La Serie A dei Bambini). Deactivated via PATCH active:false at end of test. Underlying video/preview media docs remain in storage.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New regression file: /app/backend/tests/test_iteration9.py (7 tests, ~5s). Video preview pipeline uses imageio-ffmpeg binary at /root/.venv/lib/python3.11/site-packages/imageio_ffmpeg/binaries/ffmpeg-linux-aarch64-v7.0.2 (works). Existing pre-seeded shop items on match 6aaa5ce2cfb606f5c0fb7560: 'Highlights test' video (6aaa9ce13e4ac1597866ce92, has preview 6aaa9ce13e4ac1597866ce91), 2x TEST_iter5_video WITHOUT preview (6aaa7615d71faac0259f6030 and 6aaa75d61b406c550fb5753a) – useful to exercise 'Genera anteprima' regen. UI selectors verified: home-shop, home-shop-item-{id}, match-center-shop, shop-row-{id}, shop-row-preview-{id}, shop-preview-regen-{id}, shop-toggle-{id}. Admin path: /admin/t/{tid}/partite/{mid} → tab labelled 'MEDIA' (NOT 'Foto/Video') opens the ShopManager.",
+  "rca of the issue": "N/A – no bugs found; feature works end-to-end"
+}

@@ -88,6 +88,9 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] Premi: tabella con ricerca, filtro squadra e ordinamento (MVP, media fantavoto, gol, assist, badge, nome, squadra) + conteggio; dialog «Premio speciale» con ricerca e select giocatori senza ripetizioni (nome+squadra), formato «Cognome Nome · Squadra · n. X»
 - [x] Test: 6/6 backend iterazione 8 (`test_iteration8.py`), flussi frontend verificati (`iteration_8.json`)
 
+## Implementato (2026-06) – Iterazione 9
+- [x] Anteprima video shop: alla messa in vendita di un video il backend estrae un fotogramma (ffmpeg via `imageio-ffmpeg`, 2s con fallback 0,5s, in thread), lo sfoca leggermente e appone la filigrana → `preview_media_id`; vetrina pubblica (home, Match Center, homepage società) mostra il fotogramma; pulsante «Genera anteprima» (`POST /shop/items/{id}/preview`) per i video già in vendita senza miniatura. Test 7/7 (`test_iteration9.py`, `iteration_9.json`)
+
 ## Backlog prioritizzato
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana
 - P1 (Fase 5): comunicazioni email/SMS (provider da scegliere), segnalazione pubblica con captcha, rimborsi Stripe da Control Room
