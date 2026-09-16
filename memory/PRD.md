@@ -50,11 +50,19 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] Cronaca live pubblica: punteggio live da eventi per gare in corso, Match Center con polling 5s e indicatore LIVE
 - [x] Orari torneo: fine giornata fino a sera, pausa opzionale (es. pranzo), preset Mattina/Pomeriggio/Giornata intera/Fino a sera
 
+## Implementato (2026-06) – Iterazione 4
+- [x] Tabellino unico stile fantacalcio (`MatchWorkspace` + `MatchSheet`/`SheetRow`): casa e ospite affiancate, righe h-12, modalità «Prepara distinta» (società/segreteria/staff/arbitro) e «Compila gara» (arbitro assegnato, DT, SA); numero maglia 1° clic presente / 2° assente / 3° da confermare; voto base 6 con −/+ (passo 0,5), bonus (Gol, Assist, Rig. parato, MVP) e malus (Amm., Esp., Autogol) con strip scorrevole, fantavoto; nome cliccabile → scheda giocatore (`PlayerCardDialog`)
+- [x] Backend `POST /matches/{id}/sheet` (attendance+ratings+stats, close bool): risultato calcolato da gol/autogol (non modificabile a mano), eventi derivati senza minuti, validazioni (distinte presenti, ≥1 presente per squadra, 0 da confermare), arbitro → `report_submitted` («Chiudi gara e invia»), DT/SA → `official` («Chiudi gara e pubblica»), rettifica con motivazione → `rectified` + versione prima/dopo; ricalcolo classifica, marcatori, badge, addebiti
+- [x] Portale: Match Center con «Tabellino» (episodi per tipo senza minuti), pagelle compatte voto/bonus/fanta, scheda giocatore pubblica (solo con consenso)
+- [x] Motore badge (`services/badges.py`): 30+ definizioni (Esordio, Primo gol, Doppietta, Tripletta, Porta inviolata, Para-rigori, MVP, MVP x2/x3/seriale, Fuoriclasse 7,5, Elite 8, Sempre presente, Bomber 5/10/20, Assist King 3/5/10, Muro, Fair Play, Top Player giornata, Migliori per ruolo, Squadra della settimana, Campione/Finalista/Promosso/Salvezza), scope gara/stagione/carriera, assegnazione automatica all'ufficializzazione, ricalcolo su rettifica/riapertura/chiusura stagione con sync senza duplicati; premi speciali manuali (SA/DT); notizia automatica «X ha conquistato il badge …» (solo con consenso, esclusi Esordio); badge in scheda giocatore, rose, Premi (admin), Match Center pubblico
+- [x] Social Match Center (`SocialCard.jsx`, canvas 1080×1350): risultato, colori società, MVP (bonus esplicito o miglior fantavoto), podio, premi/badge, stato Anteprima/Pronta, Scarica PNG, Condividi (Web Share API con file), Rigenera; in Match Center pubblico e tab «Social» del workspace
+- [x] Blog e interviste (`routers/posts.py`, `pages/admin/Blog.jsx`, `pages/public/PublicBlog.jsx`): notizie/interviste/gallery/video/match story, upload chunked (4 MB) su Emergent Object Storage servito da `/api/media/{id}`, tag società e partita, bozza/programmato/pubblicato/ritirato, filtri, anteprima, Match story automatica da gara ufficiale (nomi secondo consenso), portale News + articolo + «Ultime news» in home; Responsabile Società limitato ai contenuti della propria società (`/societa/blog`); programmati visibili solo alla data
+- [x] Test: 30/30 backend iterazione 4 (`/app/backend/tests/test_iteration4.py`), flussi frontend verificati (`/app/test_reports/iteration_4.json`)
+
 ## Backlog prioritizzato
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana
-- P0 (Fase 4 residuo): pagelle/fantasy rating, premi e nomination, esiti stagione (promosse/retrocesse), grafiche post-partita (dalla v39)
 - P1 (Fase 5): documenti versionati (Object Storage), scadenze, pagamenti/ricevute (anche quota a convocazione v39), comunicazioni, segnalazione pubblica con captcha
-- P1 (Fase 6): news/editoriale, media, sponsor, personalizzazione visiva società con approvazione
+- P1 (Fase 6): sponsor, personalizzazione visiva società con approvazione, foto giocatori in scheda/social card, embed video esterni (YouTube)
 - P2 (Fase 7): MFA SA/DT, rate limiting, WCAG audit, backup, monitoring
 
 ## Decisioni aperte

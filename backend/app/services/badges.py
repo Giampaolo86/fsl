@@ -212,7 +212,7 @@ async def badge_news(t_id: str, b: dict, actor):
     now = datetime.now(timezone.utc).isoformat()
     title = f"{name} ha conquistato il badge {b['label']}"
     body = f"{name} ({team.name if team else ''}) ha sbloccato il badge «{b['label']}»: {DEFS[b['code']][2].lower()}."
-    await posts.insert(Post(tournament_id=t_id, kind="badge", title=title, slug=f"badge-{b['code']}-{b['player_id'][-6:]}", excerpt=body, body=body, status="published", publish_at=now, published_at=now, author_name="Future Stars League", club_ids=[p.club_id], team_ids=[p.team_id], match_id=b.get("match_id"), player_ids=[p.id], auto=True, auto_key=key), actor.id if actor else None)
+    await posts.insert(Post(tournament_id=t_id, kind="badge", title=title, slug=f"badge-{b['code']}-{b['player_id'][-6:]}", excerpt=f"Badge «{b['label']}» sbloccato in {team.name if team else 'Future Stars League'}.", body=body, status="published", publish_at=now, published_at=now, author_name="Future Stars League", club_ids=[p.club_id], team_ids=[p.team_id], match_id=b.get("match_id"), player_ids=[p.id], auto=True, auto_key=key), actor.id if actor else None)
 
 
 async def for_players(t_id: str, player_ids: list[str]) -> dict:
