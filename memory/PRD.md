@@ -31,12 +31,24 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] Area Società dashboard e squadre; Area Arbitro shell mobile; Portale pubblico: hub, home torneo, squadre, scheda società, classifiche (vuote per design), regolamento
 - [x] Test: 26/26 backend (pytest `/app/backend/tests/backend_test.py`), flussi frontend verificati
 
+## Implementato (2026-06) – Iterazione 2: motore gara (porting v39 dell'utente)
+- [x] Competizioni con tipo (girone / eliminazione diretta / girone+finale), qualificate e generazione/avanzamento fase finale
+- [x] Rose giocatori (anagrafica privata, consenso immagine → nome pubblico), gestibili da staff e Responsabile Società
+- [x] Generatore calendario: round robin, campi × slot da configurazione, vincolo 1 gara/weekend, quality score; gara manuale con vincolo weekend/slot
+- [x] Partite: assegnazione arbitro, convocazioni (società/arbitro/staff), eventi live (gol, cartellini, sostituzioni…), checklist
+- [x] Referto arbitro → risultato official (scelta utente, come v39), verifica coerenza eventi/punteggio, blocco dopo invio; Direttore ufficializza/rettifica (motivazione, versioni prima/dopo) e riapre
+- [x] Classifiche con punti/tie-break configurabili (incl. scontro diretto, fair play), zone, forma, snapshot a ogni ufficializzazione
+- [x] Segnalazioni errore (ticket) da società → gestione staff (in revisione/respinta/risolta)
+- [x] Portale pubblico: prossime gare, ultimi risultati, mini classifica, marcatori, pagina Partite, Match Center (cronaca, forma, classifica), Classifiche live, Statistiche; privacy (nomi solo con consenso)
+- [x] Area Arbitro mobile (gare assegnate → live → referto) e Area Società (calendario, convocazioni, rose, segnalazioni)
+- [x] Test: 36/36 engine + 26/26 base (backend), flussi frontend verificati (`/app/test_reports/iteration_2.json`)
+
 ## Backlog prioritizzato
-- P0 (Fase 3): disponibilità campi/blackout, generatore bozza calendario (round robin, campi×slot da config, vincolo 1 gara/weekend), conflitti, quality score, versioni, pubblicazione, drag-and-drop
-- P0 (Fase 4): assegnazioni arbitri, app arbitro (checklist, eventi, live, referto bloccato), ufficializzazione/rettifica solo DT con lock ottimistico, snapshot classifiche, statistiche, Match Center pubblico, aggiornamento ≤5s
-- P1 (Fase 5): rose, documenti versionati (Object Storage, URL firmati), consensi, pagamenti/ricevute, comunicazioni (adapter email), ticket/segnalazioni pubbliche con captcha
-- P1 (Fase 6): portale completo (partite, statistiche, news, media, sponsor), personalizzazione visiva società con approvazione
-- P2 (Fase 7): MFA SA/DT, rate limiting, WCAG audit, backup, monitoring, export/cancellazione dati
+- P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana
+- P0 (Fase 4 residuo): pagelle/fantasy rating, premi e nomination, esiti stagione (promosse/retrocesse), grafiche post-partita (dalla v39)
+- P1 (Fase 5): documenti versionati (Object Storage), scadenze, pagamenti/ricevute (anche quota a convocazione v39), comunicazioni, segnalazione pubblica con captcha
+- P1 (Fase 6): news/editoriale, media, sponsor, personalizzazione visiva società con approvazione
+- P2 (Fase 7): MFA SA/DT, rate limiting, WCAG audit, backup, monitoring
 
 ## Decisioni aperte
 Provider email/SMS; gateway pagamenti online (adapter); policy retention; Pantone su mazzetta fisica.

@@ -40,7 +40,7 @@ export default function MatchWorkspace({ tournamentId: tidProp, backTo, compact 
   if (!m) return <LoadingState />;
   const isRef = user.role === "referee" && !user.is_super_admin;
   const locked = isRef ? !m.can_edit_match : !m.can_officialize;
-  const isFinal = FINAL.includes(m.status);
+  const isFinal = FINAL.includes(m.status) || (m.status === "under_review" && m.score.home !== null);
   const players = (side) => m.players[side];
   const pname = (id) => { const p = [...m.players.home, ...m.players.away].find((x) => x.id === id); return p ? `${p.shirt_number ?? ""} ${p.first_name} ${p.last_name}` : "—"; };
   const teamName = (id) => (id === m.home_team_id ? m.home.club?.name : m.away.club?.name);

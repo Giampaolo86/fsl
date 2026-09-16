@@ -397,10 +397,11 @@ async def submit_report(tournament_id: str, match_id: str, body: ScoreIn, user: 
 async def officialize(tournament_id: str, match_id: str, body: ScoreIn, user: CurrentUser = Depends(get_current_user)):
     t, role = await require_tournament(tournament_id, user, roles=OPS, writable=True)
     m = await _match_or_404(tournament_id, match_id)
-    rectify = m.status in FINAL
+    rectify = m.status in FINAL + ("under_review",) and m.score.get("home") is not None
     if rectify and not body.reason:
         raise bad_request("La rettifica richiede una motivazione")
-    check_score(m, body.home, body.away)
+    if not rectify:
+        check_score(m, body.home, body.away)
     score = {"home": body.home, "away": body.away, "home_pen": body.home_pen, "away_pen": body.away_pen}
     await _write_version(tournament_id, m, "rectification" if rectify else "officialization", score, user, role, director_notes=body.notes, reason=body.reason)
     m2 = await scoped("matches", tournament_id).update_versioned(m.id, m.version, {"score": score, "status": "rectified" if rectify else "official"}, user.id)
