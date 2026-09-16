@@ -97,8 +97,14 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] Notifiche fan: motivo esplicito nel testo («segui SPO» / «con Luca»), nessun media antecedente alla registrazione; homepage società: contatore badge compatto nelle rose
 - [x] Scheda Giocatore (`pages/PlayerProfile.jsx`, rotte pubblica `/tornei/:slug/giocatori/:id`, admin `/admin/t/:tid/giocatori/:id`, società `/societa/giocatori/:id`): hero, «Mi presento» (altezza, peso, piede, soprannome, idolo, squadra del cuore, citazione), «Dicono di me», statistiche, badge, media taggati (post `player_ids` + shop `player_ids`), storico gare. Modifica (`PUT /players/{id}/profile`) per staff, società del giocatore e genitore abbinato via `guardian_emails` (impostabili solo da staff/società); `GET /me/children` + sezione «I miei bambini» in /account. Privacy: pubblico e altre società vedono solo la vista con consenso («Giocatore» senza foto/profilo). Nomi cliccabili: Premi, marcatori, Rose («Scheda»), popup «Scheda completa». Tag giocatori nel gestore foto/video shop. Test 12/12 (`test_iteration12.py`, `iteration_12.json`)
 
+## Implementato (2026-06) – Iterazione 13
+- [x] Tag giocatori nel blog: selettore con ricerca nel `PostEditor` (filtrato per società/gara), `player_ids` salvati → contenuti nella scheda giocatore
+- [x] Cartolina giocatore 1080×1350 (`PlayerPostcard.jsx`, canvas client-side): foto, numero, nome, soprannome, citazione, dati «Mi presento», statistiche, badge, colori società; download PNG + Web Share; visibile se consenso o a chi può modificare
+- [x] Foto dal genitore: upload dalla scheda (ritaglio quadrato server-side); staff/società pubblicano subito, genitore → `photo_pending_url` con notifica alla società e approvazione/rifiuto (`POST /players/{id}/photo/review`)
+- [x] Registrazione società (`routers/registration.py`): (a) codice invito per società (admin Società → «Invito», `FSL-XXXX-XXXX`, 30 gg, uso singolo, rigenerazione invalida il precedente) → `/registrati-societa?codice=…` crea responsabile + membership e accede; (b) `/richiedi-accesso` → richiesta in Control Room → Utenti («Richieste di accesso società») con Approva (crea società se nuova + utente con password temporanea mostrata una volta) / Rifiuta. Link in /login. Test 25/25 backend + tutti i flussi frontend (`iteration_13.json`)
+
 ## Backlog prioritizzato
-- P1 Registrazione società: (a) invito con codice generato dall'admin → `/registrati-societa`; (b) richiesta libera con approvazione admin. Base attuale: creazione da Control Room → Utenti
+- ~~P1 Registrazione società~~ (fatto, iterazione 13)
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana
 - P1 (Fase 5): comunicazioni email/SMS (provider da scegliere), segnalazione pubblica con captcha, rimborsi Stripe da Control Room
 - P1 (Fase 6): sponsor, personalizzazione visiva società con approvazione, anteprima video (thumbnail) per lo shop, pacchetti foto scontati

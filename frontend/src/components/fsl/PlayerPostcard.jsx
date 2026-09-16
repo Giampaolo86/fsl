@@ -91,7 +91,7 @@ export function PlayerPostcard({ card, colors }) {
     Promise.all([fonts, withPhoto()]).then(([, img]) => { drawPostcard(ctx, card, img, colors); setReady(true); });
   }, [card, colors]);
   const blob = () => new Promise((res) => canvas.current.toBlob(res, "image/png"));
-  const fileName = () => `fsl-${(card.name || "giocatore").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`;
+  const fileName = () => `fsl-${(card.name || "giocatore").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.png`;
   const download = async () => { const b = await blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = fileName(); a.click(); URL.revokeObjectURL(a.href); };
   const share = async () => {
     const b = await blob(); const file = new File([b], fileName(), { type: "image/png" });
