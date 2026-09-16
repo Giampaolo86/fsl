@@ -143,7 +143,9 @@ async def player_card(tournament_id: str, p, public: bool = False):
     posts = await public_posts(tournament_id, None, limit=30, player_id=p.id) if show else []
     shop = await _items_out(tournament_id, await scoped("paid_media", tournament_id).list({"player_ids": p.id, "active": True}, sort=[("created_at", -1)], limit=30)) if show else []
     prof = {k: v for k, v in (p.profile or {}).items() if k in PROFILE_FIELDS} if show else {}
-    return {"player_id": p.id, "name": name, "role": p.role, "role_code": ROLE_CODE.get(p.role, ""), "shirt_number": p.shirt_number, "birth_year": None if public else p.birth_year, "team": teams[p.team_id].name if p.team_id in teams else "", "team_id": p.team_id, "club_id": p.club_id, "photo_url": p.photo_url if show else None, "public_ok": ok, "profile": prof, "guardian_emails": [] if public else p.guardian_emails, "media": {"posts": posts, "shop": shop}, "totals": dict(tot), "avg_vote": round(sum(votes) / len(votes), 2) if votes else None, "avg_fanta": round(sum(fantas) / len(fantas), 2) if fantas else None, "history": list(reversed(history)), "badges": (await badges.for_players(tournament_id, [p.id])).get(p.id, [])}
+    club = await scoped("clubs", tournament_id).get(p.club_id)
+    club_d = {"id": club.id, "name": club.name, "slug": club.slug, "colors": club.colors, "crest_url": club.crest_url if not club.crest_is_placeholder else None} if club else None
+    return {"club": club_d, "player_id": p.id, "name": name, "role": p.role, "role_code": ROLE_CODE.get(p.role, ""), "shirt_number": p.shirt_number, "birth_year": None if public else p.birth_year, "team": teams[p.team_id].name if p.team_id in teams else "", "team_id": p.team_id, "club_id": p.club_id, "photo_url": p.photo_url if show else None, "public_ok": ok, "profile": prof, "guardian_emails": [] if public else p.guardian_emails, "media": {"posts": posts, "shop": shop}, "totals": dict(tot), "avg_vote": round(sum(votes) / len(votes), 2) if votes else None, "avg_fanta": round(sum(fantas) / len(fantas), 2) if fantas else None, "history": list(reversed(history)), "badges": (await badges.for_players(tournament_id, [p.id])).get(p.id, [])}
 
 
 PROFILE_FIELDS = {"height_cm", "weight_kg", "foot", "quote", "testimonials", "nickname", "idol", "favorite_team"}
@@ -176,6 +178,7 @@ async def get_player_card(tournament_id: str, player_id: str, user: CurrentUser 
         d["photo_url"] = p.photo_url
         d["profile"] = {k: v for k, v in (p.profile or {}).items() if k in PROFILE_FIELDS}
     d["can_edit"] = editor
+    d["photo_pending_url"] = p.photo_pending_url if editor else None
     return d
 
 

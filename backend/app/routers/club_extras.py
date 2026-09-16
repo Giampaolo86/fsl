@@ -38,29 +38,62 @@ async def _store(t_id: str, data: bytes, content_type: str, filename: str, user_
 
 
 # ---------- foto giocatori ----------
-@router.post("/players/{player_id}/photo")
-async def upload_photo(tournament_id: str, player_id: str, file: UploadFile = File(...), user: CurrentUser = Depends(get_current_user)):
-    t, role = await require_tournament(tournament_id, user, roles=STAFF | {"club_manager"}, writable=True)
-    repo = scoped("players", tournament_id)
-    p = await repo.get(player_id)
-    if not p:
-        raise not_found("Giocatore")
-    if role == "club_manager" and p.club_id != user.club_in(tournament_id):
-        raise forbidden("Puoi gestire solo le rose della tua società")
-    if not (file.content_type or "").startswith("image/"):
-        raise bad_request("Carica un'immagine")
-    data = await file.read()
-    if len(data) > 8 * 1024 * 1024:
-        raise bad_request("Immagine troppo grande (max 8 MB)")
+def _square(data: bytes) -> bytes:
     from PIL import Image, ImageOps
 
     img = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
     img = ImageOps.fit(img, (512, 512), method=Image.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=88)
-    m = await _store(tournament_id, buf.getvalue(), "image/jpeg", "player.jpg", user.id, p.club_id)
-    p2 = await repo.update(p.id, {"photo_url": f"/api/media/{m.id}"}, user.id)
+    return buf.getvalue()
+
+
+@router.post("/players/{player_id}/photo")
+async def upload_photo(tournament_id: str, player_id: str, file: UploadFile = File(...), user: CurrentUser = Depends(get_current_user)):
+    from .extras import can_edit_player
+
+    repo = scoped("players", tournament_id)
+    p = await repo.get(player_id)
+    if not p:
+        raise not_found("Giocatore")
+    editor = await can_edit_player(user, tournament_id, p)
+    if not editor:
+        raise forbidden("Non puoi modificare la foto di questo giocatore")
+    if not (file.content_type or "").startswith("image/"):
+        raise bad_request("Carica un'immagine")
+    data = await file.read()
+    if len(data) > 8 * 1024 * 1024:
+        raise bad_request("Immagine troppo grande (max 8 MB)")
+    m = await _store(tournament_id, _square(data), "image/jpeg", "player.jpg", user.id, p.club_id)
+    url = f"/api/media/{m.id}"
+    if editor == "guardian":
+        p2 = await repo.update(p.id, {"photo_pending_url": url, "photo_pending_by": user.email}, user.id)
+        await notify(tournament_id, p.club_id, "photo", f"Foto da approvare: {p.first_name} {p.last_name}", f"Caricata dal genitore {user.full_name}", f"/societa/giocatori/{p.id}", dedupe_key=f"photo:{p.id}:{m.id}")
+        await audit.record(user, "player.photo_pending", "player", p.id, tournament_id, after={"media_id": m.id})
+        return {**p2.public(), "pending": True}
+    p2 = await repo.update(p.id, {"photo_url": url, "photo_pending_url": None, "photo_pending_by": None}, user.id)
     await audit.record(user, "player.photo", "player", p.id, tournament_id, after={"media_id": m.id})
+    return p2.public()
+
+
+@router.post("/players/{player_id}/photo/review")
+async def review_photo(tournament_id: str, player_id: str, body: dict, user: CurrentUser = Depends(get_current_user)):
+    from .extras import can_edit_player
+
+    repo = scoped("players", tournament_id)
+    p = await repo.get(player_id)
+    if not p:
+        raise not_found("Giocatore")
+    if await can_edit_player(user, tournament_id, p) not in ("staff", "club"):
+        raise forbidden("Solo società e organizzazione possono approvare le foto")
+    if not p.photo_pending_url:
+        raise bad_request("Nessuna foto in attesa")
+    approve = bool(body.get("approve"))
+    patch = {"photo_pending_url": None, "photo_pending_by": None}
+    if approve:
+        patch["photo_url"] = p.photo_pending_url
+    p2 = await repo.update(p.id, patch, user.id)
+    await audit.record(user, "player.photo_review", "player", p.id, tournament_id, after={"approved": approve})
     return p2.public()
 
 

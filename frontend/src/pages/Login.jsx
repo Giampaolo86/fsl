@@ -90,7 +90,9 @@ export default function Login() {
             <GoogleButton />
             <Link to="/registrati" className="btn-ghost w-full" data-testid="login-register-link">Crea un account genitore/tifoso</Link>
           </div>
-          <p className="mt-6 text-xs text-fsl-slate">Admin, Direttore, Segreteria, Arbitri e Società usano le credenziali ricevute. Genitori e tifosi si registrano liberamente: vedono tutto, segnalano errori e acquistano foto e video.</p>
+          <div className="mt-4 flex items-center gap-3 text-[10px] uppercase tracking-wider text-fsl-slate"><span className="h-px flex-1 bg-white/10" />Società<span className="h-px flex-1 bg-white/10" /></div>
+          <div className="mt-3 grid grid-cols-2 gap-2"><Link to="/registrati-societa" className="btn-ghost w-full text-xs" data-testid="login-register-club-link">Ho un codice invito</Link><Link to="/richiedi-accesso" className="btn-ghost w-full text-xs" data-testid="login-request-access-link">Richiedi accesso</Link></div>
+          <p className="mt-6 text-xs text-fsl-slate">Admin, Direttore, Segreteria e Arbitri usano le credenziali ricevute. Le società entrano con le credenziali create dall'organizzazione, con un codice invito o richiedendo l'accesso. Genitori e tifosi si registrano liberamente.</p>
         </form>
       </section>
     </div>

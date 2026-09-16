@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, UserCog } from "lucide-react";
 import { toast } from "sonner";
+import { AccessRequests } from "@/components/fsl/ClubOnboarding";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -46,6 +47,7 @@ export default function UsersPage() {
   return (
     <div>
       <PageHeader kicker="Utenti, ruoli e permessi" title="Utenti" subtitle="Ogni utente ha un ruolo e una o più membership per torneo. I permessi sono applicati lato API." actions={canCreate && <button className="btn-primary" onClick={() => setOpen(true)} data-testid="users-create-button"><Plus className="h-4 w-4" /> Nuovo utente</button>} />
+      <AccessRequests tournaments={tournaments || []} canApprove={canCreate} />
       <div className="fsl-card overflow-x-auto">
         <table className="w-full table-dark" data-testid="users-table">
           <thead><tr><th>Utente</th><th>Ruolo</th><th>Tornei assegnati</th><th>MFA</th><th>Stato</th></tr></thead>

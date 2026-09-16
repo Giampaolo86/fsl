@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, Pencil, Plus, Shield, Users } from "lucide-react";
+import { ExternalLink, KeyRound, Pencil, Plus, Shield, Users } from "lucide-react";
+import { InviteDialog } from "@/components/fsl/ClubOnboarding";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { ProfileReviews } from "@/components/fsl/ProfileReviews";
@@ -102,6 +103,7 @@ export default function Clubs() {
                   <td className="text-xs">{c.crest_is_placeholder ? <span className="text-fsl-warning">Segnaposto</span> : <span className="text-fsl-success">Ufficiale</span>}</td>
                   <td className="text-right">
                     <div className="inline-flex gap-1">
+                      {canWrite && <button className="btn-ghost h-9" onClick={() => setOpen({ invite: c })} data-testid={`club-invite-${c.slug}`}><KeyRound className="h-4 w-4" aria-hidden="true" /> Invito</button>}
                       {canWrite && <Link to={`/admin/t/${t.id}/societa/${c.id}`} className="btn-ghost h-9" data-testid={`club-edit-${c.slug}`}><Pencil className="h-4 w-4" aria-hidden="true" /> Modifica</Link>}
                       <Link to={`/tornei/${t.slug}/squadre/${c.slug}`} target="_blank" rel="noreferrer" className="btn-ghost h-9" data-testid={`club-homepage-${c.slug}`}>
                         <ExternalLink className="h-4 w-4" aria-hidden="true" /> Apri
@@ -122,6 +124,7 @@ export default function Clubs() {
         </div>
       )}
 
+      {open?.invite && <InviteDialog tid={t.id} club={open.invite} onClose={() => setOpen(null)} />}
       <Dialog open={open === "new"} onOpenChange={(o) => !o && setOpen(null)}>
         <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl" data-testid="club-create-dialog" aria-describedby={undefined}>
           <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Nuova società</DialogTitle></DialogHeader>
@@ -142,7 +145,7 @@ export default function Clubs() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!open && open !== "new"} onOpenChange={(o) => !o && setOpen(null)}>
+      <Dialog open={!!open && open !== "new" && !open.invite} onOpenChange={(o) => !o && setOpen(null)}>
         <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl" data-testid="team-create-dialog" aria-describedby={undefined}>
           <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Iscrivi {open?.name}</DialogTitle></DialogHeader>
           <label>

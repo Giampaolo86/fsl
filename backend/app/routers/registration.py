@@ -1,0 +1,166 @@
+import secrets
+from datetime import timedelta
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Request, Response
+from pydantic import BaseModel, EmailStr
+
+from ..core.deps import CurrentUser, get_current_user, load_current_user, require_tournament
+from ..core.errors import bad_request, conflict, not_found
+from ..core.security import hash_password
+from ..models.base import utcnow
+from ..models.domain import AccessRequest, Club, ClubInvite, TournamentMembership, User
+from ..repositories.base import Repository
+from ..repositories.registry import memberships, scoped, tournaments, users
+from ..services import audit
+from ..services.tournaments import slugify
+from .auth import _issue
+
+router = APIRouter(tags=["registration"])
+STAFF = {"super_admin", "director", "secretary"}
+invites = Repository("club_invites", ClubInvite)
+requests_repo = Repository("access_requests", AccessRequest)
+
+
+def _code() -> str:
+    raw = secrets.token_hex(4).upper()
+    return f"FSL-{raw[:4]}-{raw[4:]}"
+
+
+async def _valid_invite(code: str) -> Optional[ClubInvite]:
+    inv = await invites.find_one({"code": code.strip().upper()})
+    if not inv or inv.used_by:
+        return None
+    exp = inv.expires_at if inv.expires_at.tzinfo else inv.expires_at.replace(tzinfo=utcnow().tzinfo)
+    return inv if exp > utcnow() else None
+
+
+# ---------- inviti (staff) ----------
+@router.post("/tournaments/{tournament_id}/clubs/{club_id}/invite")
+async def create_invite(tournament_id: str, club_id: str, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles=STAFF, writable=True)
+    club = await scoped("clubs", tournament_id).get(club_id)
+    if not club:
+        raise not_found("Società")
+    for old in await invites.list({"club_id": club_id, "used_by": None}):
+        await invites.update(old.id, {"expires_at": utcnow()}, user.id)
+    inv = await invites.insert(ClubInvite(tournament_id=tournament_id, club_id=club_id, code=_code(), expires_at=utcnow() + timedelta(days=30)), user.id)
+    await audit.record(user, "club.invite", "club", club_id, tournament_id, after={"code": inv.code})
+    return inv.public()
+
+
+@router.get("/tournaments/{tournament_id}/clubs/{club_id}/invite")
+async def get_invite(tournament_id: str, club_id: str, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles=STAFF)
+    rows = await invites.list({"club_id": club_id}, sort=[("created_at", -1)], limit=1)
+    inv = rows[0] if rows else None
+    return {"invite": inv.public() if inv else None, "valid": bool(inv and await _valid_invite(inv.code))}
+
+
+# ---------- registrazione con codice ----------
+@router.get("/public/invites/{code}")
+async def check_invite(code: str):
+    inv = await _valid_invite(code)
+    if not inv:
+        raise bad_request("Codice invito non valido o scaduto")
+    club = await scoped("clubs", inv.tournament_id).get(inv.club_id)
+    t = await tournaments.get(inv.tournament_id)
+    return {"club": {"id": club.id, "name": club.name, "city": club.city} if club else None, "tournament": {"id": t.id, "name": t.name, "slug": t.slug} if t else None, "expires_at": inv.expires_at}
+
+
+class RegisterClubIn(BaseModel):
+    code: str
+    email: EmailStr
+    password: str
+    full_name: str
+    privacy_accepted: bool = False
+
+
+@router.post("/auth/register-club", status_code=201)
+async def register_club(body: RegisterClubIn, request: Request, response: Response):
+    if not body.privacy_accepted:
+        raise bad_request("Devi accettare l'informativa privacy")
+    if len(body.password) < 8:
+        raise bad_request("La password deve avere almeno 8 caratteri")
+    if len(body.full_name.strip()) < 2:
+        raise bad_request("Inserisci nome e cognome")
+    inv = await _valid_invite(body.code)
+    if not inv:
+        raise bad_request("Codice invito non valido o scaduto")
+    email = body.email.lower()
+    if await users.find_one({"email": email}):
+        raise conflict("Esiste già un account con questa email: accedi e chiedi all'organizzazione di abbinarti alla società")
+    u = await users.insert(User(email=email, password_hash=hash_password(body.password), full_name=body.full_name.strip(), role="club_manager"))
+    await memberships.insert(TournamentMembership(user_id=u.id, tournament_id=inv.tournament_id, role="club_manager", club_id=inv.club_id), u.id)
+    await invites.update(inv.id, {"used_by": u.id, "used_at": utcnow()}, u.id)
+    current = await load_current_user(u.id)
+    await audit.record(current, "auth.register_club", "user", u.id, inv.tournament_id, ip=request.client.host if request.client else None, after={"club_id": inv.club_id})
+    return _issue(response, current)
+
+
+# ---------- richiesta libera ----------
+class AccessRequestIn(BaseModel):
+    tournament_slug: str
+    club_name: str
+    city: str = ""
+    contact_name: str
+    email: EmailStr
+    phone: str = ""
+    note: str = ""
+    privacy_accepted: bool = False
+
+
+@router.post("/public/access-requests", status_code=201)
+async def create_access_request(body: AccessRequestIn):
+    if not body.privacy_accepted:
+        raise bad_request("Devi accettare l'informativa privacy")
+    if len(body.club_name.strip()) < 2 or len(body.contact_name.strip()) < 2:
+        raise bad_request("Compila nome società e referente")
+    t = await tournaments.find_one({"slug": body.tournament_slug})
+    if not t:
+        raise not_found("Torneo")
+    if await requests_repo.find_one({"tournament_id": t.id, "email": body.email.lower(), "status": "pending"}):
+        raise conflict("Hai già una richiesta in attesa per questo torneo")
+    r = await requests_repo.insert(AccessRequest(tournament_id=t.id, club_name=body.club_name.strip(), city=body.city.strip(), contact_name=body.contact_name.strip(), email=body.email.lower(), phone=body.phone.strip(), note=body.note.strip()[:1000]))
+    return {"id": r.id, "status": r.status}
+
+
+@router.get("/tournaments/{tournament_id}/access-requests")
+async def list_access_requests(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles=STAFF)
+    return [r.public() for r in await requests_repo.list({"tournament_id": tournament_id}, sort=[("created_at", -1)])]
+
+
+@router.post("/tournaments/{tournament_id}/access-requests/{request_id}/approve")
+async def approve_access_request(tournament_id: str, request_id: str, body: dict = None, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles={"super_admin", "director"}, writable=True)
+    r = await requests_repo.get(request_id)
+    if not r or r.tournament_id != tournament_id:
+        raise not_found("Richiesta")
+    if r.status != "pending":
+        raise conflict("Richiesta già gestita")
+    if await users.find_one({"email": r.email}):
+        raise conflict("Esiste già un utente con questa email: crea la membership da Utenti")
+    clubs = scoped("clubs", tournament_id)
+    club_id = (body or {}).get("club_id")
+    club = await clubs.get(club_id) if club_id else await clubs.find_one({"slug": slugify(r.club_name)})
+    if not club:
+        club = await clubs.insert(Club(tournament_id=tournament_id, name=r.club_name, slug=slugify(r.club_name), short_name=r.club_name[:3].upper(), city=r.city, colors={"primary": "#0B57D9", "secondary": "#F4AE2B"}), user.id)
+    temp = secrets.token_urlsafe(9)
+    u = await users.insert(User(email=r.email, password_hash=hash_password(temp), full_name=r.contact_name, role="club_manager"), user.id)
+    await memberships.insert(TournamentMembership(user_id=u.id, tournament_id=tournament_id, role="club_manager", club_id=club.id), user.id)
+    await requests_repo.update(r.id, {"status": "approved", "created_user_id": u.id, "club_id": club.id, "review_note": (body or {}).get("note", "")}, user.id)
+    await audit.record(user, "access_request.approve", "access_request", r.id, tournament_id, after={"user_id": u.id, "club_id": club.id})
+    return {"ok": True, "email": u.email, "temp_password": temp, "club": {"id": club.id, "name": club.name}}
+
+
+@router.post("/tournaments/{tournament_id}/access-requests/{request_id}/reject")
+async def reject_access_request(tournament_id: str, request_id: str, body: dict = None, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles=STAFF, writable=True)
+    r = await requests_repo.get(request_id)
+    if not r or r.tournament_id != tournament_id:
+        raise not_found("Richiesta")
+    if r.status != "pending":
+        raise conflict("Richiesta già gestita")
+    await requests_repo.update(r.id, {"status": "rejected", "review_note": (body or {}).get("note", "")}, user.id)
+    return {"ok": True}

@@ -131,6 +131,8 @@ class Player(BaseDocument):
     photo_url: Optional[str] = None
     profile: dict = {}
     guardian_emails: list[str] = []
+    photo_pending_url: Optional[str] = None
+    photo_pending_by: Optional[str] = None
 
 
 MatchStatus = Literal["draft", "scheduled", "confirmed", "in_progress", "finished", "report_submitted", "official", "under_review", "rectified", "postponed", "cancelled"]
@@ -406,3 +408,26 @@ class AuditLog(BaseDocument):
     after: Optional[dict] = None
     reason: Optional[str] = None
     ip: Optional[str] = None
+
+
+class ClubInvite(BaseDocument):
+    tournament_id: str
+    club_id: str
+    code: str
+    expires_at: datetime
+    used_by: Optional[str] = None
+    used_at: Optional[datetime] = None
+
+
+class AccessRequest(BaseDocument):
+    tournament_id: str
+    club_name: str
+    city: str = ""
+    contact_name: str
+    email: str
+    phone: str = ""
+    note: str = ""
+    status: Literal["pending", "approved", "rejected"] = "pending"
+    review_note: str = ""
+    created_user_id: Optional[str] = None
+    club_id: Optional[str] = None

@@ -44,7 +44,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  return <AuthContext.Provider value={{ user, landing, checking, login, logout, register, googleSession, updateUser }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, landing, checking, login, logout, register, googleSession, updateUser, setSession: adopt }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => useContext(AuthContext);

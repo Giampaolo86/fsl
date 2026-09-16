@@ -6,15 +6,21 @@ import { KIND_LABEL } from "@/components/fsl/Article";
 import { api, apiError } from "@/lib/api";
 import { mediaUrl, uploadMedia } from "@/lib/upload";
 
-const EMPTY = { kind: "news", title: "", excerpt: "", body: "", cover_url: null, media: [], club_ids: [], match_id: "", publish_at: "" };
+const EMPTY = { kind: "news", title: "", excerpt: "", body: "", cover_url: null, media: [], club_ids: [], player_ids: [], match_id: "", publish_at: "" };
 
 export function PostEditor({ tournamentId, post, clubMode, clubs, matches, onClose, onSaved }) {
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [pq, setPq] = useState("");
+  useEffect(() => { Promise.all([api.get(`/tournaments/${tournamentId}/players`), api.get(`/tournaments/${tournamentId}/teams`)]).then(([p, t]) => { const tn = Object.fromEntries(t.data.map((x) => [x.id, x])); setPlayers(p.data.map((x) => ({ id: x.id, club_id: x.club_id, team_id: x.team_id, label: `${x.first_name} ${x.last_name}`, team: tn[x.team_id]?.name || "" })).sort((a, b) => a.label.localeCompare(b.label))); }).catch(() => {}); }, [tournamentId]);
+  const matchSel = (matches || []).find((m) => m.id === form.match_id);
+  const matchTeams = matchSel ? [matchSel.home_team_id, matchSel.away_team_id] : null;
+  const togglePlayer = (id) => setForm((f) => ({ ...f, player_ids: (f.player_ids || []).includes(id) ? f.player_ids.filter((x) => x !== id) : [...(f.player_ids || []), id] }));
   useEffect(() => { setForm(post ? { ...EMPTY, ...post, match_id: post.match_id || "", publish_at: post.publish_at ? post.publish_at.slice(0, 16) : "" } : EMPTY); }, [post]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const body = () => ({ kind: form.kind, title: form.title, excerpt: form.excerpt, body: form.body, cover_url: form.cover_url, media: form.media, club_ids: form.club_ids, match_id: form.match_id || null, publish_at: form.publish_at ? new Date(form.publish_at).toISOString() : null });
+  const body = () => ({ kind: form.kind, title: form.title, excerpt: form.excerpt, body: form.body, cover_url: form.cover_url, media: form.media, club_ids: form.club_ids, player_ids: form.player_ids || [], match_id: form.match_id || null, publish_at: form.publish_at ? new Date(form.publish_at).toISOString() : null });
 
   const save = async (action) => {
     setBusy(true);
@@ -62,6 +68,9 @@ export function PostEditor({ tournamentId, post, clubMode, clubs, matches, onClo
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <div><div className="fsl-label mb-1">Società collegate</div>{clubMode ? <p className="text-xs text-fsl-slate">Il contenuto è collegato alla tua società.</p> : <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto" data-testid="post-clubs">{clubs.map((c) => <button key={c.id} onClick={() => toggleClub(c.id)} className={`h-7 px-2 rounded-full text-[11px] border ${form.club_ids.includes(c.id) ? "bg-fsl-gold text-ink-950 border-fsl-gold" : "border-white/20 text-fsl-slate"}`}>{c.short_name || c.name}</button>)}</div>}</div>
+          <div className="sm:col-span-2" data-testid="post-players"><div className="fsl-label mb-1 flex items-center justify-between"><span>Giocatori taggati <span className="text-fsl-slate normal-case">(il contenuto compare nella loro scheda)</span></span><span className="num text-fsl-gold">{(form.player_ids || []).length}</span></div>
+            <input className="fsl-input h-9 mb-2" placeholder="Cerca giocatore o squadra…" value={pq} onChange={(e) => setPq(e.target.value)} data-testid="post-players-search" />
+            <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto fsl-scroll">{players.filter((p) => (form.player_ids || []).includes(p.id) || ((!form.club_ids.length || form.club_ids.includes(p.club_id)) && (!matchTeams || matchTeams.includes(p.team_id)) && (!pq || `${p.label} ${p.team}`.toLowerCase().includes(pq.toLowerCase())))).slice(0, 80).map((p) => <button key={p.id} type="button" onClick={() => togglePlayer(p.id)} className={`h-7 px-2 rounded-full text-[11px] border ${(form.player_ids || []).includes(p.id) ? "bg-fsl-gold text-ink-950 border-fsl-gold font-semibold" : "border-white/20 text-fsl-slate hover:text-fsl-white"}`} data-testid={`post-player-${p.id}`}>{p.label} <span className="opacity-60">· {p.team}</span></button>)}</div></div>
           <div><div className="fsl-label mb-1">Partita collegata</div><select className="fsl-input h-9" value={form.match_id} onChange={(e) => set("match_id", e.target.value)} data-testid="post-match"><option value="">— nessuna —</option>{matches.map((m) => <option key={m.id} value={m.id}>{m.round_name} · {m.home.club?.short_name} - {m.away.club?.short_name}{m.score.home != null ? ` ${m.score.home}-${m.score.away}` : ""}</option>)}</select></div>
         </div>
         <div><div className="fsl-label mb-1">Programmazione (opzionale)</div><input type="datetime-local" className="fsl-input h-9 w-64" value={form.publish_at} onChange={(e) => set("publish_at", e.target.value)} data-testid="post-publish-at" /></div>

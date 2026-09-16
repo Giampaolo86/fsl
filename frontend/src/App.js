@@ -23,6 +23,7 @@ import BlogManager from "@/pages/admin/Blog";
 import Documents from "@/pages/club/Documents";
 import { PaymentCancel, PaymentSuccess, Sales } from "@/pages/Payments";
 import Register, { AuthCallback } from "@/pages/Register";
+import { RegisterClub, RequestAccess } from "@/pages/RegisterClub";
 import FanAccount from "@/pages/FanAccount";
 import PlayerProfile from "@/pages/PlayerProfile";
 import ClubHomeEditor from "@/pages/club/ClubHomeEditor";
@@ -72,6 +73,8 @@ function AppRoutes() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/registrati" element={<Register />} />
+              <Route path="/registrati-societa" element={<RegisterClub />} />
+              <Route path="/richiedi-accesso" element={<RequestAccess />} />
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/payment/cancel" element={<PaymentCancel />} />
               <Route path="/logout" element={<Logout />} />

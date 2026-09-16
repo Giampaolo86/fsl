@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, Camera, Heart, Newspaper, Pencil, Quote, Ruler, Weight } from "lucide-react";
+import { ArrowLeft, Camera, Check, Heart, ImagePlus, Loader2, Newspaper, Pencil, Quote, Ruler, Weight, X } from "lucide-react";
 import { PostCard } from "@/components/fsl/Article";
 import { BadgeChips } from "@/components/fsl/BadgeChips";
 import { FavButton } from "@/components/fsl/FavButton";
 import { PlayerProfileEditor, FOOT_LABEL } from "@/components/fsl/PlayerProfileEditor";
+import { PlayerPostcard } from "@/components/fsl/PlayerPostcard";
 import { Badges, EventIcons } from "@/components/fsl/Ratings";
 import { ShopItemCard } from "@/components/fsl/Shop";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
@@ -35,6 +36,13 @@ export default function PlayerProfile({ mode = "public" }) {
   const [error, setError] = useState(null);
   const [tid, setTid] = useState(mode === "admin" ? tournamentId : mode === "club" ? user?.memberships?.find((m) => m.role === "club_manager")?.tournament_id : null);
   const [edit, setEdit] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const uploadPhoto = async (file) => {
+    if (!file) return; setUploading(true);
+    const fd = new FormData(); fd.append("file", file);
+    try { const r = await api.post(`/tournaments/${tid}/players/${playerId}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } }); toast.success(r.data.pending ? "Foto inviata: sarà visibile dopo l'approvazione della società" : "Foto aggiornata"); load(); } catch (e) { toast.error(apiError(e)); } finally { setUploading(false); }
+  };
+  const reviewPhoto = async (approve) => { try { await api.post(`/tournaments/${tid}/players/${playerId}/photo/review`, { approve }); toast.success(approve ? "Foto approvata e pubblicata" : "Foto rifiutata"); load(); } catch (e) { toast.error(apiError(e)); } };
   const load = useCallback(async () => {
     try {
       let t = tid;
@@ -64,7 +72,10 @@ export default function PlayerProfile({ mode = "public" }) {
         <div className="absolute inset-0 grain opacity-30 pointer-events-none" />
         <div className="relative mx-auto max-w-[1200px] px-6 py-10 flex flex-col md:flex-row md:items-end gap-6">
           <Link to={backTo} className="absolute top-4 left-6 text-xs text-fsl-slate hover:text-fsl-white inline-flex items-center gap-1" data-testid="player-profile-back"><ArrowLeft className="h-3.5 w-3.5" /> Indietro</Link>
-          {card.photo_url ? <img src={mediaUrl(card.photo_url)} alt="" className="h-36 w-36 rounded-2xl object-cover border-2 border-fsl-gold/60 shadow-elev shrink-0" data-testid="player-profile-photo" /> : <span className={`h-36 w-36 rounded-2xl inline-flex items-center justify-center font-display font-extrabold text-3xl uppercase shrink-0 ${ROLE_TONE[card.role_code] || "bg-navy-700"}`}>{card.role_code || "—"}</span>}
+          <div className="relative shrink-0">
+            {card.photo_url ? <img src={mediaUrl(card.photo_url)} alt="" className="h-36 w-36 rounded-2xl object-cover border-2 border-fsl-gold/60 shadow-elev" data-testid="player-profile-photo" /> : <span className={`h-36 w-36 rounded-2xl inline-flex items-center justify-center font-display font-extrabold text-3xl uppercase ${ROLE_TONE[card.role_code] || "bg-navy-700"}`}>{card.role_code || "—"}</span>}
+            {card.can_edit && <label className="absolute -bottom-2 -right-2 h-10 w-10 rounded-full bg-fsl-gold text-ink-950 inline-flex items-center justify-center cursor-pointer shadow-elev hover:scale-105 transition-transform" title="Carica foto (ritaglio quadrato automatico)"><input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(e.target.files[0])} disabled={uploading} data-testid="player-photo-input" />{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}</label>}
+          </div>
           <div className="flex-1 min-w-0">
             <div className="fsl-kicker">{card.team}{card.role ? ` · ${card.role}` : ""}</div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[0.9] uppercase mt-1" data-testid="player-profile-name"><span className="num text-fsl-gold mr-3">{card.shirt_number ?? ""}</span>{card.name}{p.nickname && <span className="block text-2xl text-fsl-gold normal-case font-display">«{p.nickname}»</span>}</h1>
@@ -79,6 +90,14 @@ export default function PlayerProfile({ mode = "public" }) {
       </section>
 
       <div className="mx-auto max-w-[1200px] px-6 py-8 space-y-10">
+        {card.photo_pending_url && (
+          <div className="fsl-card-gold p-4 flex flex-wrap items-center gap-4" data-testid="player-photo-pending">
+            <img src={mediaUrl(card.photo_pending_url)} alt="" className="h-20 w-20 rounded-xl object-cover border border-fsl-gold/60" />
+            <div className="flex-1 min-w-[200px]"><div className="font-semibold">Nuova foto in attesa di approvazione</div><p className="text-xs text-fsl-slate">{card.can_edit === "guardian" ? "La società o l'organizzazione la verificherà prima di pubblicarla." : "Caricata dal genitore/tutore: verifica che sia adatta e approva per pubblicarla."}</p></div>
+            {(card.can_edit === "staff" || card.can_edit === "club") && <div className="flex gap-2"><button className="btn-gold h-9" onClick={() => reviewPhoto(true)} data-testid="player-photo-approve"><Check className="h-4 w-4" /> Approva</button><button className="btn-ghost h-9" onClick={() => reviewPhoto(false)} data-testid="player-photo-reject"><X className="h-4 w-4" /> Rifiuta</button></div>}
+          </div>
+        )}
+        {(card.public_ok || card.can_edit) && <section><h2 className="fsl-section-title mb-3">La mia cartolina</h2><PlayerPostcard card={card} colors={card.club?.colors} /></section>}
         {(facts.length > 0 || p.testimonials?.length > 0) && (
           <section className="grid lg:grid-cols-[1fr_1.2fr] gap-6" data-testid="player-profile-presentation">
             <div>
