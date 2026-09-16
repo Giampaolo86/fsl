@@ -24,7 +24,13 @@ import { ClubModule, ClubTeams } from "@/pages/club/ClubModules";
 import RefereeMatches, { RefereeModule } from "@/pages/referee/RefereeMatches";
 import PublicHub from "@/pages/public/PublicHub";
 import TournamentHome from "@/pages/public/TournamentHome";
-import { PublicClubPage, PublicClubs, PublicModule, PublicRules, PublicStandings } from "@/pages/public/PublicPages";
+import { PublicClubPage, PublicClubs, PublicModule, PublicRules } from "@/pages/public/PublicPages";
+import { PublicMatchCenter, PublicMatches, PublicStandingsLive, PublicStats } from "@/pages/public/PublicEngine";
+import Matches from "@/pages/admin/Matches";
+import MatchWorkspace from "@/components/fsl/MatchWorkspace";
+import { Rosters, Standings, Tickets } from "@/pages/admin/Engine";
+import { ClubCalendar, ClubMatch, ClubReports } from "@/pages/club/ClubEngine";
+import { RefereeMatch } from "@/pages/referee/RefereeMatches";
 
 const ADMIN_ROLES = ["super_admin", "director", "secretary"];
 
@@ -57,7 +63,14 @@ function App() {
                 <Route path="societa" element={<Clubs />} />
                 <Route path="campi" element={<Venues />} />
                 <Route path="audit" element={<Audit />} />
-                {["calendario", "partite", "referti", "classifiche", "pagamenti", "comunicazioni", "ticket", "media"].map((m) => (
+                <Route path="calendario" element={<Matches />} />
+                <Route path="partite" element={<Matches />} />
+                <Route path="partite/:matchId" element={<MatchWorkspace />} />
+                <Route path="referti" element={<Matches mode="reports" />} />
+                <Route path="classifiche" element={<Standings />} />
+                <Route path="rose" element={<Rosters />} />
+                <Route path="ticket" element={<Tickets />} />
+                {["pagamenti", "comunicazioni", "media"].map((m) => (
                   <Route key={m} path={m} element={<ModulePlaceholder module={m} />} />
                 ))}
               </Route>
@@ -65,13 +78,18 @@ function App() {
               <Route path="/societa" element={<ProtectedRoute roles={["club_manager"]}><ClubShell /></ProtectedRoute>}>
                 <Route index element={<ClubDashboard />} />
                 <Route path="squadre" element={<ClubTeams />} />
-                {["rose", "documenti", "calendario", "pagamenti", "profilo"].map((m) => (
+                <Route path="rose" element={<Rosters clubMode />} />
+                <Route path="calendario" element={<ClubCalendar />} />
+                <Route path="partite/:matchId" element={<ClubMatch />} />
+                <Route path="segnalazioni" element={<ClubReports />} />
+                {["documenti", "pagamenti", "profilo"].map((m) => (
                   <Route key={m} path={m} element={<ClubModule module={m} />} />
                 ))}
               </Route>
 
               <Route path="/arbitro" element={<ProtectedRoute roles={["referee"]}><RefereeShell /></ProtectedRoute>}>
                 <Route index element={<RefereeMatches />} />
+                <Route path="partite/:tournamentId/:matchId" element={<RefereeMatch />} />
                 <Route path="eventi" element={<RefereeModule title="Eventi" />} />
                 <Route path="squadre" element={<RefereeModule title="Squadre" />} />
                 <Route path="note" element={<RefereeModule title="Note" />} />
@@ -85,10 +103,11 @@ function App() {
                 <Route index element={<TournamentHome />} />
                 <Route path="squadre" element={<PublicClubs />} />
                 <Route path="squadre/:clubSlug" element={<PublicClubPage />} />
-                <Route path="classifiche" element={<PublicStandings />} />
+                <Route path="classifiche" element={<PublicStandingsLive />} />
                 <Route path="regolamento" element={<PublicRules />} />
-                <Route path="partite" element={<PublicModule title="Partite" phase="Fase 6" />} />
-                <Route path="statistiche" element={<PublicModule title="Statistiche" phase="Fase 6" />} />
+                <Route path="partite" element={<PublicMatches />} />
+                <Route path="partite/:matchId" element={<PublicMatchCenter />} />
+                <Route path="statistiche" element={<PublicStats />} />
                 <Route path="news" element={<PublicModule title="News" phase="Fase 6" />} />
                 <Route path="segnala-errore" element={<PublicModule title="Segnala un errore" phase="Fase 5" />} />
               </Route>

@@ -6,9 +6,9 @@ export function usePublicTournament() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const load = useCallback(() => {
+  const load = useCallback((category) => {
     setError(null);
-    api.get(`/public/tournaments/${slug}`).then((r) => setData(r.data)).catch(setError);
+    api.get(`/public/tournaments/${slug}`, { params: category ? { category } : {} }).then((r) => setData(r.data)).catch(setError);
   }, [slug]);
   useEffect(() => {
     load();

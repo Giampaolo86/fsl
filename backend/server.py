@@ -15,7 +15,7 @@ from app.core.db import client  # noqa: E402
 from app.core.deps import CurrentUser, require_roles  # noqa: E402
 from app.core.errors import forbidden  # noqa: E402
 from app.migrations import run_migrations  # noqa: E402
-from app.routers import auth, me, public, structure, tournaments, users  # noqa: E402
+from app.routers import auth, matches, me, public, structure, tournaments, users  # noqa: E402
 from app.seed import purge_demo, seed_all  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -39,7 +39,7 @@ async def seed_purge(user: CurrentUser = Depends(require_roles())):
     return {"ok": True}
 
 
-for r in (auth.router, tournaments.router, structure.router, users.router, public.router, me.router):
+for r in (auth.router, tournaments.router, structure.router, matches.router, users.router, public.router, me.router):
     api.include_router(r)
 app.include_router(api)
 

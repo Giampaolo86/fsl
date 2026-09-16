@@ -23,6 +23,7 @@ const TOURNAMENT_NAV = (id) => [
   { to: `/admin/t/${id}/partite`, label: "Partite", icon: ClipboardList },
   { to: `/admin/t/${id}/referti`, label: "Referti", icon: FileText },
   { to: `/admin/t/${id}/classifiche`, label: "Classifiche", icon: BarChart3 },
+  { to: `/admin/t/${id}/rose`, label: "Rose", icon: Users },
   { to: `/admin/t/${id}/pagamenti`, label: "Pagamenti", icon: CreditCard },
   { to: `/admin/t/${id}/comunicazioni`, label: "Contatti", icon: Phone },
   { to: `/admin/t/${id}/ticket`, label: "Ticket", icon: Ticket },

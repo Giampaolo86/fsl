@@ -107,6 +107,7 @@ async def seed_all():
     if os.environ.get("SEED_DEMO", "true").lower() != "true":
         return
     if await tournaments.find_one({"slug": "la-serie-a-dei-bambini"}):
+        await seed_match_engine(actor)
         return
 
     org = await organizations.find_one({"slug": "future-stars-league"})
@@ -200,6 +201,53 @@ async def seed_all():
     await ensure_membership(referee, serie_a.id, "referee")
     await ensure_membership(club_mgr, serie_a.id, "club_manager", roma_nord.id)
     logger.info("demo seed completed")
+    await seed_match_engine(actor)
+
+
+ROSTER = [("Davide", "Rinaldi", 1, "Portiere"), ("Luca", "Mariani", 2, "Difensore"), ("Matteo", "Conti", 7, "Attaccante"), ("Federico", "Greco", 4, "Difensore"), ("Alessandro", "De Luca", 11, "Centrocampista"), ("Marco", "De Santis", 10, "Centrocampista"), ("Andrea", "Ferri", 9, "Attaccante"), ("Simone", "Bassi", 5, "Difensore"), ("Nicolò", "Romano", 8, "Centrocampista"), ("Edoardo", "Galli", 3, "Difensore")]
+
+
+async def seed_match_engine(actor):
+    """Demo calendar, rosters, referee assignment and two official results for La Serie A dei Bambini (idempotent)."""
+    from .models.domain import Player
+    from .routers.matches import _write_version
+    from .services import engine
+
+    t = await tournaments.find_one({"slug": "la-serie-a-dei-bambini"})
+    if not t or await scoped("matches", t.id).count() > 0:
+        return
+    referee = await users.find_one({"email": "arbitro@fsl.demo"})
+    teams = scoped("teams", t.id)
+    players = scoped("players", t.id)
+    for slug in ("roma-nord", "academy-tuscolana", "sporting-eur", "atletico-prenestino"):
+        club = await scoped("clubs", t.id).find_one({"slug": slug})
+        team = await teams.find_one({"club_id": club.id})
+        if team and await players.count({"team_id": team.id}) == 0:
+            for i, (fn, ln, num, role) in enumerate(ROSTER):
+                await players.insert(Player(tournament_id=t.id, club_id=club.id, team_id=team.id, first_name=fn, last_name=ln, birth_year=2014, shirt_number=num, role=role, profile_visibility="public" if i % 3 else "private", media_consent=bool(i % 3)), actor.id)
+    await engine.generate_calendar(t, actor)
+    matches = scoped("matches", t.id)
+    rn = await teams.find_one({"club_id": (await scoped("clubs", t.id).find_one({"slug": "roma-nord"})).id})
+    first = await matches.list({"match_day": 1}, sort=[("kickoff_at", 1)], limit=21)
+    for m in first[:6]:
+        await matches.update(m.id, {"referee_user_id": referee.id, "referee_name": referee.full_name}, actor.id)
+    demo = [m for m in first if rn.id in (m.home_team_id, m.away_team_id)][:1] + [m for m in first if rn.id not in (m.home_team_id, m.away_team_id)][:1]
+    for m, (h, a) in zip(demo, [(3, 2), (1, 1)]):
+        hp = await players.list({"team_id": m.home_team_id}, limit=3)
+        ap = await players.list({"team_id": m.away_team_id}, limit=3)
+        events = []
+        for i in range(h):
+            events.append({"id": engine.new_event_id(), "team_id": m.home_team_id, "player_id": hp[i % len(hp)].id if hp else None, "type": "goal", "minute": 8 + i * 12})
+        for i in range(a):
+            events.append({"id": engine.new_event_id(), "team_id": m.away_team_id, "player_id": ap[i % len(ap)].id if ap else None, "type": "goal", "minute": 14 + i * 9})
+        events.append({"id": engine.new_event_id(), "team_id": m.away_team_id, "player_id": ap[-1].id if ap else None, "type": "yellow_card", "minute": 22})
+        score = {"home": h, "away": a, "home_pen": None, "away_pen": None}
+        await matches.update(m.id, {"events": events, "score": score, "status": "official", "referee_user_id": referee.id, "referee_name": referee.full_name, "checklist": {"teams_present": True, "lists_verified": True, "signatures": True}}, actor.id)
+        m2 = await matches.get(m.id)
+        await _write_version(t.id, m2, "referee_report", score, actor, "referee", notes="Partita corretta e leale.")
+        c = await scoped("competitions", t.id).get(m.competition_id)
+        await engine.snapshot_standings(t.id, c, m.id, actor)
+    logger.info("demo match engine seed completed")
 
 
 async def purge_demo():

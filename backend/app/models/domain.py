@@ -99,12 +99,104 @@ class Competition(BaseDocument):
     category: str
     series: str
     format: str = "single_round_robin"
+    kind: Literal["league", "knockout", "league_knockout"] = "league"
+    finals: dict = {"mode": "none", "qualifiers": 0, "third_place": False}
+    enabled: bool = True
     teams_count: int = 0
     rounds: int = 0
     status: Literal["setup", "open", "running", "closed"] = "setup"
     points: dict = {"win": 3, "draw": 1, "loss": 0}
     tiebreakers: list[str] = []
     zones: dict = {}
+
+
+class Player(BaseDocument):
+    tournament_id: str
+    club_id: str
+    team_id: str
+    first_name: str
+    last_name: str
+    birth_year: Optional[int] = None
+    shirt_number: Optional[int] = None
+    role: str = ""
+    status: Literal["active", "pending", "inactive"] = "active"
+    public_name: Optional[str] = None
+    profile_visibility: Literal["private", "team", "public"] = "private"
+    media_consent: bool = False
+    photo_url: Optional[str] = None
+
+
+MatchStatus = Literal["draft", "scheduled", "confirmed", "in_progress", "finished", "report_submitted", "official", "under_review", "rectified", "postponed", "cancelled"]
+
+
+class MatchEvent(BaseModel):
+    id: str
+    team_id: str
+    player_id: Optional[str] = None
+    assist_player_id: Optional[str] = None
+    type: Literal["goal", "own_goal", "yellow_card", "red_card", "mvp", "substitution", "injury"]
+    minute: int = 0
+    note: str = ""
+
+
+class Match(BaseDocument):
+    tournament_id: str
+    competition_id: str
+    home_team_id: str
+    away_team_id: str
+    category: str = ""
+    series: str = ""
+    match_day: int = 1
+    round_name: str = ""
+    stage: Literal["qualification", "finals"] = "qualification"
+    bracket_round: Optional[int] = None
+    bracket_slot: Optional[int] = None
+    kickoff_at: str
+    field_id: Optional[str] = None
+    field_name: str = ""
+    venue_name: str = ""
+    referee_user_id: Optional[str] = None
+    referee_name: str = ""
+    status: MatchStatus = "scheduled"
+    score: dict = {"home": None, "away": None, "home_pen": None, "away_pen": None}
+    callups: dict = {"home": [], "away": []}
+    attendance: dict = {}
+    events: list[MatchEvent] = []
+    checklist: dict = {"teams_present": False, "lists_verified": False, "signatures": False}
+    version: int = 1
+
+
+class MatchReportVersion(BaseDocument):
+    tournament_id: str
+    match_id: str
+    version: int
+    kind: Literal["referee_report", "officialization", "rectification", "reopen"]
+    score: dict
+    referee_notes: str = ""
+    director_notes: str = ""
+    reason: str = ""
+    before: Optional[dict] = None
+    actor_id: Optional[str] = None
+    actor_role: str = ""
+
+
+class StandingsSnapshot(BaseDocument):
+    tournament_id: str
+    competition_id: str
+    trigger_match_id: Optional[str] = None
+    rows: list[dict] = []
+
+
+class ErrorReport(BaseDocument):
+    tournament_id: str
+    match_id: Optional[str] = None
+    reporter_user_id: Optional[str] = None
+    reporter_name: str = ""
+    subject: str
+    description: str
+    status: Literal["open", "reviewing", "resolved", "rejected"] = "open"
+    resolution: str = ""
+    handled_by: Optional[str] = None
 
 
 class Venue(BaseDocument):

@@ -20,12 +20,17 @@ async def my_club(tournament_id: str, user: CurrentUser = Depends(get_current_us
     t = await tournaments.get(tournament_id)
     teams = await scoped("teams", tournament_id).list({"club_id": club.id})
     comps = {c.id: c for c in await scoped("competitions", tournament_id).list()}
+    from ..routers.matches import _enrich
+
+    team_ids = [tm.id for tm in teams]
+    upcoming = await scoped("matches", tournament_id).list({"$or": [{"home_team_id": {"$in": team_ids}}, {"away_team_id": {"$in": team_ids}}], "status": {"$in": ["scheduled", "confirmed"]}}, sort=[("kickoff_at", 1)], limit=1)
+    players = await scoped("players", tournament_id).count({"club_id": club.id})
     return {
         "tournament": t.public(),
         "club": club.public(),
         "teams": [{**tm.public(), "competition_name": comps[tm.competition_id].name if tm.competition_id in comps else ""} for tm in teams],
-        "next_match": None,
-        "roster": {"players": 0, "eligible": 0, "expiring_documents": 0},
+        "next_match": (await _enrich(tournament_id, upcoming))[0] if upcoming else None,
+        "roster": {"players": players, "eligible": players, "expiring_documents": 0},
         "payments": {"due": 0, "paid": 0, "currency": "EUR"},
     }
 
@@ -34,5 +39,13 @@ async def my_club(tournament_id: str, user: CurrentUser = Depends(get_current_us
 async def my_matches(user: CurrentUser = Depends(get_current_user)):
     if user.role != "referee" and not user.is_super_admin:
         raise forbidden("Area riservata agli arbitri")
-    cursor = db.matches.find({"deleted_at": None, "assignments.referee_user_id": user.id}).sort("kickoff_at", 1)
-    return [{**m, "_id": str(m["_id"])} async for m in cursor]
+    from ..routers.matches import _enrich
+
+    out = []
+    for tid in user.tournament_ids():
+        ms = await scoped("matches", tid).list({"referee_user_id": user.id}, sort=[("kickoff_at", 1)])
+        t = await tournaments.get(tid)
+        for d in await _enrich(tid, ms):
+            d["tournament"] = {"id": tid, "name": t.name if t else ""}
+            out.append(d)
+    return sorted(out, key=lambda d: d["kickoff_at"])

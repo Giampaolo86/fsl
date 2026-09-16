@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, BarChart3, CalendarDays, Grid3X3, Shield, Trophy, Users, Volleyball } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
+import { MatchCard } from "@/components/fsl/MatchCard";
 import { SectionTitle } from "@/components/fsl/Primitives";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { usePublicTournament } from "@/hooks/usePublicTournament";
@@ -23,9 +24,9 @@ export default function TournamentHome() {
   const [cat, setCat] = useState("");
   if (error) return <div className="p-6"><ErrorState message={apiError(error)} onRetry={reload} /></div>;
   if (!data) return <LoadingState full />;
-  const { tournament: t, settings: s, summary, clubs, numbers, competitions } = data;
+  const { tournament: t, settings: s, summary, clubs, numbers } = data;
   const category = cat || s.categories[0];
-  const catComps = competitions.filter((c) => c.category === category);
+  const changeCat = (c) => { setCat(c); reload(c); };
 
   return (
     <div>
@@ -35,7 +36,7 @@ export default function TournamentHome() {
         <div className="relative mx-auto max-w-[1488px] w-full px-6 pb-12 pt-28">
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <span className="fsl-kicker">{t.season_label}</span>
-            <CategorySelector categories={s.categories} value={category} onChange={setCat} />
+            <CategorySelector categories={s.categories} value={category} onChange={changeCat} />
           </div>
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[0.9] max-w-3xl" data-testid="public-tournament-title">{t.name}</h1>
           <p className="mt-4 text-fsl-white/90 text-base md:text-lg num">{fmtNum(summary.teams_capacity)} squadre. {s.categories.length} categorie. Una sola ambizione.</p>
@@ -63,20 +64,28 @@ export default function TournamentHome() {
       </section>
 
       <section className="mx-auto max-w-[1488px] px-6 mt-10 grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <SectionTitle right={<Link to={`/tornei/${slug}/partite`} className="text-xs text-fsl-gold hover:underline">Vedi calendario</Link>}>Prossime partite</SectionTitle>
-          <EmptyState icon={CalendarDays} title="Calendario in preparazione" description="Le gare compariranno qui dopo la pubblicazione del calendario da parte dell'organizzazione." testId="public-empty-matches" />
+        <div className="lg:col-span-2 space-y-6">
+          <div>
+            <SectionTitle right={<Link to={`/tornei/${slug}/partite?cat=${category}`} className="text-xs text-fsl-gold hover:underline">Vedi calendario</Link>}>Prossime partite</SectionTitle>
+            {data.upcoming_matches.length === 0 ? <EmptyState icon={CalendarDays} title="Calendario in preparazione" description="Le gare compariranno qui dopo la pubblicazione del calendario da parte dell'organizzazione." testId="public-empty-matches" /> : <div className="grid md:grid-cols-2 gap-3" data-testid="public-upcoming">{data.upcoming_matches.map((m) => <MatchCard key={m.id} m={m} to={`/tornei/${slug}/partite/${m.id}`} />)}</div>}
+          </div>
+          {data.recent_results.length > 0 && <div><SectionTitle>Ultimi risultati ufficiali</SectionTitle><div className="grid md:grid-cols-2 gap-3" data-testid="public-results">{data.recent_results.map((m) => <MatchCard key={m.id} m={m} to={`/tornei/${slug}/partite/${m.id}`} />)}</div></div>}
         </div>
-        <div>
-          <SectionTitle right={<Link to={`/tornei/${slug}/classifiche`} className="text-xs text-fsl-gold hover:underline">Tutte</Link>}>Classifica {category}</SectionTitle>
-          <div className="fsl-card p-5 space-y-3" data-testid="public-mini-standings">
-            {catComps.map((c) => (
-              <div key={c.id} className="flex items-center justify-between text-sm">
-                <span className="font-semibold">{c.series}</span>
-                <span className="text-xs text-fsl-slate num">{c.teams_registered}/{c.teams_count} squadre · {c.rounds} giornate</span>
-              </div>
-            ))}
-            <p className="text-xs text-fsl-slate flex items-center gap-2 pt-2 border-t border-white/10"><BarChart3 className="h-4 w-4 text-fsl-gold" /> La classifica si popola solo con risultati ufficiali.</p>
+        <div className="space-y-6">
+          <div>
+            <SectionTitle right={<Link to={`/tornei/${slug}/classifiche?cat=${category}`} className="text-xs text-fsl-gold hover:underline">Tutte</Link>}>Classifica {category}</SectionTitle>
+            <div className="fsl-card p-4 space-y-4" data-testid="public-mini-standings">
+              {data.standings.map((s) => (
+                <div key={s.competition.id}><div className="text-xs font-semibold uppercase text-fsl-slate mb-1">{s.competition.series}</div>
+                  {s.rows.map((r) => <div key={r.team_id} className="flex items-center gap-2 h-9 text-sm border-b border-white/[0.06] last:border-0"><span className="num w-5 text-fsl-gold font-bold">{r.pos}</span><ClubCrest club={r.club} size={20} /><span className="flex-1 truncate">{r.club?.name || r.name}</span><span className="num text-xs text-fsl-slate">{r.PG}</span><span className="num font-display font-extrabold text-lg w-8 text-right">{r.PT}</span></div>)}
+                </div>
+              ))}
+              <p className="text-xs text-fsl-slate flex items-center gap-2 pt-2 border-t border-white/10"><BarChart3 className="h-4 w-4 text-fsl-gold" /> Solo risultati ufficiali.</p>
+            </div>
+          </div>
+          <div>
+            <SectionTitle right={<Link to={`/tornei/${slug}/statistiche`} className="text-xs text-fsl-gold hover:underline">Statistiche</Link>}>Marcatori</SectionTitle>
+            <div className="fsl-card divide-y divide-white/[0.06]" data-testid="public-top-scorers-home">{data.top_scorers.length === 0 ? <p className="p-4 text-xs text-fsl-slate">Nessun gol ufficiale ancora registrato.</p> : data.top_scorers.slice(0, 5).map((s, i) => <div key={i} className="flex items-center gap-3 px-4 h-11 text-sm"><span className="num text-fsl-gold font-bold w-5">{i + 1}</span><span className="flex-1 truncate">{s.name} <span className="text-fsl-slate text-xs">· {s.team}</span></span><span className="num font-display font-extrabold text-xl">{s.goals}</span></div>)}</div>
           </div>
         </div>
       </section>

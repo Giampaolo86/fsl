@@ -2,8 +2,13 @@ from ..models.domain import (
     AuditLog,
     Club,
     Competition,
+    ErrorReport,
     Field_,
+    Match,
+    MatchReportVersion,
     Organization,
+    Player,
+    StandingsSnapshot,
     Team,
     Tournament,
     TournamentMembership,
@@ -19,6 +24,7 @@ organizations = Repository("organizations", Organization)
 tournaments = Repository("tournaments", Tournament)
 settings_repo = Repository("tournament_settings", TournamentSettings)
 audit_repo = Repository("audit_logs", AuditLog)
+matches_global = Repository("matches", Match)
 
 SCOPED = {
     "competitions": ("competitions", Competition),
@@ -26,6 +32,11 @@ SCOPED = {
     "fields": ("fields", Field_),
     "clubs": ("clubs", Club),
     "teams": ("teams", Team),
+    "players": ("players", Player),
+    "matches": ("matches", Match),
+    "report_versions": ("referee_report_versions", MatchReportVersion),
+    "standings_snapshots": ("standings_snapshots", StandingsSnapshot),
+    "error_reports": ("tickets", ErrorReport),
 }
 
 
