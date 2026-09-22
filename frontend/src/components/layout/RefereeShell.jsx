@@ -1,14 +1,13 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Bell, ClipboardList, ListChecks, LogOut, NotebookPen, Users } from "lucide-react";
+import { BookOpenCheck, ClipboardList, FileCheck2, LogOut } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { OfflineBanner } from "@/components/fsl/States";
 
 const NAV = [
   ["Partite", "/arbitro", ClipboardList],
-  ["Eventi", "/arbitro/eventi", ListChecks],
-  ["Squadre", "/arbitro/squadre", Users],
-  ["Note", "/arbitro/note", NotebookPen],
+  ["Referti", "/arbitro/referti", FileCheck2],
+  ["Guida", "/arbitro/guida", BookOpenCheck],
 ];
 
 export default function RefereeShell() {
@@ -21,9 +20,7 @@ export default function RefereeShell() {
           <LogOut className="h-5 w-5" />
         </button>
         <Logo to="/arbitro" compact />
-        <button className="h-11 w-11 rounded-md inline-flex items-center justify-center text-fsl-slate" aria-label="Notifiche" data-testid="referee-notifications-button">
-          <Bell className="h-5 w-5" />
-        </button>
+        <span className="h-8 px-2.5 rounded-full border border-white/15 text-[11px] font-semibold num text-fsl-slate inline-flex items-center" data-testid="referee-today">{new Date().toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" })}</span>
       </header>
       <div className="px-4 pt-3 text-center">
         <div className="fsl-kicker">Area Arbitro</div>
@@ -32,7 +29,7 @@ export default function RefereeShell() {
       <main className="flex-1 px-4 py-4 pb-24">
         <Outlet />
       </main>
-      <nav className="fixed bottom-0 inset-x-0 mx-auto max-w-[640px] h-[72px] bg-ink-950 border-t border-white/10 grid grid-cols-4" aria-label="Navigazione arbitro">
+      <nav className="fixed bottom-0 inset-x-0 mx-auto max-w-[640px] h-[72px] bg-ink-950 border-t border-white/10 grid grid-cols-3 pb-[env(safe-area-inset-bottom)]" aria-label="Navigazione arbitro">
         {NAV.map(([label, to, Icon]) => (
           <NavLink
             key={to}

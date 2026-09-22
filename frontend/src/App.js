@@ -129,9 +129,8 @@ function AppRoutes() {
               <Route path="/arbitro" element={<ProtectedRoute roles={["referee"]}><RefereeShell /></ProtectedRoute>}>
                 <Route index element={<RefereeMatches />} />
                 <Route path="partite/:tournamentId/:matchId" element={<RefereeMatch />} />
-                <Route path="eventi" element={<RefereeModule title="Eventi" />} />
-                <Route path="squadre" element={<RefereeModule title="Squadre" />} />
-                <Route path="note" element={<RefereeModule title="Note" />} />
+                <Route path="referti" element={<RefereeMatches done />} />
+                <Route path="guida" element={<RefereeModule />} />
               </Route>
 
               <Route element={<PublicShell />}>

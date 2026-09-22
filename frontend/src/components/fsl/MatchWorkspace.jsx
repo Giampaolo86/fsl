@@ -97,7 +97,7 @@ export default function MatchWorkspace({ tournamentId: tidProp, compact = false 
         )}
       </section>
 
-      <div className={`grid ${isStaff ? "grid-cols-4" : "grid-cols-3"} gap-1 fsl-card p-1`} role="tablist">{[["sheet", "Tabellino", ClipboardList], ["social", "Social", Share2], ...(isStaff ? [["media", "Media", Camera]] : []), ["history", "Storia", History]].map(([k, l, Icon]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`h-11 min-w-0 px-1 rounded-md text-[11px] sm:text-xs font-semibold uppercase inline-flex items-center justify-center gap-1.5 ${tab === k ? "bg-fsl-blue" : "text-fsl-slate hover:text-fsl-white"}`} aria-label={l} data-testid={`tab-${k}`}><Icon className="h-4 w-4 shrink-0" /><span className="truncate">{l}</span></button>)}</div>
+      <div className={`grid ${isStaff ? "grid-cols-4" : compact ? "grid-cols-2" : "grid-cols-3"} gap-1 fsl-card p-1`} role="tablist">{[["sheet", "Tabellino", ClipboardList], ...(compact ? [] : [["social", "Social", Share2]]), ...(isStaff ? [["media", "Media", Camera]] : []), ["history", "Storia", History]].map(([k, l, Icon]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`h-11 min-w-0 px-1 rounded-md text-[11px] sm:text-xs font-semibold uppercase inline-flex items-center justify-center gap-1.5 ${tab === k ? "bg-fsl-blue" : "text-fsl-slate hover:text-fsl-white"}`} aria-label={l} data-testid={`tab-${k}`}><Icon className="h-4 w-4 shrink-0" /><span className="truncate">{l}</span></button>)}</div>
 
       {tab === "sheet" && (
         <div className="space-y-3">

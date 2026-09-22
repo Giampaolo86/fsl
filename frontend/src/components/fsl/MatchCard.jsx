@@ -18,7 +18,7 @@ export const MATCH_STATUS = {
 export function MatchStatusBadge({ status, label }) {
   const [l, cls, Icon] = MATCH_STATUS[status] || MATCH_STATUS.scheduled;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border bg-ink-950/60 px-2 h-6 text-[10px] font-semibold uppercase tracking-wider ${cls}`} data-testid={`match-status-${status}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border bg-ink-950/60 px-2 h-6 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap shrink-0 ${cls}`} data-testid={`match-status-${status}`}>
       <Icon className="h-3 w-3" aria-hidden="true" /> {label || l}
     </span>
   );

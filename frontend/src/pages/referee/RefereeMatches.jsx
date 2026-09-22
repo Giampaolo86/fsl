@@ -1,26 +1,50 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ClipboardList } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ClipboardList, ListChecks, PlayCircle, ShieldAlert, Timer } from "lucide-react";
 import { MatchCard } from "@/components/fsl/MatchCard";
 import MatchWorkspace from "@/components/fsl/MatchWorkspace";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { api, apiError } from "@/lib/api";
+import { fmtDate } from "@/lib/format";
 
-export default function RefereeMatches() {
+const FINAL = ["official", "rectified"];
+const isToday = (iso) => iso && new Date(iso).toDateString() === new Date().toDateString();
+
+export default function RefereeMatches({ done = false }) {
   const [list, setList] = useState(null);
   const [error, setError] = useState(null);
   useEffect(() => { api.get("/me/referee/matches").then((r) => setList(r.data)).catch(setError); }, []);
   if (error) return <ErrorState message={apiError(error)} />;
   if (!list) return <LoadingState />;
-  const todo = list.filter((m) => !["official", "rectified", "cancelled"].includes(m.status));
-  const done = list.filter((m) => ["official", "rectified"].includes(m.status));
+  const sorted = [...list].sort((a, b) => (a.kickoff_at || "").localeCompare(b.kickoff_at || ""));
+  const todo = sorted.filter((m) => !FINAL.includes(m.status) && m.status !== "cancelled");
+  const sent = sorted.filter((m) => FINAL.includes(m.status)).reverse();
+  const to = (m) => `/arbitro/partite/${m.tournament.id}/${m.id}`;
+  if (done) {
+    return (
+      <div className="space-y-4" data-testid="referee-reports">
+        <h1 className="text-3xl font-extrabold">Referti inviati</h1>
+        {sent.length === 0 ? <EmptyState icon={CheckCircle2} title="Nessun referto inviato" description="Le gare chiuse con tabellino ufficiale compariranno qui." testId="referee-reports-empty" /> : <div className="space-y-2">{sent.map((m) => <MatchCard key={m.id} m={m} to={to(m)} compact />)}</div>}
+      </div>
+    );
+  }
+  const live = todo.find((m) => m.status === "in_progress");
+  const next = live || todo.find((m) => isToday(m.kickoff_at)) || todo[0];
+  const rest = todo.filter((m) => m.id !== next?.id);
   return (
     <div className="space-y-5">
       <h1 className="text-3xl font-extrabold">Le mie partite</h1>
-      {list.length === 0 ? <EmptyState icon={ClipboardList} title="Nessuna gara assegnata" description="Quando il Direttore ti assegnerà una gara la troverai qui." testId="referee-empty" /> : (
+      {list.length === 0 ? <EmptyState icon={ClipboardList} title="Nessuna gara assegnata" description="Quando il Direttore ti assegnerà una gara la troverai qui." testId="referee-empty" /> : todo.length === 0 ? <EmptyState icon={CheckCircle2} title="Tutto arbitrato" description="Nessuna gara in programma: i referti inviati sono nella tab Referti." testId="referee-all-done" /> : (
         <>
-          <section><h2 className="fsl-kicker mb-2">Da arbitrare ({todo.length})</h2><div className="space-y-2" data-testid="referee-todo">{todo.map((m) => <MatchCard key={m.id} m={m} to={`/arbitro/partite/${m.tournament.id}/${m.id}`} compact />)}</div></section>
-          {done.length > 0 && <section><h2 className="fsl-kicker mb-2">Referti inviati ({done.length})</h2><div className="space-y-2">{done.map((m) => <MatchCard key={m.id} m={m} to={`/arbitro/partite/${m.tournament.id}/${m.id}`} compact />)}</div></section>}
+          {next && (
+            <section className="fsl-card-gold p-4 space-y-3" data-testid="referee-next">
+              <div className="flex items-center justify-between"><span className="fsl-kicker flex items-center gap-1.5">{live ? <><PlayCircle className="h-4 w-4" /> In corso</> : isToday(next.kickoff_at) ? <><Timer className="h-4 w-4" /> Oggi</> : "Prossima gara"}</span><span className="text-xs text-fsl-slate num">{fmtDate(next.kickoff_at, { time: true })}</span></div>
+              <MatchCard m={next} to={to(next)} compact />
+              <Link to={to(next)} className="btn-gold w-full" data-testid="referee-open-next"><ClipboardList className="h-4 w-4" /> Apri il tabellino</Link>
+            </section>
+          )}
+          {rest.length > 0 && <section><h2 className="fsl-kicker mb-2">Da arbitrare ({rest.length})</h2><div className="space-y-2" data-testid="referee-todo">{rest.map((m) => <MatchCard key={m.id} m={m} to={to(m)} compact />)}</div></section>}
+          {sent.length > 0 && <Link to="/arbitro/referti" className="block text-center text-xs text-fsl-gold" data-testid="referee-to-reports">Referti inviati ({sent.length}) →</Link>}
         </>
       )}
     </div>
@@ -29,9 +53,28 @@ export default function RefereeMatches() {
 
 export function RefereeMatch() {
   const { tournamentId } = useParams();
-  return <div><Link to="/arbitro" className="text-xs text-fsl-gold" data-testid="referee-back">← Le mie partite</Link><div className="mt-3"><MatchWorkspace tournamentId={tournamentId} compact /></div></div>;
+  return (
+    <div>
+      <Link to="/arbitro" className="btn-ghost h-11 mb-3" data-testid="referee-back"><ArrowLeft className="h-4 w-4" /> Le mie partite</Link>
+      <MatchWorkspace tournamentId={tournamentId} compact />
+    </div>
+  );
 }
 
-export function RefereeModule({ title }) {
-  return <EmptyState icon={ClipboardList} title={title} description="Apri una gara assegnata per gestire eventi, convocazioni e note." testId={`referee-module-${title.toLowerCase()}`} />;
+const STEPS = [
+  [ListChecks, "1 · Prepara la distinta", "Prima del fischio d'inizio tocca il numero dei giocatori presenti per ciascuna squadra e salva le distinte. Le società possono averle già preparate: verifica e correggi."],
+  [ClipboardList, "2 · Compila la gara", "Durante o dopo la gara passa a «Compila gara»: tocca il logo per «tutti presenti», il numero per presente/assente/da confermare; usa + e − per gol, assist, ammonizioni, espulsioni e voto. Il punteggio si calcola dal tabellino."],
+  [ShieldAlert, "3 · Checklist e note", "Spunta squadre presenti, distinte verificate e firme acquisite. Scrivi eventuali note (infortuni, comportamento, ritardi). Nelle finali con parità inserisci i rigori."],
+  [CheckCircle2, "4 · Invia il referto", "«Chiudi gara e invia» rende il referto definitivo: classifiche, marcatori e badge si aggiornano solo con i risultati ufficiali. Per correzioni successive contatta il Direttore (rettifica)."],
+];
+
+export function RefereeModule() {
+  return (
+    <div className="space-y-4" data-testid="referee-guide">
+      <h1 className="text-3xl font-extrabold">Guida rapida</h1>
+      <p className="text-sm text-fsl-slate">Come compilare il referto FSL da telefono, in quattro passaggi.</p>
+      <ol className="space-y-3">{STEPS.map(([Icon, title, text]) => <li key={title} className="fsl-card p-4 flex gap-3"><Icon className="h-5 w-5 text-fsl-gold shrink-0 mt-0.5" /><div><div className="font-display font-bold uppercase">{title}</div><p className="text-sm text-fsl-slate mt-1">{text}</p></div></li>)}</ol>
+      <div className="rounded-md bg-navy-700/50 border border-white/10 p-3 text-xs text-fsl-slate">Se manca la connessione compare un avviso: salva di nuovo appena torna la rete. Aggiungi l'app alla schermata Home di iPhone per un accesso rapido.</div>
+    </div>
+  );
 }
