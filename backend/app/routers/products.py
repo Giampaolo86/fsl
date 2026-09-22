@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from ..core.errors import bad_request, forbidden, not_found
+from ..core.errors import ApiError, bad_request, forbidden, not_found
 from ..models.domain import PaidMedia, Purchase
 from ..repositories.base import Repository
 from ..repositories.registry import scoped, tournaments
@@ -112,7 +112,7 @@ async def open_product(token: str, request: Request):
 
     pur = await Repository("purchases", Purchase).find_one({"download_token": token, "payment_status": "paid"})
     if not pur:
-        raise not_found("Acquisto")
+        raise ApiError(404, "NOT_FOUND", "Acquisto non trovato")
     it = await Repository("paid_media", PaidMedia).get(pur.item_id)
     if not it or it.kind not in ("team_card", "album"):
         raise not_found("Prodotto")

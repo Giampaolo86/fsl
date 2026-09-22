@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from pydantic import BaseModel
 
 from ..core.deps import CurrentUser, get_current_user, require_tournament
-from ..core.errors import bad_request, conflict, forbidden, not_found
+from ..core.errors import ApiError, bad_request, conflict, forbidden, not_found
 from ..models.domain import ClubDocument, MediaFile, Notification, PaidMedia, Purchase
 from ..repositories.registry import Repository, scoped, tournaments
 from ..services import audit, storage
@@ -484,7 +484,7 @@ async def payment_status(session_id: str):
 async def download(token: str):
     p = await Repository("purchases", Purchase).find_one({"download_token": token, "payment_status": "paid"})
     if not p:
-        raise not_found("Acquisto")
+        raise ApiError(404, "NOT_FOUND", "Acquisto non trovato")
     it = await _find_item(p.item_id)
     if it and it.kind in DIGITAL:
         t = await tournaments.get(it.tournament_id)

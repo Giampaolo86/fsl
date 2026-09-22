@@ -103,6 +103,9 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] Foto dal genitore: upload dalla scheda (ritaglio quadrato server-side); staff/società pubblicano subito, genitore → `photo_pending_url` con notifica alla società e approvazione/rifiuto (`POST /players/{id}/photo/review`)
 - [x] Registrazione società (`routers/registration.py`): (a) codice invito per società (admin Società → «Invito», `FSL-XXXX-XXXX`, 30 gg, uso singolo, rigenerazione invalida il precedente) → `/registrati-societa?codice=…` crea responsabile + membership e accede; (b) `/richiedi-accesso` → richiesta in Control Room → Utenti («Richieste di accesso società») con Approva (crea società se nuova + utente con password temporanea mostrata una volta) / Rifiuta. Link in /login. Test 25/25 backend + tutti i flussi frontend (`iteration_13.json`)
 
+## Implementato (2026-06) – Iterazione 14
+- [x] Prodotti digitali a 2,49 € (`routers/products.py`, Stripe price `fsl_digital_249`): **Cartolina squadra** 1080×1350 (canvas `TeamCard.jsx`: stemma, rosa, classifica, marcatori, badge; anteprima con filigrana + acquisto dalla homepage società) e **Album stagione** per bambino (`DigitalProduct.jsx`: cartolina, badge, interviste, foto taggate, storico gare, stampa PDF; acquisto dalla scheda giocatore, solo con consenso o per genitore/staff). Link personale `/tornei/:slug/prodotti/:token` (sempre aggiornato), apertura da /payment/success e da «I miei acquisti». Test 16/16 backend + flussi frontend (`iteration_14.json`)
+
 ## Backlog prioritizzato
 - ~~P1 Registrazione società~~ (fatto, iterazione 13)
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana

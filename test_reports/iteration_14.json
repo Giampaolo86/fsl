@@ -1,0 +1,32 @@
+{
+  "summary": "Iterazione 14 – prodotti digitali 2,49€ (Cartolina squadra e Album stagione). Backend: 16/16 pytest verdi (/app/backend/tests/test_iteration14.py). Coperti: POST /public/tournaments/{slug}/products get-or-create per team_card (stesso id su chiamata ripetuta), kind non valido → 400, team_id inesistente → 404; card-preview con shape completa (team, club.colors, competition, standing con pos/PT/PG/V/N/P/GF/GS, roster non vuota con name/shirt_number/role/goals/badges, top_scorers, badges_total, preview:true); album con consenso da anonimo → 200 title 'Album stagione · Luca M.'; album senza consenso da anonimo → 403; stesso album da admin → 200. Checkout: POST /payments/checkout item_id team_card → checkout_url https://checkout.stripe.com, status → payment_status pending. GET /payments/product/{token} team_card ok (team 'Sporting Eur 2014', roster non vuota); album da anonimo → card.name 'Luca M.'; stesso token da fan.notifiche@test.it (guardian) → card.name 'Luca Mariani'; token invalido → 404. Regressione: /public/tournaments/{slug} shop non contiene team_card/album; GET /me/purchases per guardian: eventuali digital non hanno download_url. Frontend: PublicClubHome ha team-card-open-{team_id} con testo 'Cartolina · 2,49 €'; click apre team-card-dialog con team-card-canvas renderizzato e watermark 'ANTEPRIMA'; team-card-buy ('Acquista · 2,49 €') abilitato → redirect verificato su https://checkout.stripe.com (Sandbox banner + prezzo €2,49 mostrati). Player profile: sezione album-offer con '2,49 €' e album-buy → redirect Stripe OK. /tornei/.../prodotti/{token_team_card}: digital-product + product-paid ('ACQUISTATO') + product-title 'Cartolina squadra · Sporting Eur 2014' + team-card-canvas + team-card-share + team-card-download (funziona, scarica 'fsl-squadra-sporting-eur-2014.png' come richiesto). /tornei/.../prodotti/{token_album}: season-album con album-title 'Album stagione Luca M.' (anon) o 'Luca Mariani' (guardian loggato), player-postcard, album-badges (4), album-photos, album-history con partite, album-print. Token inesistente → ErrorState 'Acquisto non trovata' senza crash. Regressione: match-center /partite/... shop foto/video ancora presente (8 shop items); /payment/success?session_id=fake → 'Transazione non trovata' senza crash.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/tornei/.../prodotti/{token_invalid}", "issues": ["Testo di errore usa 'Acquisto non trovata' (concordanza sbagliata: dovrebbe essere 'Acquisto non trovato'). Non bloccante."]},
+      {"screen": "Stripe Checkout line item", "issues": ["Descrizione line item è generica 'FSL Contenuto digitale (Cartolina squadra / Album stagione)' anziché il titolo specifico dell'item. Purely cosmetic (il pagamento avviene sul price fsl_digital_249)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration14.py", "/app/test_reports/pytest/iter14.xml"],
+  "action_items": [
+    "IMPORTANTE (già risolto in questo run): al primo accesso il bundle serviva una versione stale di PublicClubHome.jsx priva della useState di teamCard causando 'setTeamCard is not defined' al click su team-card-open. Il restart del frontend ha ricompilato correttamente. Se ricapita, invalidare la cache HMR o restart pianificato dopo edit critici.",
+    "(minor) Correggere concordanza 'Acquisto non trovato' nella pagina prodotti."
+  ],
+  "critical_code_review_comments": [
+    "products.get_or_create_product usa (kind, ref_id) come chiave get-or-create ma non filtra per tournament_id nel find_one (scoped repository probabilmente lo fa; verificare che scoped('paid_media', t.id) applichi il filtro). Altrimenti collisioni cross-torneo se lo stesso ref_id compare in due tornei.",
+    "team_card_payload chiama engine.compute_standings DUE VOLTE (una per il row, una per calcolare pos). Rifattorizzare per calcolarla una sola volta e cachearla; il calcolo classifica può essere costoso.",
+    "open_product non registra un evento di apertura né rate-limita: il token è un secret ma se leaked, chiunque scarica infinite volte. Considerare log e rate limit per token.",
+    "album_payload include tutti i posts (limit=100) e concatena media in photos[:60]; se un post ha molte immagini, il carico è alto. Considerare pagination server-side.",
+    "PublicClubHome.jsx: importi non usati (Bus, CalendarDays, Clock, MapPin, ShieldCheck) — pulire. Il file è già dense e la funzione buy è duplicata rispetto a buyProduct in altri componenti (DRY)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration14.py"],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% (tutti i testid richiesti presenti e integrazione Stripe verificata)"},
+  "test_credentials": "As per /app/memory/test_credentials.md (admin, fan.notifiche guardian, tokens simulati team_card e album). Nessuna nuova credenziale creata.",
+  "seed_data_creation": "Creati 2 checkout Stripe test session (payment_status pending) durante i test — non completati. Creato item paid_media 'Album stagione' su un giocatore senza consenso via admin (get-or-create); rimane in DB ma non è pagato/visibile pubblicamente.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iterazione 14 completamente verde. ATTENZIONE: durante il primo test è emerso 'setTeamCard is not defined' — root cause era un bundle HMR stale del frontend (il source PublicClubHome.jsx era già corretto). Un sudo supervisorctl restart frontend ha risolto e i test successivi sono passati. Se il main agent modifica di nuovo PublicClubHome.jsx e vede errori 'X is not defined' su handlers, restart del frontend è la mitigazione. Tokens Mongo simulati (paid) tuttora validi: team_card 1kQ-JDLATF9kgms90qMLlbKSP_vanP8Q e album RuNhWAvP6MekDgwBVajdrcIQXPlqTnCy.",
+  "rca of the issue": "Nessun bug bloccante. L'errore iniziale 'setTeamCard is not defined' era dovuto a un bundle webpack stale (l'HMR aveva servito un chunk senza la useState hook aggiunta di recente). Reproduzione: aprire /tornei/la-serie-a-dei-bambini/squadre/sporting-eur e cliccare il pulsante Cartolina. Mitigazione applicata: sudo supervisorctl restart frontend → ricompilazione pulita del bundle, click funziona end-to-end fino al redirect a checkout.stripe.com."
+}
