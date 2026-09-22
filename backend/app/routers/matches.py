@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -8,7 +8,9 @@ from ..core.deps import WRITE_ROLES, CurrentUser, get_current_user, require_tour
 from ..core.errors import bad_request, conflict, forbidden, not_found
 from ..models.base import utcnow
 from ..models.domain import ErrorReport, Match, MatchEvent, MatchReportVersion, Player
-from ..repositories.registry import scoped, users
+from bson import ObjectId
+
+from ..repositories.registry import scoped, settings_repo, users
 from ..services import audit, engine
 
 router = APIRouter(prefix="/tournaments/{tournament_id}", tags=["matches"])
@@ -305,7 +307,12 @@ async def get_match(tournament_id: str, match_id: str, user: CurrentUser = Depen
     d["can_officialize"] = role in OPS
     mine = await _club_teams(user, tournament_id) if role == "club_manager" else set()
     lock = m.status in FINAL + ("report_submitted",) and role not in OPS
-    d["can_callup"] = {side: (not lock) and (role in OPS | {"secretary"} or (role == "referee" and m.referee_user_id == user.id) or getattr(m, f"{side}_team_id") in mine) for side in ("home", "away")}
+    deadline = callup_deadline(m)
+    club_locked = role == "club_manager" and deadline is not None and datetime.now(timezone.utc) > deadline
+    d["callup_deadline"] = deadline.isoformat() if deadline else None
+    d["callup_locked_for_club"] = club_locked
+    d["can_callup"] = {side: (not lock) and (role in OPS | {"secretary"} or (role == "referee" and m.referee_user_id == user.id) or (getattr(m, f"{side}_team_id") in mine and not club_locked)) for side in ("home", "away")}
+    d["fees"] = await match_fees(tournament_id, m)
     d["can_fill_sheet"] = role in OPS or (role == "referee" and m.referee_user_id == user.id and m.status not in FINAL + ("report_submitted",))
     return d
 
@@ -437,7 +444,37 @@ def events_from_stats(m: Match, stats: dict) -> list[MatchEvent]:
     return out
 
 
-def sheet_problems(m: Match, attendance: dict) -> list[str]:
+CALLUP_DEADLINE_HOUR = 20
+
+
+def callup_deadline(m: Match):
+    if not m.kickoff_at:
+        return None
+    try:
+        k = datetime.fromisoformat(m.kickoff_at)
+    except ValueError:
+        return None
+    k = k.replace(tzinfo=timezone.utc) if k.tzinfo is None else k
+    return (k - timedelta(days=1)).replace(hour=CALLUP_DEADLINE_HOUR, minute=0, second=0, microsecond=0)
+
+
+async def match_fees(tournament_id: str, m: Match) -> dict:
+    from .extras import PaymentEntry
+
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    fee = float(((s.fees if s else {}) or {}).get("callup_fee") or 0)
+    entries = await scoped("payments", tournament_id).list({"match_id": m.id})
+    teams = {tm.id: tm for tm in await scoped("teams", tournament_id).list({"_id": {"$in": [ObjectId(m.home_team_id), ObjectId(m.away_team_id)]}})}
+    out = {"fee": fee}
+    for side in ("home", "away"):
+        tm = teams.get(getattr(m, f"{side}_team_id"))
+        if not tm:
+            continue
+        ids = m.callups.get(side, [])
+        present = sum(1 for pid in ids if m.attendance.get(pid) == "present")
+        pay = next((e for e in entries if e.club_id == tm.club_id and e.kind == "payment"), None)
+        out[side] = {"club_id": tm.club_id, "callups": len(ids), "present": present, "amount": round(present * fee, 2), "receipt_no": pay.receipt_no if pay else None, "paid_amount": pay.amount if pay else None, "paid_at": pay.created_at.isoformat() if pay else None, "method": pay.method if pay else None}
+    return out
     problems = []
     for side, label in (("home", "casa"), ("away", "ospite")):
         ids = m.callups.get(side, [])
@@ -598,3 +635,43 @@ async def patch_error(tournament_id: str, error_id: str, body: ErrorPatch, user:
     e2 = await repo.update(e.id, {"status": body.status, "resolution": body.resolution, "handled_by": user.id}, user.id)
     await audit.record(user, "ticket.update", "ticket", e.id, tournament_id, before={"status": e.status}, after={"status": body.status}, reason=body.resolution)
     return e2.public()
+
+
+class CollectIn(BaseModel):
+    side: str
+    method: str = "contanti"
+    amount: Optional[float] = None
+
+
+@router.post("/matches/{match_id}/fees/collect")
+async def collect_match_fee(tournament_id: str, match_id: str, body: CollectIn, user: CurrentUser = Depends(get_current_user)):
+    from .extras import PaymentEntry
+
+    t, role = await require_tournament(tournament_id, user, roles=OPS | {"secretary"}, writable=True)
+    m = await scoped("matches", tournament_id).get(match_id)
+    if not m or body.side not in ("home", "away"):
+        raise not_found("Gara")
+    fees = await match_fees(tournament_id, m)
+    f = fees.get(body.side)
+    if not f:
+        raise not_found("Squadra")
+    if f["receipt_no"]:
+        raise conflict(f"Quota già incassata (ricevuta {f['receipt_no']})")
+    if f["present"] == 0:
+        raise bad_request("Segna prima le presenze effettive: nessun giocatore presente")
+    amount = round(body.amount if body.amount is not None else f["amount"], 2)
+    if amount <= 0:
+        raise bad_request("Importo non valido: imposta la quota per convocato nelle Impostazioni")
+    repo = scoped("payments", tournament_id)
+    tm = await scoped("teams", tournament_id).get(getattr(m, f"{body.side}_team_id"))
+    charge = await repo.find_one({"match_id": m.id, "club_id": f["club_id"], "kind": "charge"})
+    desc = f"{f['present']} presenti × {fees['fee']:.2f} € · {m.round_name or ''} {tm.name if tm else ''}".strip()
+    if charge:
+        await repo.update(charge.id, {"amount": amount, "description": desc}, user.id)
+    else:
+        await repo.insert(PaymentEntry(tournament_id=tournament_id, club_id=f["club_id"], kind="charge", amount=amount, description=desc, match_id=m.id, recorded_by=user.id), user.id)
+    n = await repo.count({"kind": "payment"}) + 1
+    receipt = f"RIC-{datetime.now().year}-{n:04d}"
+    e = await repo.insert(PaymentEntry(tournament_id=tournament_id, club_id=f["club_id"], kind="payment", amount=amount, description=f"Quota gara · {desc}", match_id=m.id, method=body.method, receipt_no=receipt, recorded_by=user.id), user.id)
+    await audit.record(user, "payment.match_fee", "payment", e.id, tournament_id, after={"match_id": m.id, "club_id": f["club_id"], "amount": amount, "receipt": receipt, "present": f["present"]})
+    return {"ok": True, "receipt_no": receipt, "amount": amount, "present": f["present"], "fees": await match_fees(tournament_id, m)}

@@ -35,6 +35,7 @@ export function RosterImportClub({ tid, teamId }) {
         <button className="btn-ghost" disabled={!teamId} onClick={() => downloadTemplate(tid, teamId).catch((e) => toast.error(apiError(e)))} data-testid="roster-template-download"><Download className="h-4 w-4" /> Scarica modulo Excel</button>
         <label className={`btn-gold cursor-pointer ${busy || !teamId ? "opacity-60 pointer-events-none" : ""}`}><Upload className="h-4 w-4" /> Carica modulo compilato<input type="file" accept=".xlsx" className="hidden" onChange={(e) => upload(e.target.files[0])} data-testid="roster-import-input" /></label>
       </div>
+      <AddPlayerRequest tid={tid} teamId={teamId} onDone={load} />
       {list.length > 0 && <div className="divide-y divide-white/[0.06] rounded-md border border-white/10" data-testid="roster-import-history">{list.slice(0, 5).map((i) => <div key={i.id} className="h-11 px-3 flex items-center gap-3 text-xs"><span className={`h-6 px-2 rounded text-[10px] font-bold uppercase inline-flex items-center ${STATUS[i.status][1]}`} data-testid={`roster-import-status-${i.id}`}>{STATUS[i.status][0]}</span><span className="flex-1 truncate">{i.team_label} · {i.rows.length} giocatori{i.error_count ? ` · ${i.error_count} righe con anomalie` : ""}{i.status === "approved" ? ` · ${i.imported_count} caricati` : ""}</span>{i.note && <span className="text-fsl-slate truncate max-w-[220px]">{i.note}</span>}<span className="num text-fsl-slate">{fmtDate(i.created_at)}</span></div>)}</div>}
     </section>
   );
@@ -86,5 +87,37 @@ export function RosterImportAdmin({ tid, onImported }) {
       <div className="divide-y divide-white/[0.06]">{list.slice(0, 8).map((i) => <div key={i.id} className="min-h-[48px] py-1.5 px-2 flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 text-sm" data-testid={`roster-import-row-${i.id}`}><span className={`h-6 px-2 rounded text-[10px] font-bold uppercase inline-flex items-center shrink-0 ${STATUS[i.status][1]}`}>{STATUS[i.status][0]}</span><span className="flex-1 min-w-0 truncate"><span className="font-semibold">{i.club_name}</span> · {i.team_label} · {i.rows.length} giocatori</span>{i.error_count ? <span className="h-6 px-2 rounded-full border border-fsl-warning/50 text-fsl-warning text-[10px] font-bold inline-flex items-center shrink-0 num" data-testid={`roster-import-anomalies-${i.id}`}>{i.error_count} anomalie</span> : null}<span className="text-xs text-fsl-slate num">{fmtDate(i.created_at, { time: true })}</span>{i.status === "submitted" && <button className="btn-gold h-9" onClick={() => setReview(i)} data-testid={`roster-import-review-${i.id}`}>Rivedi e carica</button>}</div>)}</div>
       {review && <ReviewDialog tid={tid} imp={review} onClose={() => setReview(null)} onDone={() => { setReview(null); load(); onImported?.(); }} />}
     </section>
+  );
+}
+
+
+const EMPTY_REQ = { first_name: "", last_name: "", role: "", shirt_number: "", birth_year: "", note: "" };
+
+function AddPlayerRequest({ tid, teamId, onDone }) {
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState(EMPTY_REQ);
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault(); setBusy(true);
+    try {
+      await api.post(`/tournaments/${tid}/roster-imports/request-player`, { team_id: teamId, ...f, shirt_number: f.shirt_number === "" ? null : Number(f.shirt_number), birth_year: f.birth_year === "" ? null : Number(f.birth_year) });
+      toast.success("Richiesta inviata all'organizzazione: il giocatore sarà aggiunto dopo l'approvazione"); setF(EMPTY_REQ); setOpen(false); onDone();
+    } catch (err) { toast.error(apiError(err)); } finally { setBusy(false); }
+  };
+  return (
+    <div className="rounded-md border border-dashed border-white/20 p-3" data-testid="roster-add-request">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-fsl-slate"><span className="flex-1 min-w-[200px]">La rosa non cambia durante il torneo: per aggiungere un giocatore invia una richiesta all'organizzazione.</span><button type="button" className="btn-ghost h-9" disabled={!teamId} onClick={() => setOpen((v) => !v)} data-testid="roster-add-toggle">{open ? "Chiudi" : "Richiedi aggiunta giocatore"}</button></div>
+      {open && (
+        <form onSubmit={submit} className="mt-3 grid grid-cols-2 sm:grid-cols-6 gap-2" data-testid="roster-add-form">
+          <input className="fsl-input h-10 sm:col-span-2" placeholder="Nome" required value={f.first_name} onChange={(e) => setF({ ...f, first_name: e.target.value })} data-testid="roster-add-first" />
+          <input className="fsl-input h-10 sm:col-span-2" placeholder="Cognome" required value={f.last_name} onChange={(e) => setF({ ...f, last_name: e.target.value })} data-testid="roster-add-last" />
+          <select className="fsl-input h-10" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })} data-testid="roster-add-role"><option value="">Ruolo</option>{["Portiere", "Difensore", "Centrocampista", "Attaccante"].map((r) => <option key={r} value={r}>{r}</option>)}</select>
+          <input type="number" min="1" max="99" className="fsl-input h-10 num" placeholder="N. maglia" value={f.shirt_number} onChange={(e) => setF({ ...f, shirt_number: e.target.value })} data-testid="roster-add-shirt" />
+          <input type="number" className="fsl-input h-10 num sm:col-span-1" placeholder="Anno nascita" value={f.birth_year} onChange={(e) => setF({ ...f, birth_year: e.target.value })} data-testid="roster-add-year" />
+          <input className="fsl-input h-10 sm:col-span-3" placeholder="Motivo (es. nuovo tesserato, trasferimento)" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} data-testid="roster-add-note" />
+          <button className="btn-gold h-10 sm:col-span-2" disabled={busy} data-testid="roster-add-submit">Invia richiesta</button>
+        </form>
+      )}
+    </div>
   );
 }

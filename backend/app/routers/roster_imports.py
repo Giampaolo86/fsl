@@ -156,6 +156,43 @@ class ApproveIn(BaseModel):
     note: str = ""
 
 
+class AddPlayerIn(BaseModel):
+    team_id: str
+    first_name: str
+    last_name: str
+    role: str = ""
+    shirt_number: Optional[int] = None
+    birth_year: Optional[int] = None
+    note: str = ""
+
+
+@router.post("/request-player", status_code=201)
+async def request_player(tournament_id: str, body: AddPlayerIn, user: CurrentUser = Depends(get_current_user)):
+    t, role = await require_tournament(tournament_id, user, roles=STAFF | {"club_manager"}, writable=True)
+    tm = await scoped("teams", tournament_id).get(body.team_id)
+    if not tm:
+        raise not_found("Squadra")
+    if role == "club_manager" and tm.club_id != user.club_in(tournament_id):
+        raise forbidden("Puoi richiedere giocatori solo per la tua società")
+    first, last = body.first_name.strip(), body.last_name.strip()
+    if len(first) < 2 or len(last) < 2:
+        raise bad_request("Inserisci nome e cognome")
+    errors = []
+    role_n = ROLES.get(body.role.strip().lower()) if body.role else ""
+    if body.role and not role_n:
+        errors.append("Ruolo non riconosciuto")
+    if body.shirt_number is not None and not (1 <= body.shirt_number <= 99):
+        errors.append("Numero maglia fuori range (1-99)")
+    existing = await scoped("players", tournament_id).find_one({"team_id": tm.id, "shirt_number": body.shirt_number}) if body.shirt_number is not None else None
+    if existing:
+        errors.append(f"Numero {body.shirt_number} già assegnato a {existing.first_name} {existing.last_name}")
+    row = {"n": 1, "first_name": first, "last_name": last, "role": role_n or body.role.strip(), "shirt_number": body.shirt_number, "birth_date": "", "birth_year": body.birth_year, "errors": errors}
+    repo = scoped("roster_imports", tournament_id)
+    imp = await repo.insert(RosterImport(tournament_id=tournament_id, club_id=tm.club_id, team_id=tm.id, filename="Richiesta aggiunta giocatore", team_name=tm.name, rows=[row], note=body.note.strip()[:300], submitted_by=user.id), user.id)
+    await audit.record(user, "roster_import.request_player", "roster_import", imp.id, tournament_id, after={"team_id": tm.id, "player": f"{first} {last}"})
+    return (await _out(tournament_id, [imp]))[0]
+
+
 @router.post("/{import_id}/approve")
 async def approve(tournament_id: str, import_id: str, body: ApproveIn, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user, roles=STAFF, writable=True)

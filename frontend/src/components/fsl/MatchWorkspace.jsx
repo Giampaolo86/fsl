@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { AlertTriangle, Camera, CheckCircle2, ClipboardList, History, RotateCcw, Save, Send, Share2, Users } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, ClipboardList, Euro, History, Lock, Receipt, RotateCcw, Save, Send, Share2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { MatchSheet } from "@/components/fsl/MatchSheet";
@@ -109,7 +109,13 @@ export default function MatchWorkspace({ tournamentId: tidProp, compact = false 
             <p className="text-xs text-fsl-slate flex-1 min-w-[200px]">{mode === "distinta" ? "Tocca il numero per aggiungere o togliere un giocatore dalla distinta." : "Logo squadra: tutti presenti. Numero: 1° tocco presente, 2° assente, 3° da confermare. Voto base 6 con −/+; G/A/RP/★MVP (obbligatorio, uno) e AM/ES/AG aggiornano fantavoto e risultato."}</p>
           </div>
 
+          {mode === "distinta" && m.callup_deadline && !isStaff && !isRef && (
+            <div className={`rounded-md border p-3 text-xs flex items-center gap-2 ${m.callup_locked_for_club ? "border-fsl-warning/50 bg-fsl-warning/10 text-fsl-warning" : "border-white/10 bg-navy-700/50 text-fsl-slate"}`} data-testid="callup-deadline">
+              <Lock className="h-4 w-4 shrink-0" /> {m.callup_locked_for_club ? `Termine convocazioni scaduto (${fmtDate(m.callup_deadline, { time: true })}): per modifiche contatta l'organizzazione.` : `Conferma i convocati entro le ${fmtDate(m.callup_deadline, { time: true })} (sera precedente la gara).`}
+            </div>
+          )}
           <MatchSheet m={m} mode={mode} callups={callups} sheet={sheet} onCallups={setCallups} onSheet={setSheet} canEdit={canEdit} onOpen={setOpenPlayer} />
+          {mode === "gara" && isStaff && m.fees && <MatchFees m={m} tournamentId={tournamentId} onDone={load} />}
 
           {mode === "distinta" && canDistinta && <button className="btn-gold w-full" disabled={busy || !dirty} onClick={saveCallups} data-testid="save-callups-button"><Save className="h-4 w-4" /> Salva distinte</button>}
 
@@ -151,6 +157,27 @@ export default function MatchWorkspace({ tournamentId: tidProp, compact = false 
       <PlayerCardDialog playerId={openPlayer} onClose={() => setOpenPlayer(null)} fetcher={fetchCard} />
       <ReasonDialog open={dialog === "rectify"} onOpenChange={(o) => !o && setDialog(null)} title="Rettifica e ripubblica" description={`Il risultato passerà da ${m.score.home}-${m.score.away} a ${live.home}-${live.away}. Classifica, marcatori e pagelle vengono ricalcolati; la versione precedente resta nella storia.`} confirmLabel="Rettifica" danger onConfirm={closeMatch} />
       <ReasonDialog open={dialog === "reopen"} onOpenChange={(o) => !o && setDialog(null)} title="Riapri gara" description="La gara passa in revisione; la classifica pubblica non cambia finché non pubblichi di nuovo." confirmLabel="Riapri" onConfirm={reopen} />
+    </div>
+  );
+}
+
+
+function MatchFees({ m, tournamentId, onDone }) {
+  const [busy, setBusy] = useState(null);
+  const collect = async (side) => {
+    setBusy(side);
+    try { const r = await api.post(`/tournaments/${tournamentId}/matches/${m.id}/fees/collect`, { side, method: "contanti" }); toast.success(`Incasso registrato · ricevuta ${r.data.receipt_no}`); onDone(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(null); }
+  };
+  if (!m.fees.fee) return <div className="rounded-md bg-navy-700/50 border border-white/10 p-3 text-xs text-fsl-slate flex items-center gap-2" data-testid="match-fees-unset"><Euro className="h-4 w-4" /> Quota per convocato non impostata: configurala in Impostazioni → Quote per generare le ricevute gara.</div>;
+  return (
+    <div className="fsl-card p-4 space-y-2" data-testid="match-fees">
+      <div className="flex items-center justify-between"><h3 className="fsl-kicker flex items-center gap-1.5"><Euro className="h-4 w-4" /> Quota gara · {m.fees.fee.toFixed(2).replace(".", ",")} € a presente</h3><span className="text-[11px] text-fsl-slate">Le presenze effettive (verde) determinano l'importo</span></div>
+      {["home", "away"].map((side) => { const f = m.fees[side]; if (!f) return null; const team = m[side]; return (
+        <div key={side} className="flex flex-wrap items-center gap-3 rounded-md border border-white/10 p-3" data-testid={`match-fee-${side}`}>
+          <ClubCrest club={team.club} size={28} /><div className="flex-1 min-w-[160px]"><div className="font-semibold text-sm">{team.club?.name}</div><div className="text-xs text-fsl-slate num">{f.present} presenti su {f.callups} convocati · {f.amount.toFixed(2).replace(".", ",")} €</div></div>
+          {f.receipt_no ? <span className="h-9 px-3 rounded-full bg-fsl-success/15 border border-fsl-success/50 text-fsl-success text-xs font-semibold inline-flex items-center gap-1.5 num" data-testid={`match-fee-receipt-${side}`}><Receipt className="h-4 w-4" /> {f.receipt_no} · {Number(f.paid_amount).toFixed(2).replace(".", ",")} € ricevuti</span> : <button className="btn-gold h-9" disabled={busy === side || f.present === 0} onClick={() => collect(side)} data-testid={`match-fee-collect-${side}`}><Receipt className="h-4 w-4" /> Incassa e genera ricevuta</button>}
+        </div>
+      ); })}
     </div>
   );
 }
