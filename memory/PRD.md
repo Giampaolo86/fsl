@@ -109,9 +109,12 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 ## Implementato (2026-06) – Iterazione 15 · Check mobile (iPhone 390px)
 - [x] Overflow orizzontale eliminato su tutte le pagine pubbliche, Area Società e Control Room: regole globali (`.grid > * { min-width:0 }`, `html/body overflow-x:hidden`, `.fsl-card min-w-0`), StandingsTable responsive (V/N/P/GF/GS/DR/Forma nascoste sotto i breakpoint, padding celle ridotto), righe pagelle con badge a capo, nav Area Società scrollabile con fade, badge «anomalie» separato nelle rose admin. Verificato 13 pagine pubbliche + 3 società + 4 admin (`iteration_15.json`)
 
+## Implementato (2026-06) – Iterazione 16 · Area Arbitro iPhone
+- [x] RefereeShell: nav a 3 tab reali (Partite / Referti / Guida), rimossi placeholder e campanella inattiva, chip data; lista con blocco «In corso / Oggi / Prossima gara» + CTA «Apri il tabellino»; pagina Referti inviati; Guida rapida in 4 passi; workspace gara arbitro con sole tab Tabellino/Storia; pulsante indietro accessibile; badge stato su una riga. Verificato 5/5 scenari mobile + regressione desktop (`iteration_16.json`)
+
 ## Stato implementazioni (check 2026-06)
 Completo e testato: Match Engine (calendario, tabellino unico, referti, rettifiche), classifiche/statistiche pubbliche, badge engine + premi (griglia ordinabile, premio speciale), social card gara, blog/news/interviste (tag società/gara/giocatori), shop foto/video (Stripe, anteprima video automatica), documenti società, import rosa Excel con approvazione, homepage società (editor società con approvazione + editor admin diretto, immagini di default, gallery), account genitore (preferiti, notifiche mirate, segnalazioni, «I miei bambini», acquisti), scheda giocatore («Mi presento», dicono di me, media taggati, foto con approvazione, cartolina), prodotti digitali 2,49 € (cartolina squadra, album stagione), registrazione società (codice invito + richiesta con approvazione), PWA + logo custom, responsive mobile.
-Parziale / da completare: consenso privacy digitale del genitore (oggi flag gestito da società/admin); invio email (credenziali, inviti, link acquisti) — nessun provider configurato; area arbitro verificata solo nei flussi base; notifiche solo in-app (niente push/email).
+Parziale / da completare: consenso privacy digitale del genitore (oggi flag gestito da società/admin); invio email (credenziali, inviti, link acquisti) — nessun provider configurato; notifiche solo in-app (niente push/email).
 
 ## Backlog prioritizzato
 - ~~P1 Registrazione società~~ (fatto, iterazione 13)

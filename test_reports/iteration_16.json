@@ -1,0 +1,22 @@
+{
+  "summary": "Iterazione 16 – test frontend Area Arbitro (mobile 390x844) + regressione desktop 1920. Login arbitro@fsl.demo OK → /arbitro: header con logo, logout-button, chip referee-today; blocco referee-next 'In corso' (Trastevere – Alba Roma) con pulsante referee-open-next; sezione referee-todo (3 gare Programmata); link referee-to-reports; nav inferiore a 3 tab (referee-nav-partite/referti/guida) — placeholder Eventi/Squadre/Note assenti come richiesto; nessuna campanella. docSw=390 su tutte le rotte arbitro. 4 badge match-status altezza 24px (<=26px) su una riga. Navigazione tab: /arbitro/referti mostra h1 'Referti inviati' + referee-reports con MatchCard (non empty); /arbitro/guida mostra h1 'Guida rapida' + referee-guide con 4 step; ritorno a /arbitro/partite OK. Workspace gara scheduled (Sporting Eur – Appio Latino, 6aaa5ce2cfb606f5c0fb7548): referee-back h=44, hero punteggio 0-0, tab SOLO ['Tabellino','Storia'] (nessun Social/Media), mode-distinta abilita 10 tap numeri giocatore e save-callups-button (disabled inizialmente, corretto), mode-gara mostra sheet-notes, sheet-problems ('Distinta SPO mancante · Distinta APP mancante · MVP non assegnato (★)'), save-sheet-button e close-match-button entrambi larghi 322px (viewport 390 con padding), close-match-button correttamente disabled finché problemi presenti. docSw=390 stabile. referee-back → /arbitro, logout-button → /login OK. Desktop 1920: /arbitro centrato in container max-width 640px (x=640, right=1280), nav 3 tab intatta. Regressione admin workspace /admin/t/6a9b5b045d9e0985643d0a9f/partite/6aaa5ce2cfb606f5c0fb7560: tab confermate ['Tabellino','Social','Media','Storia'] (4 tab). Nessun bug rilevato.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Nessun problema rilevato: RefereeShell, RefereeMatches, MatchWorkspace, MatchStatusBadge, App routes /arbitro/referti e /arbitro/guida risultano allineati alle specifiche."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skip come richiesto)", "frontend": "100% (5/5 scenari mobile + desktop regressione OK)"},
+  "test_credentials": "arbitro@fsl.demo/Demo1234!, castellani.giampaolo@gmail.com/FSL-Admin-2026! da /app/memory/test_credentials.md",
+  "seed_data_creation": "",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Area Arbitro mobile 390x844 completamente verificata. Non sono stati inviati referti definitivi (close-match-button non premuto) per non alterare classifiche demo, come da richiesta. save-callups-button non è stato effettivamente salvato (era comunque disabled con distinta vuota). Se retest, riusare match scheduled 6aaa5ce2cfb606f5c0fb7548 (Sporting Eur – Appio Latino) per testare mode-gara: sheet-problems mostra correttamente distinte mancanti + MVP non assegnato.",
+  "rca of the issue": "Nessuna issue."
+}
