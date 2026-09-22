@@ -16,11 +16,11 @@ export function Badges({ list = [] }) {
 export function RatingRow({ r, onOpen }) {
   const Name = onOpen && r.player_id ? "button" : "span";
   return (
-    <div className={`h-12 px-2 flex items-center gap-2 border-b border-white/[0.06] ${r.present === false ? "opacity-50" : ""}`} data-testid={`rating-row-${r.player_id || r.shirt_number}`}>
+    <div className={`min-h-[48px] py-1.5 px-2 flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-1 border-b border-white/[0.06] ${r.present === false ? "opacity-50" : ""}`} data-testid={`rating-row-${r.player_id || r.shirt_number}`}>
       {r.photo_url ? <img src={mediaUrl(r.photo_url)} alt="" className="h-8 w-8 rounded-full object-cover shrink-0 border border-white/20" /> : <span className={`h-8 w-8 rounded-full inline-flex items-center justify-center text-[10px] font-bold uppercase shrink-0 ${ROLE_TONE[r.role] || "bg-navy-700"}`}>{r.role}</span>}
       <span className="num text-fsl-gold text-xs w-5 text-right shrink-0">{r.shirt_number ?? ""}</span>
       <Name onClick={onOpen && r.player_id ? () => onOpen(r.player_id) : undefined} className={`flex-1 min-w-0 text-left text-sm font-semibold truncate ${Name === "button" ? "hover:text-fsl-gold transition-colors" : ""}`} data-testid={Name === "button" ? `open-player-${r.player_id}` : undefined}>{r.name}</Name>
-      <div className="w-[120px] sm:w-[160px] shrink-0 overflow-x-auto no-scrollbar flex items-center gap-1"><EventIcons ev={r.events} compact /><Badges list={r.badges} /></div>
+      <div className="order-last basis-full sm:order-none sm:basis-auto sm:w-[160px] shrink-0 overflow-x-auto no-scrollbar flex items-center gap-1 pl-12 sm:pl-0 empty:hidden"><EventIcons ev={r.events} compact /><Badges list={r.badges} /></div>
       {r.present === false || r.pending ? (
         <span className="w-[76px] text-right text-[10px] uppercase text-fsl-slate shrink-0">{r.pending ? "Da conf." : "Assente"}</span>
       ) : (

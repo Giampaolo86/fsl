@@ -20,7 +20,7 @@ export function StandingsTable({ competition, rows, clubBase, testId }) {
       </div>
       <div className="overflow-x-auto">
         <table className="w-full table-dark">
-          <thead><tr><th className="w-10">Pos</th><th>Squadra</th><th className="text-right">PG</th><th className="text-right">V</th><th className="text-right">N</th><th className="text-right">P</th><th className="text-right">GF</th><th className="text-right">GS</th><th className="text-right">DR</th><th className="text-right">PT</th><th>Forma</th></tr></thead>
+          <thead><tr><th className="w-10">Pos</th><th>Squadra</th><th className="text-right">PG</th><th className="text-right hidden md:table-cell">V</th><th className="text-right hidden md:table-cell">N</th><th className="text-right hidden md:table-cell">P</th><th className="text-right hidden lg:table-cell">GF</th><th className="text-right hidden lg:table-cell">GS</th><th className="text-right hidden sm:table-cell">DR</th><th className="text-right">PT</th><th className="hidden sm:table-cell">Forma</th></tr></thead>
           <tbody>
             {rows.length === 0 && <tr><td colSpan={11} className="text-center text-sm text-fsl-slate py-8">Nessuna squadra iscritta.</td></tr>}
             {rows.map((r) => (
@@ -32,13 +32,13 @@ export function StandingsTable({ competition, rows, clubBase, testId }) {
                 <td>
                   <span className="flex items-center gap-2 font-semibold">
                     <ClubCrest club={r.club} size={24} />
-                    {clubBase && r.club?.slug ? <Link to={`${clubBase}/${r.club.slug}`} className="hover:text-fsl-gold">{r.club?.name || r.name}</Link> : r.club?.name || r.name}
+                    {clubBase && r.club?.slug ? <Link to={`${clubBase}/${r.club.slug}`} className="hover:text-fsl-gold truncate max-w-[140px] sm:max-w-none inline-block align-middle">{r.club?.name || r.name}</Link> : r.club?.name || r.name}
                   </span>
                 </td>
-                <td className="num text-right">{r.PG}</td><td className="num text-right">{r.V}</td><td className="num text-right">{r.N}</td><td className="num text-right">{r.P}</td>
-                <td className="num text-right">{r.GF}</td><td className="num text-right">{r.GS}</td><td className="num text-right">{r.DR > 0 ? `+${r.DR}` : r.DR}</td>
+                <td className="num text-right">{r.PG}</td><td className="num text-right hidden md:table-cell">{r.V}</td><td className="num text-right hidden md:table-cell">{r.N}</td><td className="num text-right hidden md:table-cell">{r.P}</td>
+                <td className="num text-right hidden lg:table-cell">{r.GF}</td><td className="num text-right hidden lg:table-cell">{r.GS}</td><td className="num text-right hidden sm:table-cell">{r.DR > 0 ? `+${r.DR}` : r.DR}</td>
                 <td className="num text-right font-display font-extrabold text-xl text-fsl-gold">{r.PT}</td>
-                <td><span className="flex gap-0.5">{r.form.map((f, i) => <span key={i} className={`h-5 w-5 rounded text-[10px] font-bold inline-flex items-center justify-center ${f === "V" ? "bg-fsl-success text-ink-950" : f === "N" ? "bg-fsl-slate text-ink-950" : "bg-fsl-danger"}`}>{f}</span>)}</span></td>
+                <td className="hidden sm:table-cell"><span className="flex gap-0.5">{r.form.map((f, i) => <span key={i} className={`h-5 w-5 rounded text-[10px] font-bold inline-flex items-center justify-center ${f === "V" ? "bg-fsl-success text-ink-950" : f === "N" ? "bg-fsl-slate text-ink-950" : "bg-fsl-danger"}`}>{f}</span>)}</span></td>
               </tr>
             ))}
           </tbody>

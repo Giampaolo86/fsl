@@ -36,8 +36,9 @@ export default function ClubShell() {
             </button>
           </div>
         </div>
-        <nav className="border-t border-white/10 bg-navy-900" aria-label="Navigazione società">
-          <div className="mx-auto max-w-[1488px] px-4 md:px-6 flex overflow-x-auto">
+        <nav className="border-t border-white/10 bg-navy-900 relative" aria-label="Navigazione società">
+          <span className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-navy-900 to-transparent lg:hidden" aria-hidden="true" />
+          <div className="mx-auto max-w-[1488px] px-4 md:px-6 flex overflow-x-auto no-scrollbar snap-x">
             {CLUB_NAV.map(([label, to, Icon]) => (
               <NavLink
                 key={to}

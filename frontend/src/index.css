@@ -31,6 +31,10 @@
   html {
     background: #03131f;
   }
+  html,
+  body {
+    overflow-x: hidden;
+  }
   body {
     @apply bg-navy-900 text-fsl-white font-sans antialiased;
     font-feature-settings: "cv11", "ss01";
@@ -72,7 +76,10 @@
 
 @layer components {
   .fsl-card {
-    @apply bg-navy-800 rounded-lg border border-white/[0.14] shadow-card;
+    @apply bg-navy-800 rounded-lg border border-white/[0.14] shadow-card min-w-0;
+  }
+  .grid > * {
+    min-width: 0;
   }
   .fsl-card-gold {
     @apply bg-navy-800 rounded-lg border border-fsl-gold/30 shadow-card;
@@ -141,10 +148,10 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
   }
   .table-dark th {
-    @apply sticky top-0 z-10 bg-navy-800 text-left text-[11px] font-semibold uppercase tracking-wider text-fsl-slate px-4 h-12 border-b border-white/10;
+    @apply sticky top-0 z-10 bg-navy-800 text-left text-[11px] font-semibold uppercase tracking-wider text-fsl-slate px-2 sm:px-4 h-12 border-b border-white/10;
   }
   .table-dark td {
-    @apply px-4 h-[52px] border-b border-white/[0.06] text-sm align-middle;
+    @apply px-2 sm:px-4 h-[52px] border-b border-white/[0.06] text-sm align-middle;
   }
   .table-dark tbody tr {
     @apply transition-colors hover:bg-white/[0.04];
