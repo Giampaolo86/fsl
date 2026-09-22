@@ -106,6 +106,13 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 ## Implementato (2026-06) – Iterazione 14
 - [x] Prodotti digitali a 2,49 € (`routers/products.py`, Stripe price `fsl_digital_249`): **Cartolina squadra** 1080×1350 (canvas `TeamCard.jsx`: stemma, rosa, classifica, marcatori, badge; anteprima con filigrana + acquisto dalla homepage società) e **Album stagione** per bambino (`DigitalProduct.jsx`: cartolina, badge, interviste, foto taggate, storico gare, stampa PDF; acquisto dalla scheda giocatore, solo con consenso o per genitore/staff). Link personale `/tornei/:slug/prodotti/:token` (sempre aggiornato), apertura da /payment/success e da «I miei acquisti». Test 16/16 backend + flussi frontend (`iteration_14.json`)
 
+## Implementato (2026-06) – Iterazione 15 · Check mobile (iPhone 390px)
+- [x] Overflow orizzontale eliminato su tutte le pagine pubbliche, Area Società e Control Room: regole globali (`.grid > * { min-width:0 }`, `html/body overflow-x:hidden`, `.fsl-card min-w-0`), StandingsTable responsive (V/N/P/GF/GS/DR/Forma nascoste sotto i breakpoint, padding celle ridotto), righe pagelle con badge a capo, nav Area Società scrollabile con fade, badge «anomalie» separato nelle rose admin. Verificato 13 pagine pubbliche + 3 società + 4 admin (`iteration_15.json`)
+
+## Stato implementazioni (check 2026-06)
+Completo e testato: Match Engine (calendario, tabellino unico, referti, rettifiche), classifiche/statistiche pubbliche, badge engine + premi (griglia ordinabile, premio speciale), social card gara, blog/news/interviste (tag società/gara/giocatori), shop foto/video (Stripe, anteprima video automatica), documenti società, import rosa Excel con approvazione, homepage società (editor società con approvazione + editor admin diretto, immagini di default, gallery), account genitore (preferiti, notifiche mirate, segnalazioni, «I miei bambini», acquisti), scheda giocatore («Mi presento», dicono di me, media taggati, foto con approvazione, cartolina), prodotti digitali 2,49 € (cartolina squadra, album stagione), registrazione società (codice invito + richiesta con approvazione), PWA + logo custom, responsive mobile.
+Parziale / da completare: consenso privacy digitale del genitore (oggi flag gestito da società/admin); invio email (credenziali, inviti, link acquisti) — nessun provider configurato; area arbitro verificata solo nei flussi base; notifiche solo in-app (niente push/email).
+
 ## Backlog prioritizzato
 - ~~P1 Registrazione società~~ (fatto, iterazione 13)
 - P0 (Fase 3 residuo): blackout campi/indisponibilità, drag-and-drop calendario, versioni bozza/pubblicazione, recuperi in settimana

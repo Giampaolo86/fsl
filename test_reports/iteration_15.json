@@ -1,0 +1,30 @@
+{
+  "summary": "Iterazione 15 – solo verifica responsive/mobile (390x844) come richiesto. Tutte le 13 pagine pubbliche testate con docSw <= 390 e nessun elemento visibile con right > 392 (esclusi contenitori .overflow-x-auto/scroll e caroselli snap): /tornei/la-serie-a-dei-bambini, /partite, /partite/6aaa5ce2cfb606f5c0fb7560 (Match Center), /classifiche, /statistiche, /squadre, /squadre/sporting-eur, /giocatori/6aaa5ce2cfb606f5c0fb7532, /news, /login, /registrati, /registrati-societa, /richiedi-accesso. Match Center mobile verificato: hero punteggio 3-2 leggibile, match-center-events presente, Classifica embedded con colonne visibili esattamente ['Pos','Squadra','PG','PT'] (V/N/P/GF/GS/DR/Forma nascoste), Pagelle (match-center-ratings): nomi giocatori NON troncati (visibili 'Luca M.', 'Simone B.', 'Matteo C.', 'Giocatore'), badge 'G G DOPPIETTA' vanno a capo sotto il nome come atteso. Nessun elemento truncato con ellipsis+overflow trovato in .match-center-ratings. Sezioni Badge/Foto/Video presenti. Classifiche pagina mobile: solo 4 colonne visibili ['Pos','Squadra','PG','PT'] su 18 righe (tutte leggibili). Desktop 1920 regressione: la tabella classifiche mostra tutte 11 colonne ['Pos','Squadra','PG','V','N','P','GF','GS','DR','PT','Forma'] confermata. Area Società (societa@fsl.demo): /societa, /societa/rose, /societa/partite/{id} docSw=390 tutti OK; nav Dashboard/Squadre/Rose/Documenti/Calendario/Segnalazioni/Pagamenti/Blog/Profilo confermata scrollabile (scrollWidth=1053 > clientWidth=390, overflow-x-auto, classe 'mx-auto max-w-[1488px] px-4 md:px-6 flex overflow-x-auto no-scrollbar snap-x'); click su 'Rose' naviga correttamente a /societa/rose. Control Room (castellani.giampaolo): /admin/t/{tid}/partite, /admin/t/{tid}/partite/{mid} (Tabellino visibile con righe giocatore contenenti −/+ voto icone Lucide utilizzabili), /admin/t/{tid}/classifiche → docSw=390 OK. Admin Rose docSw=390 OK; il matcher ha segnalato 2 span '· 1 anomalie' con right=484/514 ma sono clippati visivamente dal parent span.truncate (overflow-x:hidden) → nessun impatto utente, nessun overflow reale (verificato che docSw resta 390 e la pagina non scrolla orizzontalmente).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/tornei/la-serie-a-dei-bambini (home torneo hero mobile)", "issues": ["IMG di sfondo con classe 'absolute inset-0 h-full w-full object-cover scale-105' ha bounding right=400 (10px oltre viewport) per effetto scale(1.05). Non causa overflow di pagina (docSw=390) perché il parent è overflow-hidden; puramente cosmetico."]},
+      {"screen": "/admin/t/{tid}/rose (mobile)", "issues": ["Le righe della card 'Moduli rosa ricevuti' usano span.flex-1.min-w-0.truncate per il nome file: il testo aggiuntivo '· N anomalie' viene troncato via ellipsis e non è leggibile su mobile. Non è un bug di overflow (contenuto è clippato dal parent), ma UX: valutare di mostrare '· N anomalie' su una riga sotto o come badge separato."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(minor UX) In /admin/t/{tid}/rose mobile, l'informazione 'N anomalie' finisce troncata dietro l'ellipsis del nome file — considerare wrap su seconda riga o badge separato.",
+    "(cosmetic) L'immagine hero di /tornei/{slug} usa scale-105 che sfora di 10px il viewport; nessun impatto ma il parent clippa correttamente."
+  ],
+  "critical_code_review_comments": [
+    "StandingsTable: colonne 'hidden md:table-cell' funzionano ma il match center embedded ha un solo <table>; verificare che PublicClubHome match hero non renderizzi accidentalmente due tabelle su desktop (nel test desktop trovate 22 header = 2 tabelle standings sulla pagina Match Center, atteso e coerente con sidebar 'Classifica').",
+    "index.css .grid > * { min-width: 0 } + html/body overflow-x hidden: soluzione efficace ma globale. Aggiungere test di regressione futuro (Playwright) che verifichi docSw <= viewport su rotte critiche a ogni deploy.",
+    "In /admin/t/{tid}/rose, la struttura 'flex-1 min-w-0 truncate' avvolge sia il nome file sia il suffisso '· N anomalie' — separando i due span (nome truncate + suffisso shrink-0) l'anomalia resterebbe visibile."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped come da richiesta)", "frontend": "100% (13/13 pagine pubbliche mobile + 3/3 Area Società + 4/4 Control Room, desktop regressione classifiche OK, Match Center ratings/standings mobile OK)"},
+  "test_credentials": "societa@fsl.demo/Demo1234!, castellani.giampaolo@gmail.com/FSL-Admin-2026! (da /app/memory/test_credentials.md)",
+  "seed_data_creation": "",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Le fix responsive (index.css `.grid > * { min-width: 0 }`, `html/body overflow-x hidden`, StandingsTable colonne hidden by breakpoint, Ratings flex-wrap badge, ClubShell nav overflow-x-auto+snap) sono verificate al 100% su iPhone 390x844. Se serve retestare, il matcher JS deve escludere solo overflow-x auto/scroll (non hidden) altrimenti si generano falsi positivi su elementi con .truncate.",
+  "rca of the issue": "Nessun bug bloccante. Falso positivo dell'automatismo: elementi con parent overflow-x:hidden (Tailwind 'truncate') possono avere bounding rect oltre viewport ma sono clippati e non causano scroll orizzontale documento. docSw==390 su tutte le rotte testate conferma che le fix hanno risolto il problema segnalato dall'utente iPhone."
+}
