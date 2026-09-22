@@ -167,7 +167,7 @@ async def _home_news(t_id: str) -> list[dict]:
 async def _home_shop(t_id: str, all_matches, clubs) -> list[dict]:
     from .club_extras import _items_out
 
-    items = await scoped("paid_media", t_id).list({"active": True}, sort=[("created_at", -1)], limit=8)
+    items = await scoped("paid_media", t_id).list({"active": True, "kind": {"$in": ["photo", "video"]}}, sort=[("created_at", -1)], limit=8)
     if not items:
         return []
     matches = {m.id: m for m in all_matches}

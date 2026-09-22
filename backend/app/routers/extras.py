@@ -9,7 +9,7 @@ from ..core.deps import CurrentUser, get_current_user, require_tournament
 from ..core.errors import bad_request, conflict, forbidden, not_found
 from ..models.base import BaseDocument, utcnow
 from ..models.domain import PlayerBadge
-from ..repositories.registry import SCOPED, scoped, settings_repo
+from ..repositories.registry import SCOPED, scoped, settings_repo, tournaments
 from ..services import audit, badges, engine
 
 router = APIRouter(prefix="/tournaments/{tournament_id}", tags=["extras"])
@@ -145,7 +145,8 @@ async def player_card(tournament_id: str, p, public: bool = False):
     prof = {k: v for k, v in (p.profile or {}).items() if k in PROFILE_FIELDS} if show else {}
     club = await scoped("clubs", tournament_id).get(p.club_id)
     club_d = {"id": club.id, "name": club.name, "slug": club.slug, "colors": club.colors, "crest_url": club.crest_url if not club.crest_is_placeholder else None} if club else None
-    return {"club": club_d, "player_id": p.id, "name": name, "role": p.role, "role_code": ROLE_CODE.get(p.role, ""), "shirt_number": p.shirt_number, "birth_year": None if public else p.birth_year, "team": teams[p.team_id].name if p.team_id in teams else "", "team_id": p.team_id, "club_id": p.club_id, "photo_url": p.photo_url if show else None, "public_ok": ok, "profile": prof, "guardian_emails": [] if public else p.guardian_emails, "media": {"posts": posts, "shop": shop}, "totals": dict(tot), "avg_vote": round(sum(votes) / len(votes), 2) if votes else None, "avg_fanta": round(sum(fantas) / len(fantas), 2) if fantas else None, "history": list(reversed(history)), "badges": (await badges.for_players(tournament_id, [p.id])).get(p.id, [])}
+    tdoc = await tournaments.get(tournament_id)
+    return {"club": club_d, "tournament": {"slug": tdoc.slug, "name": tdoc.name} if tdoc else None, "player_id": p.id, "name": name, "role": p.role, "role_code": ROLE_CODE.get(p.role, ""), "shirt_number": p.shirt_number, "birth_year": None if public else p.birth_year, "team": teams[p.team_id].name if p.team_id in teams else "", "team_id": p.team_id, "club_id": p.club_id, "photo_url": p.photo_url if show else None, "public_ok": ok, "profile": prof, "guardian_emails": [] if public else p.guardian_emails, "media": {"posts": posts, "shop": shop}, "totals": dict(tot), "avg_vote": round(sum(votes) / len(votes), 2) if votes else None, "avg_fanta": round(sum(fantas) / len(fantas), 2) if fantas else None, "history": list(reversed(history)), "badges": (await badges.for_players(tournament_id, [p.id])).get(p.id, [])}
 
 
 PROFILE_FIELDS = {"height_cm", "weight_kg", "foot", "quote", "testimonials", "nickname", "idol", "favorite_team"}

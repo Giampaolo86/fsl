@@ -326,10 +326,11 @@ class Notification(BaseDocument):
 
 class PaidMedia(BaseDocument):
     tournament_id: str
-    match_id: str
-    kind: Literal["video", "photo"] = "photo"
+    match_id: Optional[str] = None
+    kind: Literal["video", "photo", "team_card", "album"] = "photo"
     title: str
-    media_id: str
+    media_id: Optional[str] = None
+    ref_id: Optional[str] = None
     preview_media_id: Optional[str] = None
     lookup_key: str
     price_cents: int

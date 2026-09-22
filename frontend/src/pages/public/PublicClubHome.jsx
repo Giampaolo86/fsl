@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Award, Bus, CalendarDays, Camera, Clock, Globe, Instagram, Mail, MapPin, MessageCircle, Phone, ShieldCheck, Trophy, Users } from "lucide-react";
+import { Award, Bus, Image as ImageIcon, CalendarDays, Camera, Clock, Globe, Instagram, Mail, MapPin, MessageCircle, Phone, ShieldCheck, Trophy, Users } from "lucide-react";
 import { PostCard } from "@/components/fsl/Article";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
@@ -12,6 +12,7 @@ import { ROLE_CODE, ROLE_TONE } from "@/lib/fanta";
 import { api, apiError } from "@/lib/api";
 import { mediaUrl } from "@/lib/upload";
 import { toast } from "sonner";
+import { TeamCardDialog } from "@/components/fsl/TeamCardDialog";
 
 function Block({ title, icon: Icon, children, className = "", testId }) {
   return <section className={`fsl-card p-5 ${className}`} data-testid={testId}><h2 className="fsl-kicker mb-3 flex items-center gap-2">{Icon && <Icon className="h-4 w-4 text-fsl-gold" />}{title}</h2>{children}</section>;
@@ -22,6 +23,7 @@ export default function PublicClubHome() {
   const [d, setD] = useState(null);
   const [error, setError] = useState(null);
   const [openPlayer, setOpenPlayer] = useState(null);
+  const [teamCard, setTeamCard] = useState(null);
   const [busy, setBusy] = useState(null);
   const fetchCard = useCallback((pid) => api.get(`/public/tournaments/${slug}/players/${pid}`), [slug]);
   useEffect(() => { setD(null); api.get(`/public/tournaments/${slug}/clubs/${clubSlug}`).then((r) => setD(r.data)).catch(setError); }, [slug, clubSlug]);
@@ -69,7 +71,7 @@ export default function PublicClubHome() {
           <div className="grid lg:grid-cols-2 gap-4">
             {d.rosters.map((r) => (
               <div key={r.team.id} className="fsl-card overflow-hidden" data-testid={`club-roster-${r.team.id}`}>
-                <div className="h-12 px-4 flex items-center gap-3 border-b border-white/10" style={{ background: `linear-gradient(90deg, ${primary}66, transparent)` }}><Trophy className="h-4 w-4 text-fsl-gold" /><span className="font-display font-bold uppercase">{r.team.name}</span><span className="text-xs text-fsl-slate truncate">{r.competition}</span><span className="ml-auto num text-xs text-fsl-slate">{r.count} tesserati</span></div>
+                <div className="h-12 px-4 flex items-center gap-3 border-b border-white/10" style={{ background: `linear-gradient(90deg, ${primary}66, transparent)` }}><Trophy className="h-4 w-4 text-fsl-gold" /><span className="font-display font-bold uppercase">{r.team.name}</span><span className="text-xs text-fsl-slate truncate">{r.competition}</span><span className="ml-auto num text-xs text-fsl-slate">{r.count} tesserati</span><button className="btn-gold h-8 px-3 text-xs shrink-0" onClick={() => setTeamCard(r.team)} data-testid={`team-card-open-${r.team.id}`}><ImageIcon className="h-3.5 w-3.5" /> Cartolina · 2,49 €</button></div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-white/[0.06]">
                   {r.players.map((pl, i) => (
                     <button key={i} type="button" disabled={!pl.id} onClick={() => pl.id && setOpenPlayer(pl.id)} className="h-16 px-3 flex items-center gap-2 text-left enabled:hover:bg-white/[0.04] disabled:cursor-default" data-testid={pl.id ? `club-player-${pl.id}` : undefined}>
@@ -116,6 +118,7 @@ export default function PublicClubHome() {
         )}
       </div>
       <PlayerCardDialog playerId={openPlayer} onClose={() => setOpenPlayer(null)} fetcher={fetchCard} />
+      {teamCard && <TeamCardDialog slug={slug} team={teamCard} onClose={() => setTeamCard(null)} />}
     </div>
   );
 }

@@ -26,6 +26,7 @@ import Register, { AuthCallback } from "@/pages/Register";
 import { RegisterClub, RequestAccess } from "@/pages/RegisterClub";
 import FanAccount from "@/pages/FanAccount";
 import PlayerProfile from "@/pages/PlayerProfile";
+import DigitalProduct from "@/pages/DigitalProduct";
 import ClubHomeEditor from "@/pages/club/ClubHomeEditor";
 import PublicClubHome from "@/pages/public/PublicClubHome";
 import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
@@ -143,6 +144,7 @@ function AppRoutes() {
                 <Route path="squadre" element={<PublicClubs />} />
                 <Route path="squadre/:clubSlug" element={<PublicClubHome />} />
                 <Route path="giocatori/:playerId" element={<PlayerProfile mode="public" />} />
+                <Route path="prodotti/:token" element={<DigitalProduct />} />
                 <Route path="classifiche" element={<PublicStandingsLive />} />
                 <Route path="regolamento" element={<PublicRules />} />
                 <Route path="partite" element={<PublicMatches />} />

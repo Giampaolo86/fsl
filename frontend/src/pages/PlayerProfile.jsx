@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, Camera, Check, Heart, ImagePlus, Loader2, Newspaper, Pencil, Quote, Ruler, Weight, X } from "lucide-react";
+import { ArrowLeft, BookOpen, Camera, Check, Heart, ImagePlus, Loader2, Newspaper, Pencil, Quote, Ruler, Weight, X } from "lucide-react";
 import { PostCard } from "@/components/fsl/Article";
 import { BadgeChips } from "@/components/fsl/BadgeChips";
 import { FavButton } from "@/components/fsl/FavButton";
 import { PlayerProfileEditor, FOOT_LABEL } from "@/components/fsl/PlayerProfileEditor";
 import { PlayerPostcard } from "@/components/fsl/PlayerPostcard";
+import { buyProduct } from "@/pages/DigitalProduct";
 import { Badges, EventIcons } from "@/components/fsl/Ratings";
 import { ShopItemCard } from "@/components/fsl/Shop";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
@@ -37,6 +38,8 @@ export default function PlayerProfile({ mode = "public" }) {
   const [tid, setTid] = useState(mode === "admin" ? tournamentId : mode === "club" ? user?.memberships?.find((m) => m.role === "club_manager")?.tournament_id : null);
   const [edit, setEdit] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [buyingAlbum, setBuyingAlbum] = useState(false);
+  const buyAlbum = async () => { setBuyingAlbum(true); try { await buyProduct(slug || card?.tournament?.slug || "", "album", playerId); } catch (e) { toast.error(apiError(e)); setBuyingAlbum(false); } };
   const uploadPhoto = async (file) => {
     if (!file) return; setUploading(true);
     const fd = new FormData(); fd.append("file", file);
@@ -98,6 +101,13 @@ export default function PlayerProfile({ mode = "public" }) {
           </div>
         )}
         {(card.public_ok || card.can_edit) && <section><h2 className="fsl-section-title mb-3">La mia cartolina</h2><PlayerPostcard card={card} colors={card.club?.colors} /></section>}
+        {(card.public_ok || card.can_edit) && (
+          <section className="relative overflow-hidden rounded-2xl border border-fsl-gold/30 bg-navy-800 p-6 md:p-8 grid md:grid-cols-[1fr_auto] items-center gap-6" data-testid="album-offer">
+            <div className="absolute inset-0 grain opacity-40 pointer-events-none" />
+            <div className="relative"><div className="fsl-kicker flex items-center gap-2"><BookOpen className="h-4 w-4 text-fsl-gold" /> Album stagione</div><h2 className="mt-1 text-3xl sm:text-4xl font-extrabold uppercase leading-[0.95]">Tutta la stagione di {card.name.split(" ")[0]} in un album</h2><p className="mt-2 text-sm text-fsl-slate max-w-xl">Cartolina, badge conquistati, interviste, le foto più belle e ogni partita giocata: un ricordo digitale che si aggiorna fino all'ultima giornata, stampabile in PDF.</p></div>
+            <div className="relative flex flex-col items-stretch gap-2 min-w-[200px]"><div className="font-display font-extrabold text-4xl text-fsl-gold num text-center">2,49 €</div><button className="btn-gold" disabled={buyingAlbum} onClick={buyAlbum} data-testid="album-buy">{buyingAlbum ? "Reindirizzamento…" : "Acquista l'album"}</button><span className="text-[10px] text-fsl-slate text-center">Pagamento sicuro Stripe · link personale</span></div>
+          </section>
+        )}
         {(facts.length > 0 || p.testimonials?.length > 0) && (
           <section className="grid lg:grid-cols-[1fr_1.2fr] gap-6" data-testid="player-profile-presentation">
             <div>

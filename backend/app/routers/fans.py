@@ -103,7 +103,9 @@ async def my_purchases(user: CurrentUser = Depends(get_current_user)):
     out = []
     for r in rows:
         it = items.get(r.item_id)
-        out.append({"id": r.id, "created_at": r.created_at, "amount": r.amount, "title": it.title if it else "—", "kind": it.kind if it else "", "match_id": it.match_id if it else None, "tournament_id": r.tournament_id, "download_url": f"/api/payments/download/{r.download_token}"})
+        t = await tournaments.get(r.tournament_id)
+        digital = it is not None and it.kind in ("team_card", "album")
+        out.append({"id": r.id, "created_at": r.created_at, "amount": r.amount, "title": it.title if it else "—", "kind": it.kind if it else "", "match_id": it.match_id if it else None, "tournament_id": r.tournament_id, "download_url": None if digital else f"/api/payments/download/{r.download_token}", "open_url": f"/tornei/{t.slug}/prodotti/{r.download_token}" if digital and t else None})
     return out
 
 

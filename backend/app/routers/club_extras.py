@@ -7,6 +7,7 @@ from datetime import date, datetime, timezone
 from typing import Optional
 
 import stripe
+from fastapi.responses import RedirectResponse
 from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from pydantic import BaseModel
 
@@ -22,7 +23,8 @@ public_router = APIRouter(prefix="/public/tournaments/{slug}", tags=["public"])
 STAFF = {"super_admin", "director", "secretary"}
 OPS = {"super_admin", "director"}
 DOC_KINDS = {"certificato_medico": "Certificato medico", "documento_identita": "Documento d'identità", "consenso_privacy": "Consenso privacy", "consenso_immagine": "Consenso immagine", "iscrizione": "Modulo iscrizione", "altro": "Altro"}
-PRICES = {"video": ("fsl_video_099", 99), "photo": ("fsl_photo_049", 49)}
+PRICES = {"video": ("fsl_video_099", 99), "photo": ("fsl_photo_049", 49), "team_card": ("fsl_digital_249", 249), "album": ("fsl_digital_249", 249)}
+DIGITAL = {"team_card", "album"}
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or "sk_test_emergent"
 media_repo = Repository("media_files", MediaFile)
 
@@ -340,7 +342,7 @@ async def _items_out(t_id: str, items: list[PaidMedia]) -> list[dict]:
 @router.post("/shop/items", status_code=201)
 async def create_item(tournament_id: str, body: PaidMediaIn, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user, roles=STAFF, writable=True)
-    if body.kind not in PRICES:
+    if body.kind not in PRICES or body.kind in DIGITAL:
         raise bad_request("Tipo non valido")
     m = await scoped("matches", tournament_id).get(body.match_id)
     media = await scoped("media", tournament_id).get(body.media_id)
@@ -471,6 +473,10 @@ async def payment_status(session_id: str):
     if p.payment_status == "paid":
         it = await _find_item(p.item_id)
         out.update({"download_url": f"/api/payments/download/{p.download_token}", "title": it.title if it else "", "kind": it.kind if it else ""})
+        if it and it.kind in DIGITAL:
+            t = await tournaments.get(it.tournament_id)
+            out["open_url"] = f"/tornei/{t.slug}/prodotti/{p.download_token}" if t else None
+            out.pop("download_url", None)
     return out
 
 
@@ -480,7 +486,10 @@ async def download(token: str):
     if not p:
         raise not_found("Acquisto")
     it = await _find_item(p.item_id)
-    media = await media_repo.get(it.media_id) if it else None
+    if it and it.kind in DIGITAL:
+        t = await tournaments.get(it.tournament_id)
+        return RedirectResponse(f"/tornei/{t.slug}/prodotti/{p.download_token}")
+    media = await media_repo.get(it.media_id) if it and it.media_id else None
     if not media:
         raise not_found("File")
     data, ct = await storage.get_object(media.storage_path)
