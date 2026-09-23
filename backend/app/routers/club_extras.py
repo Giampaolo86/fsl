@@ -25,7 +25,7 @@ OPS = {"super_admin", "director"}
 DOC_KINDS = {"certificato_medico": "Certificato medico", "documento_identita": "Documento d'identità", "consenso_privacy": "Consenso privacy", "consenso_immagine": "Consenso immagine", "iscrizione": "Modulo iscrizione", "altro": "Altro"}
 PRICES = {"video": ("fsl_video_099", 99), "photo": ("fsl_photo_049", 49), "team_card": ("fsl_digital_249", 249), "album": ("fsl_digital_249", 249)}
 DIGITAL = {"team_card", "album"}
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY") or "sk_test_emergent"
+stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
 media_repo = Repository("media_files", MediaFile)
 
 
