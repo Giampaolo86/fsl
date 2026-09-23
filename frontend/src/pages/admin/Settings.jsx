@@ -211,6 +211,15 @@ export default function Settings() {
             <Field label="Documenti richiesti" hint="Separati da virgola"><input className="fsl-input" value={s.required_documents.join(", ")} onChange={(e) => upd("required_documents", list(e.target.value))} data-testid="settings-documents-input" /></Field>
             <Field label="Canali notifica" hint="email, sms, whatsapp"><input className="fsl-input" value={s.notification_channels.join(", ")} onChange={(e) => upd("notification_channels", list(e.target.value))} data-testid="settings-channels-input" /></Field>
           </div>
+          {s.categories.length > 0 && <div className="mt-5" data-testid="settings-fee-by-category">
+            <div className="fsl-kicker mb-2">Quota atleta per categoria <span className="text-fsl-slate font-sans normal-case font-normal">· lascia vuoto per usare la quota generale ({Number(s.fees.callup_fee ?? 0).toFixed(2).replace(".", ",")} €)</span></div>
+            <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-3">
+              {s.categories.map((cat) => { const v = s.fees.callup_fee_by_category?.[cat]; return (
+                <label key={cat} className="flex items-center gap-2 h-11 px-3 rounded-md bg-navy-700/50 border border-white/10"><span className="text-sm font-semibold flex-1 truncate">{cat}</span>
+                  <input type="number" min="0" step="0.5" placeholder={Number(s.fees.callup_fee ?? 0).toFixed(2)} className="fsl-input h-8 w-24 text-right num" value={v ?? ""} onChange={(e) => { const by = { ...(s.fees.callup_fee_by_category || {}) }; if (e.target.value === "") delete by[cat]; else by[cat] = Number(e.target.value); upd("fees", { ...s.fees, callup_fee_by_category: by }); }} data-testid={`settings-callup-fee-${cat}`} /><span className="text-xs text-fsl-slate">€</span></label>
+              ); })}
+            </div>
+          </div>}
         </section>
       </fieldset>
     </div>

@@ -461,9 +461,10 @@ def callup_deadline(m: Match):
 
 
 async def match_fees(tournament_id: str, m: Match) -> dict:
+    from .extras import callup_fee_for
 
     s = await settings_repo.find_one({"tournament_id": tournament_id})
-    fee = float(((s.fees if s else {}) or {}).get("callup_fee") or 0)
+    fee = callup_fee_for(s, m.category)
     entries = await scoped("payments", tournament_id).list({"match_id": m.id})
     teams = {tm.id: tm for tm in await scoped("teams", tournament_id).list({"_id": {"$in": [ObjectId(m.home_team_id), ObjectId(m.away_team_id)]}})}
     out = {"fee": fee}

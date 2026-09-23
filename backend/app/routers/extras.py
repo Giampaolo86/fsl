@@ -442,9 +442,16 @@ async def outcomes(tournament_id: str, user: CurrentUser = Depends(get_current_u
 
 
 # ---------- pagamenti a convocazione ----------
+def callup_fee_for(s, category: str) -> float:
+    fees = (s.fees if s else {}) or {}
+    by_cat = fees.get("callup_fee_by_category") or {}
+    v = by_cat.get(category) if category else None
+    return float(v if v not in (None, "") else (fees.get("callup_fee") or 0))
+
+
 async def charge_callups(tournament_id: str, m, actor):
     s = await settings_repo.find_one({"tournament_id": tournament_id})
-    fee = float((s.fees or {}).get("callup_fee") or 0)
+    fee = callup_fee_for(s, m.category)
     if fee <= 0:
         return
     repo = scoped("payments", tournament_id)
@@ -474,7 +481,7 @@ async def payments_summary(tournament_id: str, user: CurrentUser = Depends(get_c
         ch = sum(e.amount for e in entries if e.club_id == c.id and e.kind == "charge")
         pa = sum(e.amount for e in entries if e.club_id == c.id and e.kind == "payment")
         out.append({"club": {"id": c.id, "name": c.name, "slug": c.slug, "colors": c.colors, "short_name": c.short_name}, "charged": round(ch, 2), "paid": round(pa, 2), "balance": round(ch - pa, 2)})
-    return {"fee": (s.fees or {}).get("callup_fee") or 0, "currency": (s.fees or {}).get("currency", "EUR"), "clubs": out, "total_due": round(sum(x["balance"] for x in out), 2)}
+    return {"fee": (s.fees or {}).get("callup_fee") or 0, "fee_by_category": {k: v for k, v in ((s.fees or {}).get("callup_fee_by_category") or {}).items() if v not in (None, "")}, "currency": (s.fees or {}).get("currency", "EUR"), "clubs": out, "total_due": round(sum(x["balance"] for x in out), 2)}
 
 
 ROME = ZoneInfo("Europe/Rome")

@@ -171,7 +171,7 @@ function MatchFees({ m, tournamentId, onDone }) {
   if (!m.fees.fee) return <div className="rounded-md bg-navy-700/50 border border-white/10 p-3 text-xs text-fsl-slate flex items-center gap-2" data-testid="match-fees-unset"><Euro className="h-4 w-4" /> Quota per convocato non impostata: configurala in Impostazioni → Quote per generare le ricevute gara.</div>;
   return (
     <div className="fsl-card p-4 space-y-2" data-testid="match-fees">
-      <div className="flex items-center justify-between"><h3 className="fsl-kicker flex items-center gap-1.5"><Euro className="h-4 w-4" /> Quota gara · {m.fees.fee.toFixed(2).replace(".", ",")} € a presente</h3><span className="text-[11px] text-fsl-slate">Le presenze effettive (verde) determinano l'importo</span></div>
+      <div className="flex items-center justify-between"><h3 className="fsl-kicker flex items-center gap-1.5"><Euro className="h-4 w-4" /> Quota gara · {m.fees.fee.toFixed(2).replace(".", ",")} € a presente{m.category ? ` · ${m.category}` : ""}</h3><span className="text-[11px] text-fsl-slate">Le presenze effettive (verde) determinano l'importo</span></div>
       {["home", "away"].map((side) => { const f = m.fees[side]; if (!f) return null; const team = m[side]; return (
         <div key={side} className="flex flex-wrap items-center gap-3 rounded-md border border-white/10 p-3" data-testid={`match-fee-${side}`}>
           <ClubCrest club={team.club} size={28} /><div className="flex-1 min-w-[160px]"><div className="font-semibold text-sm">{team.club?.name}</div><div className="text-xs text-fsl-slate num">{f.present} presenti su {f.callups} convocati · {f.amount.toFixed(2).replace(".", ",")} €</div></div>
