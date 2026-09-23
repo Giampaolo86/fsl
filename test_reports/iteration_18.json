@@ -1,0 +1,19 @@
+{
+  "summary": "Tested Iteration 18 features: (1) Admin Pagamenti 'Incassi per giornata e campo' section with day cards, expand/collapse toggle, CSV exports (all + per-day), and role guard hiding it from club managers. (2) Backend role guard on GET /api/tournaments/{tid}/payments/daily (403 for club_manager, 200 for admin) and CSV export endpoint. (3) Callup notification flow: adding a player to a match creates a 'Luca è convocato:' notification for the parent (fan), visible in the fan notifications panel on /account with the shirt icon. (4) Reminder + dedupe: after moving kickoff to +3h an 'Oggi in campo: Luca' notification appears and does NOT duplicate on re-poll. All backend seed data restored (kickoff reverted, callups cleared).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iteration18.py", "/app/test_reports/pytest/iter18.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DailyTakings.jsx uses `defaultOpen` prop but stores it only as the initial state; changing the array order (e.g. after tid change) would not re-open the new first card because useEffect isn't reset in DayCard. Not a functional bug now but worth noting.",
+    "downloadCsv() calls URL.revokeObjectURL immediately after a.click(); the click on <a> is synchronous and download is queued, but Chrome sometimes needs the URL a tick longer. Consider using setTimeout(revoke, 0) if downloads flake on slower networks (worked fine in tests)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration18.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100%"},
+  "test_credentials": "Used /app/memory/test_credentials.md (admin castellani.giampaolo, club societa@fsl.demo, fan fan.notifiche@test.it)",
+  "seed_data_creation": "Added Luca (PID 6aaa5ce2cfb606f5c0fb7532) to match 6aaa5ce2cfb606f5c0fb7550 (home side) then cleared. Reminder test patched kickoff on match with Luca in callups then restored via test fixture teardown (test_reminder_and_dedup restores kickoff_at + clears callups).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 18 features fully validated. Match IDs used for callup test: 6aaa5ce2cfb606f5c0fb7550 (Sporting Eur home vs Alba Roma). Fan account fan.notifiche@test.it has many historical callup notifications from prior tests visible in panel (does not impact dedupe verification because backend keys by mid+day).",
+  "rca of the issue": "N/A - no issues found."
+}
