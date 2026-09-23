@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
@@ -8,8 +9,6 @@ from ..core.deps import WRITE_ROLES, CurrentUser, get_current_user, require_tour
 from ..core.errors import bad_request, conflict, forbidden, not_found
 from ..models.base import utcnow
 from ..models.domain import ErrorReport, Match, MatchEvent, MatchReportVersion, Player
-from bson import ObjectId
-
 from ..repositories.registry import scoped, settings_repo, users
 from ..services import audit, engine
 
@@ -475,6 +474,9 @@ async def match_fees(tournament_id: str, m: Match) -> dict:
         pay = next((e for e in entries if e.club_id == tm.club_id and e.kind == "payment"), None)
         out[side] = {"club_id": tm.club_id, "callups": len(ids), "present": present, "amount": round(present * fee, 2), "receipt_no": pay.receipt_no if pay else None, "paid_amount": pay.amount if pay else None, "paid_at": pay.created_at.isoformat() if pay else None, "method": pay.method if pay else None}
     return out
+
+
+def sheet_problems(m: Match, attendance: dict) -> list:
     problems = []
     for side, label in (("home", "casa"), ("away", "ospite")):
         ids = m.callups.get(side, [])

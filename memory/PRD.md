@@ -112,6 +112,16 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 ## Implementato (2026-06) – Iterazione 16 · Area Arbitro iPhone
 - [x] RefereeShell: nav a 3 tab reali (Partite / Referti / Guida), rimossi placeholder e campanella inattiva, chip data; lista con blocco «In corso / Oggi / Prossima gara» + CTA «Apri il tabellino»; pagina Referti inviati; Guida rapida in 4 passi; workspace gara arbitro con sole tab Tabellino/Storia; pulsante indietro accessibile; badge stato su una riga. Verificato 5/5 scenari mobile + regressione desktop (`iteration_16.json`)
 
+## Implementato (2026-06) – Iterazione 17 · Processo gara completo
+- [x] Scadenza convocazioni società: ore 20:00 del giorno precedente (`callup_deadline`, `callup_locked_for_club`; admin/segreteria/arbitro non bloccati) con avviso nel workspace
+- [x] Quota gara sulle presenze effettive: pannello «Quota gara» in Compila gara (staff) con presenti × quota, «Incassa e genera ricevuta» → addebito aggiornato + pagamento con ricevuta `RIC-YYYY-NNNN` (`POST /matches/{id}/fees/collect`), visibile in Pagamenti
+- [x] Richiesta aggiunta giocatore dalla società (Rose → «Richiedi aggiunta giocatore») → richiesta in Control Room → Rose con approvazione «Rivedi e carica». Test 9/9 backend + frontend (`iteration_17.json`; il testing agent ha corretto un ReferenceError `tournamentId→tid` in MatchWorkspace)
+
+## Iterazione 18 (2026-06) · Fix lint + regressione flusso gara
+- [x] `matches.py`: ripristinata `sheet_problems(m, attendance)` (era stata fusa per errore in `match_fees` → F821), import ordinati; ruff F821 pulito, backend 200
+- [x] Regressione via API: convocati → presenze (4 presenti/1 assente) → incasso 10,00 € RIC-2026-0007, doppio incasso 409, tabellino bozza `in_progress`, `GET /matches/{id}` espone `fees` e `callup_deadline`
+- Stand-by (scelta utente): email automatiche
+
 ## Stato implementazioni (check 2026-06)
 Completo e testato: Match Engine (calendario, tabellino unico, referti, rettifiche), classifiche/statistiche pubbliche, badge engine + premi (griglia ordinabile, premio speciale), social card gara, blog/news/interviste (tag società/gara/giocatori), shop foto/video (Stripe, anteprima video automatica), documenti società, import rosa Excel con approvazione, homepage società (editor società con approvazione + editor admin diretto, immagini di default, gallery), account genitore (preferiti, notifiche mirate, segnalazioni, «I miei bambini», acquisti), scheda giocatore («Mi presento», dicono di me, media taggati, foto con approvazione, cartolina), prodotti digitali 2,49 € (cartolina squadra, album stagione), registrazione società (codice invito + richiesta con approvazione), PWA + logo custom, responsive mobile.
 Parziale / da completare: consenso privacy digitale del genitore (oggi flag gestito da società/admin); invio email (credenziali, inviti, link acquisti) — nessun provider configurato; notifiche solo in-app (niente push/email).

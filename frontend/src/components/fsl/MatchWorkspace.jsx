@@ -115,7 +115,7 @@ export default function MatchWorkspace({ tournamentId: tidProp, compact = false 
             </div>
           )}
           <MatchSheet m={m} mode={mode} callups={callups} sheet={sheet} onCallups={setCallups} onSheet={setSheet} canEdit={canEdit} onOpen={setOpenPlayer} />
-          {mode === "gara" && isStaff && m.fees && <MatchFees m={m} tournamentId={tournamentId} onDone={load} />}
+          {mode === "gara" && isStaff && m.fees && <MatchFees m={m} tournamentId={tid} onDone={load} />}
 
           {mode === "distinta" && canDistinta && <button className="btn-gold w-full" disabled={busy || !dirty} onClick={saveCallups} data-testid="save-callups-button"><Save className="h-4 w-4" /> Salva distinte</button>}
 
