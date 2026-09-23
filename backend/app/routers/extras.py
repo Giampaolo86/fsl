@@ -1,15 +1,18 @@
+import csv
+import io
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel
 
 from ..core.deps import CurrentUser, get_current_user, require_tournament
 from ..core.errors import bad_request, conflict, forbidden, not_found
 from ..models.base import BaseDocument, utcnow
 from ..models.domain import PlayerBadge
-from ..repositories.registry import SCOPED, scoped, settings_repo, tournaments
+from ..repositories.registry import SCOPED, scoped, settings_repo, tournaments, users
 from ..services import audit, badges, engine
 
 router = APIRouter(prefix="/tournaments/{tournament_id}", tags=["extras"])
@@ -472,6 +475,73 @@ async def payments_summary(tournament_id: str, user: CurrentUser = Depends(get_c
         pa = sum(e.amount for e in entries if e.club_id == c.id and e.kind == "payment")
         out.append({"club": {"id": c.id, "name": c.name, "slug": c.slug, "colors": c.colors, "short_name": c.short_name}, "charged": round(ch, 2), "paid": round(pa, 2), "balance": round(ch - pa, 2)})
     return {"fee": (s.fees or {}).get("callup_fee") or 0, "currency": (s.fees or {}).get("currency", "EUR"), "clubs": out, "total_due": round(sum(x["balance"] for x in out), 2)}
+
+
+ROME = ZoneInfo("Europe/Rome")
+METHOD_LABELS = {"cash": "Contanti", "contanti": "Contanti", "pos": "POS", "bonifico": "Bonifico", "card": "POS"}
+
+
+async def _takings_rows(tournament_id: str) -> list[dict]:
+    entries = await scoped("payments", tournament_id).list({"kind": "payment"}, sort=[("created_at", 1)], limit=10000)
+    oid = __import__("bson").ObjectId
+    matches = {m.id: m for m in await scoped("matches", tournament_id).list({"_id": {"$in": [oid(e.match_id) for e in entries if e.match_id]}}, limit=10000)} if entries else {}
+    teams = {tm.id: tm for tm in await scoped("teams", tournament_id).list(limit=5000)}
+    clubs = {c.id: c for c in await scoped("clubs", tournament_id).list(limit=5000)}
+    staff = {u.id: u for u in await users.list({"_id": {"$in": [oid(e.recorded_by) for e in entries if e.recorded_by]}}, limit=500)} if entries else {}
+
+    def club_name(tid):
+        tm = teams.get(tid)
+        c = clubs.get(tm.club_id) if tm else None
+        return (c.short_name or c.name) if c else "?"
+
+    rows = []
+    for e in entries:
+        m = matches.get(e.match_id) if e.match_id else None
+        c = clubs.get(e.club_id)
+        local = (e.created_at.replace(tzinfo=timezone.utc) if e.created_at.tzinfo is None else e.created_at).astimezone(ROME)
+        present = None
+        if m:
+            side = "home" if teams.get(m.home_team_id) and teams[m.home_team_id].club_id == e.club_id else "away"
+            present = sum(1 for pid in m.callups.get(side, []) if m.attendance.get(pid) == "present")
+        rows.append({"id": e.id, "date": local.strftime("%Y-%m-%d"), "time": local.strftime("%H:%M"), "receipt_no": e.receipt_no or "", "club": c.name if c else "—", "match": f"{club_name(m.home_team_id)} – {club_name(m.away_team_id)}" if m else "", "round": m.round_name if m else "", "field": (m.field_name or m.venue_name or "Senza campo") if m else "Fuori gara", "present": present, "amount": round(e.amount, 2), "method": METHOD_LABELS.get(e.method, e.method or "—"), "description": e.description, "recorded_by": staff[e.recorded_by].full_name if e.recorded_by in staff else ""})
+    return rows
+
+
+@router.get("/payments/daily")
+async def payments_daily(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles=STAFF)
+    rows = await _takings_rows(tournament_id)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    days = defaultdict(lambda: {"total": 0.0, "count": 0, "methods": defaultdict(float), "fields": defaultdict(lambda: {"total": 0.0, "count": 0, "rows": []})})
+    for r in rows:
+        d = days[r["date"]]
+        d["total"] += r["amount"]
+        d["count"] += 1
+        d["methods"][r["method"]] += r["amount"]
+        f = d["fields"][r["field"]]
+        f["total"] += r["amount"]
+        f["count"] += 1
+        f["rows"].append(r)
+    out = []
+    for date in sorted(days, reverse=True):
+        d = days[date]
+        out.append({"date": date, "total": round(d["total"], 2), "count": d["count"], "methods": [{"method": k, "amount": round(v, 2)} for k, v in sorted(d["methods"].items(), key=lambda kv: -kv[1])], "fields": [{"field": k, "total": round(v["total"], 2), "count": v["count"], "rows": sorted(v["rows"], key=lambda r: r["time"])} for k, v in sorted(d["fields"].items(), key=lambda kv: -kv[1]["total"])]})
+    return {"currency": ((s.fees or {}) if s else {}).get("currency", "EUR"), "total": round(sum(r["amount"] for r in rows), 2), "count": len(rows), "days": out}
+
+
+@router.get("/payments/export")
+async def payments_export(tournament_id: str, date: Optional[str] = None, user: CurrentUser = Depends(get_current_user)):
+    t, _ = await require_tournament(tournament_id, user, roles=STAFF)
+    rows = [r for r in await _takings_rows(tournament_id) if not date or r["date"] == date]
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    w.writerow(["Data", "Ora", "Ricevuta", "Società", "Gara", "Turno", "Campo", "Presenti", "Importo", "Metodo", "Causale", "Registrato da"])
+    for r in rows:
+        w.writerow([datetime.strptime(r["date"], "%Y-%m-%d").strftime("%d/%m/%Y"), r["time"], r["receipt_no"], r["club"], r["match"], r["round"], r["field"], "" if r["present"] is None else r["present"], f"{r['amount']:.2f}".replace(".", ","), r["method"], r["description"], r["recorded_by"]])
+    w.writerow([])
+    w.writerow(["Totale", "", "", "", "", "", "", "", f"{sum(r['amount'] for r in rows):.2f}".replace(".", ","), "", f"{len(rows)} ricevute", ""])
+    fname = f"incassi-{t.slug}-{date or 'tutti'}.csv"
+    return Response(content="\ufeff" + buf.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
 @router.get("/payments")

@@ -5,9 +5,8 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from ..core.deps import WRITE_ROLES, CurrentUser, get_current_user, require_tournament
+from ..core.deps import CurrentUser, get_current_user, require_tournament
 from ..core.errors import bad_request, conflict, forbidden, not_found
-from ..models.base import utcnow
 from ..models.domain import ErrorReport, Match, MatchEvent, MatchReportVersion, Player
 from ..repositories.registry import scoped, settings_repo, users
 from ..services import audit, engine
@@ -373,6 +372,10 @@ async def save_callups(tournament_id: str, match_id: str, body: CallupsIn, user:
         raise conflict("Gara ufficiale: le convocazioni sono bloccate")
     m2 = await scoped("matches", tournament_id).update(m.id, patch, user.id)
     await audit.record(user, "match.callups", "match", m.id, tournament_id, after={k: (len(v) if isinstance(v, list) else v) for k, v in patch.get("callups", {}).items()})
+    if "callups" in patch:
+        from .fans import notify_callups
+
+        await notify_callups(tournament_id, m2, m.callups, patch["callups"])
     return (await _enrich(tournament_id, [m2]))[0]
 
 
@@ -458,7 +461,6 @@ def callup_deadline(m: Match):
 
 
 async def match_fees(tournament_id: str, m: Match) -> dict:
-    from .extras import PaymentEntry
 
     s = await settings_repo.find_one({"tournament_id": tournament_id})
     fee = float(((s.fees if s else {}) or {}).get("callup_fee") or 0)

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
@@ -159,7 +160,82 @@ async def _fan_notify(t_id: str, uid: str, kind: str, title: str, body: str, lin
     await repo.insert(Notification(tournament_id=t_id, user_id=uid, kind=kind, title=title, body=body, link=link, dedupe_key=key))
 
 
+ROME = ZoneInfo("Europe/Rome")
+REMINDER_HOUR = 18
+
+
+def _kick(iso: str):
+    try:
+        k = datetime.fromisoformat(iso)
+    except ValueError:
+        return None
+    return k.replace(tzinfo=timezone.utc) if k.tzinfo is None else k
+
+
+async def _match_names(t_id: str, m):
+    teams = {tm.id: tm for tm in await scoped("teams", t_id).list({"_id": {"$in": [__import__("bson").ObjectId(x) for x in (m.home_team_id, m.away_team_id)]}})}
+    clubs = {c.id: c for c in await scoped("clubs", t_id).list({"_id": {"$in": [__import__("bson").ObjectId(tm.club_id) for tm in teams.values()]}})}
+
+    def name(tid):
+        tm = teams.get(tid)
+        c = clubs.get(tm.club_id) if tm else None
+        return c.name if c else "?"
+
+    return f"{name(m.home_team_id)} – {name(m.away_team_id)}"
+
+
+def _when(m) -> str:
+    k = _kick(m.kickoff_at)
+    when = k.astimezone(ROME).strftime("%d/%m alle %H:%M") if k else m.kickoff_at
+    return f"{when}{' · ' + m.field_name if m.field_name else ''}{' · ' + m.venue_name if m.venue_name else ''}"
+
+
+async def notify_callups(t_id: str, m, before: dict, after: dict):
+    added = [pid for side in ("home", "away") for pid in after.get(side, []) if pid not in before.get(side, [])]
+    if not added:
+        return
+    kids = [p for p in await scoped("players", t_id).list({"_id": {"$in": [__import__("bson").ObjectId(x) for x in added if len(x) == 24]}}) if p.guardian_emails]
+    if not kids:
+        return
+    t = await tournaments.get(t_id)
+    emails = sorted({e.lower() for p in kids for e in p.guardian_emails})
+    parents = await users.list({"email": {"$in": emails}}, limit=200)
+    if not parents:
+        return
+    label = await _match_names(t_id, m)
+    for p in kids:
+        for u in parents:
+            if u.email.lower() in [e.lower() for e in p.guardian_emails]:
+                await _fan_notify(t_id, u.id, "callup", f"{p.first_name} è convocato: {label}", f"{_when(m)} · {m.round_name or t.name}", f"/tornei/{t.slug}/partite/{m.id}", f"fan:{u.id}:callup:{m.id}:{p.id}")
+
+
+async def _children_reminders(user: CurrentUser):
+    now = datetime.now(timezone.utc)
+    horizon = (now + timedelta(hours=40)).strftime("%Y-%m-%dT%H:%M")
+    for t in await tournaments.list({"published": True}):
+        kids = {p.id: p for p in await scoped("players", t.id).list({"guardian_emails": user.email.lower()}, limit=20)}
+        if not kids:
+            continue
+        ids = list(kids)
+        q = {"status": {"$in": ["scheduled", "confirmed"]}, "kickoff_at": {"$gte": now.strftime("%Y-%m-%dT%H:%M"), "$lte": horizon}, "$or": [{"callups.home": {"$in": ids}}, {"callups.away": {"$in": ids}}]}
+        for m in await scoped("matches", t.id).list(q, sort=[("kickoff_at", 1)], limit=20):
+            k = _kick(m.kickoff_at)
+            if not k:
+                continue
+            local = k.astimezone(ROME)
+            remind_from = (local - timedelta(days=1)).replace(hour=REMINDER_HOUR, minute=0, second=0, microsecond=0)
+            if now.astimezone(ROME) < remind_from:
+                continue
+            day = "Oggi" if local.date() == now.astimezone(ROME).date() else "Domani"
+            label = await _match_names(t.id, m)
+            for pid in m.callups.get("home", []) + m.callups.get("away", []):
+                p = kids.get(pid)
+                if p:
+                    await _fan_notify(t.id, user.id, "callup", f"{day} in campo: {p.first_name} · {label}", f"{_when(m)} · {m.round_name or t.name}", f"/tornei/{t.slug}/partite/{m.id}", f"fan:{user.id}:reminder:{m.id}:{p.id}:{m.kickoff_at}")
+
+
 async def _fan_generate(user: CurrentUser):
+    await _children_reminders(user)
     fav = user.favorites or {}
     if not (fav.get("teams") or fav.get("players")):
         return
