@@ -205,8 +205,9 @@ export default function Settings() {
 
         <section className="fsl-card p-6">
           <SectionTitle>Quote, documenti e canali</SectionTitle>
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-4 gap-4">
             <Field label="Quota iscrizione (€)"><input type="number" min="0" className="fsl-input" value={s.fees.registration} onChange={(e) => upd("fees", { ...s.fees, registration: Number(e.target.value) })} data-testid="settings-fee-input" /></Field>
+            <Field label="Quota atleta (€)" hint="Per ogni atleta presente in gara: addebito e incasso dal tabellino"><input type="number" min="0" step="0.5" className="fsl-input" value={s.fees.callup_fee ?? 0} onChange={(e) => upd("fees", { ...s.fees, callup_fee: Number(e.target.value) })} data-testid="settings-callup-fee-input" /></Field>
             <Field label="Documenti richiesti" hint="Separati da virgola"><input className="fsl-input" value={s.required_documents.join(", ")} onChange={(e) => upd("required_documents", list(e.target.value))} data-testid="settings-documents-input" /></Field>
             <Field label="Canali notifica" hint="email, sms, whatsapp"><input className="fsl-input" value={s.notification_channels.join(", ")} onChange={(e) => upd("notification_channels", list(e.target.value))} data-testid="settings-channels-input" /></Field>
           </div>
