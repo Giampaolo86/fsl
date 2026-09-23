@@ -10,7 +10,7 @@ export const seriesLabel = (series = []) => (series.every((x) => /^serie\s/i.tes
 export function HubHero({ main }) {
   return (
     <section className="relative overflow-hidden grain bg-ink-950" data-testid="hub-hero">
-      <img src={IMG("hero")} alt="" className="absolute inset-y-0 right-0 lg:right-[14%] h-full w-full lg:w-[56%] object-cover object-[60%_center]" /><div className="hidden lg:block absolute inset-y-0 right-0 w-[26%] bg-gradient-to-r from-transparent via-ink-950/70 to-ink-950" />
+      <img src={IMG("hero")} alt="" className="absolute inset-y-0 right-0 lg:right-[14%] h-full w-full lg:w-[56%] object-cover object-[60%_center] opacity-60 lg:opacity-100" /><div className="hidden lg:block absolute inset-y-0 right-0 w-[26%] bg-gradient-to-r from-transparent via-ink-950/70 to-ink-950" />
       <div className="absolute inset-0 bg-[linear-gradient(90deg,#03131F_0%,#03131F_30%,rgba(3,19,31,0.75)_48%,rgba(3,19,31,0.1)_70%,rgba(3,19,31,0.35)_100%)]" />
       <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-navy-900 to-transparent" />
       <div className="relative mx-auto max-w-[1488px] px-6 pt-20 pb-24 lg:pt-28 lg:pb-32 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] gap-10">

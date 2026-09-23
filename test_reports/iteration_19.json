@@ -1,0 +1,18 @@
+{
+  "summary": "Iteration 19: validated redesigned PublicHub ('/') and new '/tornei' page, PublicShell header/footer, and backend /api/public/tournaments. All 7 review items pass. Backend: GET /api/public/tournaments returns 3 tournaments each with required keys (categories, series, teams_per_series, fields_count, summary.teams_capacity, status, slug). Frontend hub: public-hub, hub-hero (hero-login/discover/tournaments), 3 mission cards, 5 category cards (la-serie-a-dei-bambini x 2014-2017 + torneo-degli-amici-2015) — click on public-tournament-card-la-serie-a-dei-bambini-2014 correctly navigates to /tornei/la-serie-a-dei-bambini?category=2014 and tournament page renders. hub-stats shows 170 SQUADRE / 4 CATEGORIE / SERIE A E SERIE B / OTT 2026 – MAG 2027. hub-media has 5 non-broken images and CTA → /tornei/la-serie-a-dei-bambini/news. Access section: access-club→/login?area=societa, access-referee→/login?area=arbitri, access-staff→/login?area=staff, access-fan-register→/registrati. Nav items all present with only HOME active (border-fsl-gold). ACCEDI (public-area-societa-link) → /login. Hamburger opens public-mobile-menu with public-fan-register-link → /registrati. /tornei renders public-tournaments-page with 3 cards (la-serie-a-dei-bambini, torneo-degli-amici, winter-stars-2025 archived included as required). Nav-classifiche routes to /tornei/la-serie-a-dei-bambini/classifiche with tournament nav (Partite visible). Footer present. No horizontal overflow @1440 (scrollWidth=1440) or @390 (scrollWidth=390). Fan regression: fan.notifiche@test.it login → home shows fan-notifications-button (with 8 unread badge), 'Fan Notifiche' name, 'I miei preferiti' link, public-fan-logout; logout works (ACCEDI returns, bell gone). Tournament pages /tornei/la-serie-a-dei-bambini, /partite, /squadre, /news all load without error banners. No console errors beyond expected 401 on anonymous /api/auth/me.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "GET /api/public/tournaments filters correctly (draft 'future-cup-weekend' excluded; archived 'winter-stars-2025' included as required)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (1/1)", "frontend": "100% (7/7 review items)"},
+  "test_credentials": "Used fan.notifiche@test.it / Password123 from /app/memory/test_credentials.md.",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "PublicHub redesign is stable. Hub renders 5 category cards from 2 active tournaments. /tornei lists 3 published tournaments (active+archived). PublicShell nav correctly switches to tournament nav on /tornei/:slug/*. Mobile menu (390px) opens with fan register CTA. No overflow issues. Anonymous /api/auth/me returning 401 is expected and does not surface UI errors.",
+  "rca of the issue": "N/A"
+}
