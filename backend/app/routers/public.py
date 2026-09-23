@@ -110,6 +110,8 @@ async def list_public():
         d = t.public()
         d["summary"] = compute_summary(s) if s else {}
         d["categories"] = s.categories if s else []
+        d["series"] = s.series if s else []
+        d["teams_per_series"] = s.teams_per_series if s else 0
         d["clubs_count"] = await scoped("clubs", t.id).count()
         d["fields_count"] = await scoped("fields", t.id).count()
         out.append(d)

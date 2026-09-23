@@ -33,7 +33,7 @@ import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
 import ClubDashboard from "@/pages/club/ClubDashboard";
 import { ClubTeams } from "@/pages/club/ClubModules";
 import RefereeMatches, { RefereeModule } from "@/pages/referee/RefereeMatches";
-import PublicHub from "@/pages/public/PublicHub";
+import PublicHub, { PublicTournamentsList } from "@/pages/public/PublicHub";
 import TournamentHome from "@/pages/public/TournamentHome";
 import { PublicClubs, PublicRules } from "@/pages/public/PublicPages";
 import { PublicMatchCenter, PublicMatches, PublicStandingsLive, PublicStats } from "@/pages/public/PublicEngine";
@@ -132,7 +132,7 @@ function AppRoutes() {
 
               <Route element={<PublicShell />}>
                 <Route path="/" element={<PublicHub />} />
-                <Route path="/tornei" element={<PublicHub />} />
+                <Route path="/tornei" element={<PublicTournamentsList />} />
                 <Route path="/account" element={<ProtectedRoute roles={["fan"]}><FanAccount /></ProtectedRoute>} />
               </Route>
               <Route path="/tornei/:slug" element={<PublicShell />}>
