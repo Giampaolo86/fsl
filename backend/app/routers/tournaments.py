@@ -60,6 +60,9 @@ async def _counts(tournament_id: str) -> dict:
         "venues": await scoped("venues", tournament_id).count(),
         "matches_total": matches_total,
         "matches_official": matches_official,
+        "reports_pending": await db.matches.count_documents({"tournament_id": tournament_id, "deleted_at": None, "status": "report_submitted"}),
+        "tickets_open": await db.tickets.count_documents({"tournament_id": tournament_id, "deleted_at": None, "status": {"$in": ["open", "reviewing"]}}),
+        "matches_live": await db.matches.count_documents({"tournament_id": tournament_id, "deleted_at": None, "status": "in_progress"}),
         "completion_pct": round(100 * matches_official / matches_total) if matches_total else 0,
     }
 

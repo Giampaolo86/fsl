@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends
 
 from ..core.db import db
@@ -25,13 +27,18 @@ async def my_club(tournament_id: str, user: CurrentUser = Depends(get_current_us
     team_ids = [tm.id for tm in teams]
     upcoming = await scoped("matches", tournament_id).list({"$or": [{"home_team_id": {"$in": team_ids}}, {"away_team_id": {"$in": team_ids}}], "status": {"$in": ["scheduled", "confirmed"]}}, sort=[("kickoff_at", 1)], limit=1)
     players = await scoped("players", tournament_id).count({"club_id": club.id})
+    pays = await scoped("payments", tournament_id).list({"club_id": club.id}, limit=5000)
+    charged = sum(e.amount for e in pays if e.kind == "charge")
+    paid = sum(e.amount for e in pays if e.kind == "payment")
+    soon = (date.today() + timedelta(days=30)).isoformat()
+    docs = await scoped("documents", tournament_id).list({"club_id": club.id, "expires_at": {"$ne": None, "$lte": soon}}, limit=500)
     return {
         "tournament": t.public(),
         "club": club.public(),
         "teams": [{**tm.public(), "competition_name": comps[tm.competition_id].name if tm.competition_id in comps else ""} for tm in teams],
         "next_match": (await _enrich(tournament_id, upcoming))[0] if upcoming else None,
-        "roster": {"players": players, "eligible": players, "expiring_documents": 0},
-        "payments": {"due": 0, "paid": 0, "currency": "EUR"},
+        "roster": {"players": players, "eligible": players, "expiring_documents": len(docs)},
+        "payments": {"due": round(charged - paid, 2), "paid": round(paid, 2), "currency": "EUR"},
     }
 
 

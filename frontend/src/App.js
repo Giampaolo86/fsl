@@ -31,11 +31,11 @@ import ClubHomeEditor from "@/pages/club/ClubHomeEditor";
 import PublicClubHome from "@/pages/public/PublicClubHome";
 import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
 import ClubDashboard from "@/pages/club/ClubDashboard";
-import { ClubModule, ClubTeams } from "@/pages/club/ClubModules";
+import { ClubTeams } from "@/pages/club/ClubModules";
 import RefereeMatches, { RefereeModule } from "@/pages/referee/RefereeMatches";
 import PublicHub from "@/pages/public/PublicHub";
 import TournamentHome from "@/pages/public/TournamentHome";
-import { PublicClubs, PublicModule, PublicRules } from "@/pages/public/PublicPages";
+import { PublicClubs, PublicRules } from "@/pages/public/PublicPages";
 import { PublicMatchCenter, PublicMatches, PublicStandingsLive, PublicStats } from "@/pages/public/PublicEngine";
 import Matches from "@/pages/admin/Matches";
 import MatchWorkspace from "@/components/fsl/MatchWorkspace";
@@ -121,9 +121,6 @@ function AppRoutes() {
                 <Route path="documenti" element={<Documents clubMode />} />
                 <Route path="profilo" element={<ClubHomeEditor />} />
                 <Route path="giocatori/:playerId" element={<PlayerProfile mode="club" />} />
-                {[].map((m) => (
-                  <Route key={m} path={m} element={<ClubModule module={m} />} />
-                ))}
               </Route>
 
               <Route path="/arbitro" element={<ProtectedRoute roles={["referee"]}><RefereeShell /></ProtectedRoute>}>
@@ -151,7 +148,7 @@ function AppRoutes() {
                 <Route path="statistiche" element={<PublicStats />} />
                 <Route path="news" element={<PublicNews />} />
                 <Route path="news/:postSlug" element={<PublicPost />} />
-                <Route path="segnala-errore" element={<PublicModule title="Segnala un errore" phase="Fase 5" />} />
+                <Route path="segnala-errore" element={<Navigate to="../partite" replace />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

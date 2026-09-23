@@ -6,6 +6,7 @@ import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
+import { fmtDate } from "@/lib/format";
 
 export function useMyClub() {
   const { user } = useAuth();
@@ -35,15 +36,15 @@ export default function ClubDashboard() {
             <div className="fsl-kicker">{tournament.name}</div>
             <h1 className="text-4xl sm:text-5xl font-extrabold leading-[0.92]" data-testid="club-dashboard-name">{club.name}</h1>
             <p className="text-fsl-gold font-display uppercase text-sm tracking-wide mt-1">{club.motto}</p>
-            {club.crest_is_placeholder && <p className="text-xs text-fsl-slate mt-2">Stemma segnaposto · carica il tuo stemma ufficiale dal Profilo (Fase 6)</p>}
+            {club.crest_is_placeholder && <p className="text-xs text-fsl-slate mt-2">Stemma segnaposto · <Link to="/societa/profilo" className="text-fsl-gold hover:underline">carica il tuo stemma ufficiale</Link> da «La mia homepage»</p>}
           </div>
         </div>
       </section>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <KpiTile icon={Users} value={teams.length} label="Squadre iscritte" testId="club-kpi-teams" />
-        <KpiTile icon={FileText} value={data.roster.players} label="Giocatori in rosa" hint="Rose in Fase 5" testId="club-kpi-players" />
-        <KpiTile icon={CreditCard} value={`${data.payments.due} €`} label="Da pagare" hint="Pagamenti in Fase 5" testId="club-kpi-payments" />
-        <KpiTile icon={CalendarDays} value="—" label="Prossima gara" hint="Calendario in Fase 3" testId="club-kpi-next" />
+        <KpiTile icon={Users} value={teams.length} label="Squadre iscritte" testId="club-kpi-teams" to="/societa/squadre" />
+        <KpiTile icon={FileText} value={data.roster.players} label="Giocatori in rosa" hint={data.roster.expiring_documents ? `${data.roster.expiring_documents} documenti in scadenza` : "Rose e documenti"} testId="club-kpi-players" to="/societa/rose" />
+        <KpiTile icon={CreditCard} value={`${data.payments.due.toFixed(2)} €`} label="Da pagare" hint={`Pagato ${data.payments.paid.toFixed(2)} €`} testId="club-kpi-payments" to="/societa/pagamenti" />
+        <KpiTile icon={CalendarDays} value={data.next_match ? fmtDate(data.next_match.kickoff_at, { time: true }) : "—"} label="Prossima gara" hint={data.next_match ? `${data.next_match.home?.club?.short_name || data.next_match.home?.name || ""} – ${data.next_match.away?.club?.short_name || data.next_match.away?.name || ""}` : "Nessuna gara programmata"} testId="club-kpi-next" to={data.next_match ? `/societa/partite/${data.next_match.id}` : "/societa/calendario"} />
       </div>
       <section>
         <SectionTitle right={<Link to="/societa/squadre" className="text-xs text-fsl-gold hover:underline">Tutte le squadre</Link>}>Le nostre squadre</SectionTitle>

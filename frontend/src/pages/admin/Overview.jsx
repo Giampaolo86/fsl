@@ -4,7 +4,8 @@ import { Archive, Calendar, CheckCircle2, ClipboardList, Grid3X3, Lock, PlayCirc
 import { toast } from "sonner";
 import { KpiTile, PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { StatusBadge } from "@/components/fsl/StatusBadge";
-import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
+import { FieldsBoard } from "@/components/fsl/FieldsBoard";
+import { ErrorState, LoadingState } from "@/components/fsl/States";
 import { ReasonDialog } from "@/components/fsl/ReasonDialog";
 import { useTournamentDetail } from "@/hooks/useTournamentData";
 import { useTournaments } from "@/context/TournamentContext";
@@ -102,33 +103,11 @@ export default function Overview() {
         <KpiTile icon={Grid3X3} value={t.counts.fields} label="Campi" hint={`${s.slots.length} slot/giorno · ${t.summary.matches_per_day} gare/giorno`} testId="overview-kpi-fields" to={`/admin/t/${t.id}/campi`} />
       </div>
 
-      <section>
-        <SectionTitle right={<span className="text-xs text-fsl-slate">Control Room del giorno · attiva in Fase 3/4 con calendario e referti</span>}>Campi in parallelo</SectionTitle>
-        <div className={`grid gap-4 ${s.fields_count >= 3 ? "lg:grid-cols-3" : s.fields_count === 2 ? "lg:grid-cols-2" : ""}`} data-testid="overview-fields-grid">
-          {fields.map((f) => (
-            <div key={f} className="fsl-card overflow-hidden">
-              <div className="h-12 px-4 flex items-center justify-between border-b border-white/10 bg-ink-950/40">
-                <span className="font-display font-bold uppercase">{f}</span>
-                <Grid3X3 className="h-4 w-4 text-fsl-slate" aria-hidden="true" />
-              </div>
-              <ul className="divide-y divide-white/[0.06]">
-                {s.slots.map((slot) => (
-                  <li key={slot} className="h-12 px-4 flex items-center gap-3 text-sm">
-                    <span className="num font-semibold text-fsl-white w-12">{slot}</span>
-                    <span className="inline-flex items-center gap-1.5 text-xs text-fsl-slate">
-                      <span className="h-2 w-2 rounded-full bg-fsl-slate/50" aria-hidden="true" /> Slot libero · nessuna gara programmata
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
+      <FieldsBoard tournamentId={t.id} fields={fields} slots={s.slots} />
 
       <div className="grid lg:grid-cols-3 gap-4">
-        <EmptyState icon={ClipboardList} title="Referti attesi" description="I referti compariranno qui quando le gare saranno programmate e assegnate (Fase 4)." testId="overview-empty-reports" />
-        <EmptyState icon={Shield} title="Segnalazioni" description="I ticket collegati a gare, pagamenti e documenti saranno gestiti qui (Fase 5)." testId="overview-empty-tickets" />
+        <KpiTile icon={ClipboardList} value={t.counts.reports_pending ?? 0} label="Referti da ufficializzare" hint={t.counts.matches_live ? `${t.counts.matches_live} gare in corso` : "Inviati dagli arbitri, in attesa del Direttore"} testId="overview-kpi-reports" to={`/admin/t/${t.id}/referti`} />
+        <KpiTile icon={Shield} value={t.counts.tickets_open ?? 0} label="Segnalazioni aperte" hint="Da società e genitori, collegate alle gare" testId="overview-kpi-tickets" to={`/admin/t/${t.id}/ticket`} />
         <div className="fsl-card p-5">
           <div className="fsl-kicker mb-2">Azioni rapide</div>
           <div className="grid gap-2">

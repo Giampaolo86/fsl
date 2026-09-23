@@ -57,7 +57,7 @@ export default function UsersPage() {
                 <td><div className="font-semibold">{u.full_name}</div><div className="text-xs text-fsl-slate">{u.email}</div></td>
                 <td><span className="inline-flex items-center gap-1.5 text-xs"><UserCog className="h-3.5 w-3.5 text-fsl-gold" /> {u.role_label}</span></td>
                 <td className="text-xs text-fsl-slate">{u.is_super_admin ? "Tutti i tornei" : u.memberships.map((m) => m.tournament_name).filter(Boolean).join(", ") || "—"}</td>
-                <td className="text-xs">{u.mfa_required ? <span className="text-fsl-warning">Richiesta (Fase 7)</span> : <span className="text-fsl-slate">Consigliata</span>}</td>
+                <td className="text-xs text-fsl-slate" title="Verifica in due passaggi non ancora disponibile">Non attiva</td>
                 <td className="text-xs"><span className={u.status === "active" ? "text-fsl-success" : "text-fsl-danger"}>● {u.status === "active" ? "Attivo" : "Disabilitato"}</span></td>
               </tr>
             ))}

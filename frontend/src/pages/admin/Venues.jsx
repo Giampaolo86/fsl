@@ -27,7 +27,7 @@ export default function Venues() {
 
   return (
     <div className="space-y-8">
-      <PageHeader kicker="Campi, sedi e disponibilità" title="Campi" subtitle={`${data.fields.length} campi configurati in ${data.venues.length} sedi. Disponibilità, blackout e indisponibilità arrivano in Fase 3.`} />
+      <PageHeader kicker="Campi, sedi e disponibilità" title="Campi" subtitle={`${data.fields.length} campi configurati in ${data.venues.length} sedi.`} />
       <section>
         <SectionTitle>Sedi</SectionTitle>
         <div className="grid md:grid-cols-2 gap-4">
