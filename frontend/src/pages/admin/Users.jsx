@@ -10,6 +10,27 @@ import { useTournaments } from "@/context/TournamentContext";
 import { api, apiError } from "@/lib/api";
 import { ROLE_LABELS } from "@/lib/format";
 
+function UserActions({ u, me, onChanged }) {
+  const [temp, setTemp] = useState(null);
+  const act = async (label, fn) => { try { const r = await fn(); toast.success(label); onChanged(); return r; } catch (e) { toast.error(apiError(e)); } };
+  const canMfaReset = u.mfa_enabled && (me?.is_super_admin || !["director", "super_admin"].includes(u.role));
+  return (
+    <div className="inline-flex flex-wrap justify-end gap-1.5">
+      <button className="btn-ghost h-8 px-2.5 text-xs" onClick={async () => { const r = await act("Password temporanea generata", () => api.post(`/users/${u.id}/temporary-password`).then((x) => x.data)); if (r) setTemp(r.temporary_password); }} data-testid={`user-temp-password-${u.email}`}><KeyRound className="h-3.5 w-3.5" /> Password temp.</button>
+      {canMfaReset && <button className="btn-ghost h-8 px-2.5 text-xs" onClick={() => window.confirm(`Azzerare la verifica in due passaggi di ${u.full_name}? Dovrà riconfigurarla al prossimo accesso.`) && act("MFA azzerata", () => api.post(`/users/${u.id}/mfa/reset`))} data-testid={`user-mfa-reset-${u.email}`}>Azzera MFA</button>}
+      <button className={`btn-ghost h-8 px-2.5 text-xs ${u.status === "active" ? "text-fsl-danger" : "text-fsl-success"}`} onClick={() => window.confirm(u.status === "active" ? `Disabilitare ${u.full_name}? Le sue sessioni verranno chiuse subito.` : `Riattivare ${u.full_name}?`) && act(u.status === "active" ? "Utente disabilitato" : "Utente riattivato", () => api.patch(`/users/${u.id}/status`, { status: u.status === "active" ? "disabled" : "active" }))} data-testid={`user-toggle-status-${u.email}`}>{u.status === "active" ? "Disabilita" : "Riattiva"}</button>
+      <Dialog open={!!temp} onOpenChange={() => setTemp(null)}>
+        <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl" data-testid="temp-password-dialog" aria-describedby={undefined}>
+          <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Password temporanea</DialogTitle></DialogHeader>
+          <p className="text-sm text-fsl-slate">Comunicala a <strong className="text-fsl-white">{u.full_name}</strong> ({u.email}) di persona o per telefono. Viene mostrata una sola volta; al primo accesso dovrà sceglierne una nuova.</p>
+          <code className="block text-center text-2xl font-mono tracking-widest rounded-lg bg-navy-700/60 border border-fsl-gold/40 px-4 py-4 select-all" data-testid="temp-password-value">{temp}</code>
+          <button className="btn-primary" onClick={() => { navigator.clipboard?.writeText(temp); toast.success("Copiata"); }} data-testid="temp-password-copy">Copia</button>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function UsersPage() {
   const { user } = useAuth();
   const { tournaments } = useTournaments();

@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 20: Full backend + frontend regression on Auth v2 (cookies + CSRF + MFA + brute-force + admin ops + refresh rotation). Wrote /app/backend/tests/test_auth_v2.py (14 tests, all PASS via httpx to bypass the conftest requests-patch). Frontend: verified login-error, MFA challenge flow for direttore, /sicurezza page (mfa-card, password-form, sessions-card, 'Attiva'), logout + protected-route redirect, google-login-button on /login, fan login → /account, and auto-refresh after deleting only the access_token cookie. One CRITICAL frontend bug found on /admin/utenti.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "pages/admin/Users.jsx",
+        "issue": "UsersPage crashes with 'ReferenceError: UserActions is not defined' inside its Array.map row renderer, so /admin/utenti renders the ErrorBoundary ('Qualcosa è andato storto'). The component <UserActions u={u} me={user} onChanged={load} /> is referenced on line 62 but never imported nor defined in the file. Only definition is a local (non-exported) component in /app/frontend/src/components/layout/PublicShell.jsx which is a completely different UserActions (props: user/landing/onLogout).",
+        "selector": "/admin/utenti",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Admin Users management (temp password, toggle status, MFA column)",
+        "issue": "Because UsersPage crashes, the review-required test ids user-mfa-<email>, user-temp-password-<email>, user-toggle-status-<email>, temp-password-dialog and temp-password-value cannot be rendered. Backend endpoints work (see TestAdminUserOps in test_auth_v2.py which exercises the full referee lifecycle end-to-end via API).",
+        "affected_selectors": ["user-mfa-direttore@fsl.demo", "user-temp-password-arbitro@fsl.demo", "user-toggle-status-arbitro@fsl.demo", "temp-password-dialog", "temp-password-value"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_auth_v2.py", "/app/test_reports/pytest/auth_v2.xml"],
+  "action_items": [
+    "Fix /app/frontend/src/pages/admin/Users.jsx: implement (or import) a UserActions component that renders the required buttons/testids (user-mfa-<email>, user-temp-password-<email> opening a Dialog with data-testid=temp-password-dialog + inner data-testid=temp-password-value, and user-toggle-status-<email> with a confirmation). Currently the reference on line 62 is undefined causing the whole page to fall into the ErrorBoundary."
+  ],
+  "critical_code_review_comments": [
+    "Users.jsx references an undefined <UserActions/> component (line 62). The bundle throws 'ReferenceError: UserActions is not defined' and the entire /admin/utenti page is replaced by the ErrorBoundary — this is a P0 regression that blocks all admin user management from the UI.",
+    "The MFA/disable endpoint POST /api/auth/mfa/disable requires body {password, code} not just {code}; frontend Security.jsx should confirm this contract when exposing an MFA disable action for non-mandatory roles.",
+    "GET /api/auth/sessions returns {current: <sid>, items: [...]} (not a flat list). Any frontend or third-party consumer should not assume a flat array.",
+    "Password policy: >=10 chars + letters + digits enforced on POST /auth/register and admin user creation. Registration form label still says 'min. 8 caratteri' (Register.jsx line 64) which is now inconsistent with the enforced backend rule (>=10). Minor UX/consistency issue."
+  ],
+  "updated_files": ["/app/backend/tests/test_auth_v2.py"],
+  "success_rate": {"backend": "100% (14/14 in test_auth_v2.py)", "frontend": "83% (5/6 review UI flows PASS; Users admin page crashes)"},
+  "test_credentials": "From /app/memory/test_credentials.md + backend/.env. Used qa.superadmin@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C, direttore@fsl.demo / Demo1234! + TOTP, societa@fsl.demo / Demo1234!, fan.notifiche@test.it / Password123.",
+  "seed_data_creation": "test_auth_v2.py creates transient TEST_ referee accounts and leaves them disabled per instructions; also creates transient fan accounts via /api/auth/register with random emails. Brute-force lockout is executed against unique random emails (@test.it) to avoid locking real accounts.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend auth v2 is fully green. To exercise it, run: python -m pytest /app/backend/tests/test_auth_v2.py -v -o addopts='' (httpx bypasses the requests monkey-patch installed in conftest.py; conftest still needed to keep the legacy suite passing). Sessions API returns {current, items[]}. MFA-disable requires {password, code}. Frontend has a P0 bug on /admin/utenti (UserActions undefined) — fix that first, then re-run TEST_C from iteration_20 which validates user-mfa-<email>, user-temp-password-<email>, user-toggle-status-<email>, temp-password-dialog and temp-password-value. Auto-refresh: removing only the access_token cookie while keeping refresh_token+csrf_token successfully re-authenticates the user via axios interceptor.",
+  "rca of the issue": "Users.jsx renders <UserActions/> on line 62 but neither imports it nor defines it locally. Webpack DEV bundle throws ReferenceError inside the .map() callback → React error boundary catches it and renders the fallback screen instead of the users table. Fix: create/import a UserActions component that emits the required data-testids and calls the corresponding admin endpoints (PATCH /api/users/{id}/status, POST /api/users/{id}/temporary-password, POST /api/users/{id}/mfa/reset)."
+}
