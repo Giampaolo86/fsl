@@ -40,8 +40,8 @@ export function AuthProvider({ children }) {
     return () => { authEvents.removeEventListener("logout", onLogout); authEvents.removeEventListener("refreshed", onRefreshed); window.removeEventListener("storage", onStorage); };
   }, [check, clear]);
 
-  const login = useCallback(async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
+  const login = useCallback(async (email, password, area) => {
+    const { data } = await api.post("/auth/login", { email, password, area: area || undefined });
     if (data.mfa_required || data.mfa_setup_required) return data;
     adopt(data);
     return data;

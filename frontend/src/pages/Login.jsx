@@ -42,6 +42,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
+  const [wrongArea, setWrongArea] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const qs = new URLSearchParams(location.search);
@@ -56,11 +57,12 @@ export default function Login() {
     setBusy(true);
     setError("");
     try {
-      const data = await login(email, password);
+      const data = await login(email, password, area);
       if (data.mfa_required || data.mfa_setup_required) { setStep(data); return; }
       navigate(target(data.user, data.landing), { replace: true });
     } catch (err) {
-      setError(apiError(err));
+      const d = err?.response?.data?.detail;
+      if (d?.code === "WRONG_AREA") { setWrongArea(d.area || null); setError(d.message); } else { setWrongArea(null); setError(apiError(err)); }
     } finally {
       setBusy(false);
     }
@@ -117,9 +119,10 @@ export default function Login() {
               </span>
             </label>
             {error && (
-              <p role="alert" className="text-sm text-fsl-danger flex items-center gap-2" data-testid="login-error">
-                <span className="h-2 w-2 rounded-full bg-fsl-danger" aria-hidden="true" /> {error}
-              </p>
+              <div role="alert" className="rounded-lg border border-fsl-danger/50 bg-fsl-danger/10 p-3 text-sm text-fsl-danger" data-testid="login-error">
+                <p className="flex items-start gap-2"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-fsl-danger" aria-hidden="true" /> {error}</p>
+                {wrongArea && <Link to={`/login?area=${wrongArea}`} state={location.state} onClick={() => { setError(""); setWrongArea(null); }} className="mt-2 inline-flex items-center gap-1 rounded-full bg-fsl-gold px-3 h-8 text-xs font-bold text-ink-950" data-testid="login-wrong-area-link">Vai a «{AREAS[wrongArea]?.title}» <ChevronRight className="h-3.5 w-3.5" /></Link>}
+              </div>
             )}
             <button type="submit" disabled={busy} className="btn-primary w-full" data-testid="login-submit-button">
               <LogIn className="h-4 w-4" aria-hidden="true" /> {busy ? "Accesso in corso…" : "Accedi"}

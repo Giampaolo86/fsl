@@ -122,6 +122,21 @@ def _challenge_user_id(token: str, purpose: str) -> str:
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+    area: Optional[str] = None
+
+
+AREA_ROLES = {"genitori": {"fan"}, "societa": {"club_manager"}, "arbitri": {"referee"}, "staff": {"super_admin", "director", "secretary"}}
+AREA_LABEL = {"genitori": "Genitori e tifosi", "societa": "Area Società", "arbitri": "Area Arbitri", "staff": "Control Room"}
+
+
+def _check_area(u: User, area: Optional[str]) -> None:
+    """Ogni area ha il suo accesso: credenziali di un altro profilo → errore con l'area corretta."""
+    if not area or area not in AREA_ROLES:
+        return
+    if u.role in AREA_ROLES[area] or (area == "staff" and u.is_super_admin):
+        return
+    right = next((k for k, roles in AREA_ROLES.items() if u.role in roles), None)
+    raise ApiError(403, "WRONG_AREA", f"Queste credenziali non appartengono a «{AREA_LABEL[area]}»." + (f" Accedi da «{AREA_LABEL[right]}»." if right else ""), {"area": right})
 
 
 @router.post("/login")
@@ -140,6 +155,7 @@ async def login(body: LoginIn, request: Request, response: Response):
         raise ApiError(401, "INVALID_CREDENTIALS", "Email o password non corretti")
     if user.status != "active":
         raise ApiError(403, "DISABLED", "Account disabilitato: contatta l'organizzazione")
+    _check_area(user, body.area)
     await _clear(ident_ip, ident_email)
     return await _after_credentials(request, response, user, "login")
 
