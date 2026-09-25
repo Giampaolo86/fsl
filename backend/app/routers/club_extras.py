@@ -40,14 +40,13 @@ async def _store(t_id: str, data: bytes, content_type: str, filename: str, user_
 
 
 # ---------- foto giocatori ----------
-def _square(data: bytes) -> bytes:
-    from PIL import Image, ImageOps
+async def _player_photo(tournament_id: str, data: bytes, user_id: str, club_id: str):
+    import asyncio
 
-    img = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
-    img = ImageOps.fit(img, (512, 512), method=Image.LANCZOS)
-    buf = io.BytesIO()
-    img.save(buf, "JPEG", quality=88)
-    return buf.getvalue()
+    from ..services.cutout import cutout
+
+    out, ct, name = await asyncio.to_thread(cutout, data)
+    return await _store(tournament_id, out, ct, name, user_id, club_id)
 
 
 @router.post("/players/{player_id}/photo")
@@ -66,7 +65,7 @@ async def upload_photo(tournament_id: str, player_id: str, file: UploadFile = Fi
     data = await file.read()
     if len(data) > 8 * 1024 * 1024:
         raise bad_request("Immagine troppo grande (max 8 MB)")
-    m = await _store(tournament_id, _square(data), "image/jpeg", "player.jpg", user.id, p.club_id)
+    m = await _player_photo(tournament_id, data, user.id, p.club_id)
     url = f"/api/media/{m.id}"
     if editor == "guardian":
         p2 = await repo.update(p.id, {"photo_pending_url": url, "photo_pending_by": user.email}, user.id)
@@ -118,7 +117,7 @@ async def upload_photos_bulk(tournament_id: str, files: list[UploadFile] = File(
         if len(data) > 8 * 1024 * 1024:
             results.append({"file": f.filename, "status": "troppo_grande", "player": f"{p.first_name} {p.last_name}"})
             continue
-        m = await _store(tournament_id, _square(data), "image/jpeg", "player.jpg", user.id, p.club_id)
+        m = await _player_photo(tournament_id, data, user.id, p.club_id)
         await repo.update(p.id, {"photo_url": f"/api/media/{m.id}", "photo_pending_url": None, "photo_pending_by": None}, user.id)
         await audit.record(user, "player.photo", "player", p.id, tournament_id, after={"media_id": m.id, "bulk": True})
         results.append({"file": f.filename, "status": "ok", "player": f"{p.first_name} {p.last_name}", "player_id": p.id, "photo_url": f"/api/media/{m.id}"})

@@ -19,6 +19,7 @@ BIO = {
     "Esterno": ("{n} è un esterno classe {y} del {c}. Velocità, uno contro uno e cross precisi sono le sue armi: attacca la profondità con continuità e sa rientrare con generosità in fase difensiva.", ["Velocità", "Uno contro uno", "Cross", "Progressione", "Generosità"], "Esterno · Velocità sulla fascia · Assist-man"),
     "Attaccante": ("{n} è un attaccante classe {y} del {c}. Istinto del gol, movimenti intelligenti senza palla e freddezza sotto porta. Sa giocare spalle alla porta e far salire la squadra, ma è nell'area avversaria che fa la differenza.", ["Istinto del gol", "Movimento senza palla", "Freddezza", "Tiro", "Protezione palla"], "Attaccante · Istinto del gol · Top performer"),
 }
+CLUB_BIO = "{c} è una società di calcio giovanile nata nel {y} a {city}. Crede in un calcio che forma persone prima che giocatori: allenatori qualificati, attenzione alla crescita di ogni bambino e una comunità di famiglie che vive il campo come una seconda casa. In Future Stars League porta entusiasmo, organizzazione e il sogno di far crescere le stelle di domani."
 POSTS = [
     ("news", "I {c}: il gruppo che sta sorprendendo la categoria {cat}", "Personalità e una grande sicurezza in campo: i ragazzi del {c} si confermano tra le realtà più solide della stagione FSL.", "act_celebrate.jpg"),
     ("interview", "Il mio obiettivo è aiutare la squadra", "I ragazzi del {c} si raccontano: la passione, il lavoro quotidiano e i sogni per il futuro nel calcio.", "act_interview.jpg"),
@@ -79,6 +80,18 @@ async def seed_showcase(slug: str = "la-serie-a-dei-bambini") -> None:
         pids = [p.id for p in players if p.club_id == club.id]
         if not pids:
             continue
+        if not (club.profile or {}).get("showcase"):
+            crest = await _asset(t_id, f"crest_{club.slug}.png")
+            cover = await _asset(t_id, "team_1.jpg")
+            gallery = [await _asset(t_id, n) for n in ("team_1.jpg", "act_celebrate.jpg", "act_tunnel.jpg", "act_dribble.jpg")]
+            prof = {**(club.profile or {}), "showcase": True, "gallery_urls": [f"/api/media/{g}" for g in gallery if g]}
+            prof.setdefault("services", ["Settore giovanile", "Scuola calcio", "Allenatori qualificati", "Campo in erba sintetica", "Spogliatoi rinnovati", "Trasporto convenzionato"])
+            patch = {"profile": prof, "description": club.description or CLUB_BIO.format(c=club.name, y=club.founded_year or 2010, city=club.city or "Roma")}
+            if crest:
+                patch.update({"crest_url": f"/api/media/{crest}", "crest_is_placeholder": False})
+            if cover and not club.cover_url:
+                patch["cover_url"] = f"/api/media/{cover}"
+            await scoped("clubs", t_id).update(club.id, patch)
         cat = next((comps[teams[tm].competition_id].category for tm in teams if teams[tm].club_id == club.id and teams[tm].competition_id in comps), "")
         for i, (kind, title, excerpt, cover) in enumerate(POSTS):
             pslug = f"vetrina-{club.slug}-{kind}"
