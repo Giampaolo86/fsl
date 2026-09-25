@@ -8,6 +8,7 @@ import { MatchCard } from "@/components/fsl/MatchCard";
 import { PlayerCardDialog } from "@/components/fsl/PlayerCard";
 import { ShopItemCard } from "@/components/fsl/Shop";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
+import { HonoursStrip } from "@/pages/public/HallOfFame";
 import { ROLE_CODE, ROLE_TONE } from "@/lib/fanta";
 import { api, apiError } from "@/lib/api";
 import { mediaUrl } from "@/lib/upload";
@@ -103,6 +104,11 @@ export default function PublicClubHome() {
           <Block title="Responsabile della società" icon={ShieldCheck} testId="club-home-manager">
             {p.manager?.name ? <div className="flex items-center gap-3">{p.manager.photo_url ? <img src={mediaUrl(p.manager.photo_url)} alt="" className="h-16 w-16 rounded-full object-cover border-2" style={{ borderColor: secondary }} /> : <span className="h-16 w-16 rounded-full bg-navy-700 inline-flex items-center justify-center font-display font-bold text-xl">{p.manager.name[0]}</span>}<div><div className="font-display font-bold text-lg" style={{ color: secondary }}>{p.manager.name}</div><div className="text-xs text-fsl-slate">{p.manager.role}</div>{p.manager.phone && <a href={`tel:${p.manager.phone}`} className="block text-xs mt-1 hover:text-fsl-gold">{p.manager.phone}</a>}{p.manager.email && <a href={`mailto:${p.manager.email}`} className="block text-xs hover:text-fsl-gold">{p.manager.email}</a>}</div></div> : <p className="text-sm text-fsl-slate">Referente in aggiornamento.</p>}
           </Block>
+          {d.history?.seasons?.length > 0 && <Block title="Storia della società" icon={Trophy} testId="club-home-history">
+            <HonoursStrip h={d.history.honours} compact />
+            <ul className="mt-3 space-y-1 text-sm">{d.history.seasons.slice(0, 3).map((s, i) => <li key={i} className="flex items-center justify-between gap-2"><span className="truncate text-fsl-slate">{s.season_label} · {s.competition}</span><span className="num font-bold whitespace-nowrap">{s.champion ? "Campione" : `${s.pos}°`}</span></li>)}</ul>
+            <Link to={`/albo-doro/societa/${d.history.org_club_id}`} className="text-xs text-fsl-gold hover:underline mt-3 inline-block" data-testid="club-home-history-link">Tutta la storia nell'Albo d'oro →</Link>
+          </Block>}
           <Block title="Prossime partite" icon={CalendarDays} testId="club-home-upcoming">
             <div className="space-y-2">{d.upcoming_matches.slice(0, 3).map((m) => <MatchCard key={m.id} m={m} to={`/tornei/${slug}/partite/${m.id}`} compact />)}{d.upcoming_matches.length === 0 && <p className="text-sm text-fsl-slate">Nessuna gara in programma.</p>}</div>
             {d.recent_matches.length > 0 && <><div className="fsl-label mt-4 mb-2">Ultimi risultati</div><div className="space-y-2">{d.recent_matches.slice(0, 2).map((m) => <MatchCard key={m.id} m={m} to={`/tornei/${slug}/partite/${m.id}`} compact />)}</div></>}

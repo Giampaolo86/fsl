@@ -28,6 +28,7 @@ const TOURNAMENT_NAV = (id) => [
   { to: `/admin/t/${id}/top11`, label: "Top 11", icon: Sparkles },
   { to: `/admin/t/${id}/weekly`, label: "FSL Weekly", icon: Newspaper },
   { to: `/admin/t/${id}/studio`, label: "Social Studio", icon: Palette },
+  { to: `/admin/t/${id}/legacy`, label: "Albo d'oro", icon: Archive },
   { to: `/admin/t/${id}/pagamenti`, label: "Pagamenti", icon: CreditCard },
   { to: `/admin/t/${id}/comunicazioni`, label: "Contatti", icon: Phone },
   { to: `/admin/t/${id}/ticket`, label: "Ticket", icon: Ticket },

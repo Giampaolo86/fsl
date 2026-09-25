@@ -15,6 +15,8 @@ import Top11Public from "@/pages/public/Top11Public";
 import WeeklyAdmin from "@/pages/admin/Weekly";
 import Studio from "@/pages/admin/Studio";
 import { WeeklyDetail, WeeklyList } from "@/pages/public/WeeklyPublic";
+import { ClubHistory, HallOfFame, SeasonArchive } from "@/pages/public/HallOfFame";
+import Legacy from "@/pages/admin/Legacy";
 import Hub from "@/pages/admin/Hub";
 import NewTournament from "@/pages/admin/NewTournament";
 import Overview from "@/pages/admin/Overview";
@@ -113,6 +115,7 @@ function AppRoutes() {
                 <Route path="top11" element={<Top11Admin />} />
                 <Route path="weekly" element={<WeeklyAdmin />} />
                 <Route path="studio" element={<Studio />} />
+                <Route path="legacy" element={<Legacy />} />
                 <Route path="pagamenti" element={<Payments />} />
                 <Route path="media" element={<BlogManager />} />
                 <Route path="documenti" element={<Documents />} />
@@ -144,6 +147,9 @@ function AppRoutes() {
               <Route element={<PublicShell />}>
                 <Route path="/" element={<PublicHub />} />
                 <Route path="/tornei" element={<PublicTournamentsList />} />
+                <Route path="/albo-doro" element={<HallOfFame />} />
+                <Route path="/albo-doro/societa/:orgClubId" element={<ClubHistory />} />
+                <Route path="/albo-doro/:archiveSlug" element={<SeasonArchive />} />
                 <Route path="/account" element={<ProtectedRoute roles={["fan"]}><FanAccount /></ProtectedRoute>} />
               </Route>
               <Route path="/tornei/:slug" element={<PublicShell />}>

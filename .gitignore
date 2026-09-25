@@ -90,3 +90,4 @@ frontend/node_modules/.cache/default-development/0.pack
 
 # Stripe sandbox credentials
 backend/.stripe_sandbox.json
+frontend/node_modules/.cache/default-development/13.pack

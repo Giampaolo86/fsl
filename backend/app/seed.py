@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime, timezone
 
 from .core.db import db
 from .core.security import hash_password, verify_password
@@ -125,6 +126,7 @@ async def seed_all():
     await enroll_demo_mfa(*[u for u in (qa_admin, demo_director) if u])
     if await tournaments.find_one({"slug": "la-serie-a-dei-bambini"}):
         await seed_match_engine(actor)
+        await seed_legacy_demo()
         return
 
     org = await organizations.find_one({"slug": "future-stars-league"})
@@ -219,6 +221,33 @@ async def seed_all():
     await ensure_membership(club_mgr, serie_a.id, "club_manager", roma_nord.id)
     logger.info("demo seed completed")
     await seed_match_engine(actor)
+    await seed_legacy_demo()
+
+
+async def seed_legacy_demo():
+    """Albo d'oro demo: archivio storico di Winter Stars 2025 con le stesse società (org_club_id) della Serie A dei Bambini."""
+    from .core.db import db
+    from .services.legacy import org_key
+
+    winter = await tournaments.find_one({"slug": "winter-stars-2025"})
+    serie_a = await tournaments.find_one({"slug": "la-serie-a-dei-bambini"})
+    if not winter or not serie_a or await db.season_archives.find_one({"tournament_id": winter.id}):
+        return
+    clubs = {c.name: c for c in await scoped("clubs", serie_a.id).list(limit=200)}
+    order = [("Sporting Eur", 9, 7, 1, 1, 24, 7, 22), ("Atletico Prenestino", 9, 6, 2, 1, 20, 9, 20), ("Academy Tuscolana", 9, 5, 2, 2, 18, 11, 17), ("Virtus Aurelia", 9, 4, 3, 2, 15, 12, 15), ("Anzio Calcio", 9, 4, 1, 4, 13, 14, 13), ("Castelli Academy", 9, 3, 2, 4, 11, 15, 11), ("Fiumicino 1926", 9, 2, 3, 4, 10, 16, 9), ("Nomentana Stars", 9, 2, 1, 6, 9, 19, 7), ("Palocco United", 9, 1, 2, 6, 7, 20, 5), ("Trastevere Calcio", 9, 0, 3, 6, 5, 22, 3)]
+    rows = []
+    for i, (name, pg, v, n, p, gf, gs, pt) in enumerate(order):
+        c = clubs.get(name)
+        rows.append({"team_id": f"winter-{org_key(name)}", "name": f"{name} 2014", "pos": i + 1, "PT": pt, "PG": pg, "V": v, "N": n, "P": p, "GF": gf, "GS": gs, "DR": gf - gs, "org_club_id": c.org_club_id if c else org_key(name), "club_name": name, "crest_url": (None if not c or c.crest_is_placeholder else c.crest_url), "colors": c.colors if c else None})
+    club_list = [{"club_id": c.id, "org_club_id": c.org_club_id or org_key(c.name), "name": c.name, "short_name": c.short_name, "slug": c.slug, "city": c.city, "crest_url": None if c.crest_is_placeholder else c.crest_url, "colors": c.colors} for c in clubs.values() if any(r["club_name"] == c.name for r in rows)]
+    ref = lambda r: {k: r[k] for k in ("team_id", "name", "pos", "PT", "org_club_id", "club_name", "crest_url", "colors")}  # noqa: E731
+    doc = {"tournament_id": winter.id, "organization_id": winter.organization_id, "season_label": winter.season_label, "closed_at": datetime(2025, 3, 30, 18, 0, tzinfo=timezone.utc), "closed_by": None, "reason": "Seed: stagione storica",
+           "tournament": {"id": winter.id, "name": winter.name, "slug": winter.slug, "payoff": winter.payoff, "season_label": winter.season_label, "start_date": winter.start_date, "end_date": winter.end_date, "visual": winter.visual.model_dump(), "status": "archived"},
+           "competitions": [{"competition_id": "winter-2014", "name": "Girone unico 2014", "category": "2014", "series": "Girone unico", "champion": ref(rows[0]), "promoted": [], "relegated": [ref(rows[-1])], "playoff": [ref(rows[1]), ref(rows[2])], "final_standings": rows}],
+           "awards": {"mvp": {"name": "Davide R.", "team": "Sporting Eur 2014", "role": "Por", "player_id": None, "value": 4}, "scorer": {"name": "Matteo C.", "team": "Atletico Prenestino 2014", "role": "Att", "player_id": None, "value": 11}, "assist": {"name": "Alessandro D.", "team": "Academy Tuscolana 2014", "role": "Cen", "player_id": None, "value": 6}, "fanta": {"name": "Luca M.", "team": "Sporting Eur 2014", "role": "Dif", "player_id": None, "value": 7.85}, "top11": [{"count": 5, "name": "Davide R.", "team": "Sporting Eur 2014", "player_id": None}, {"count": 4, "name": "Matteo C.", "team": "Atletico Prenestino 2014", "player_id": None}, {"count": 3, "name": "Luca M.", "team": "Sporting Eur 2014", "player_id": None}]},
+           "totals": {"matches": 45, "goals": 132, "players": 120, "clubs": 10, "top11": 9, "weekly": 9}, "clubs": club_list}
+    await db.season_archives.update_one({"tournament_id": winter.id}, {"$set": doc}, upsert=True)
+    logger.info("legacy demo seed completed")
 
 
 ROSTER = [("Davide", "Rinaldi", 1, "Portiere"), ("Luca", "Mariani", 2, "Difensore"), ("Matteo", "Conti", 7, "Attaccante"), ("Federico", "Greco", 4, "Difensore"), ("Alessandro", "De Luca", 11, "Centrocampista"), ("Marco", "De Santis", 10, "Centrocampista"), ("Andrea", "Ferri", 9, "Attaccante"), ("Simone", "Bassi", 5, "Difensore"), ("Nicolò", "Romano", 8, "Centrocampista"), ("Edoardo", "Galli", 3, "Difensore")]

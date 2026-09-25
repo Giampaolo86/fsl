@@ -297,10 +297,13 @@ async def club_page(slug: str, club_slug: str):
     from .posts import public_posts
 
     posts = await public_posts(t.id, "news,interview,gallery,video,match_story", club.id, limit=8)
+    from ..services import legacy as legacy_svc
+
+    history = await legacy_svc.club_history(club.org_club_id or legacy_svc.org_key(club.name))
     match_ids = [m.id for m in await scoped("matches", t.id).list({"$or": [{"home_team_id": {"$in": ids}}, {"away_team_id": {"$in": ids}}]}, limit=2000)]
     shop = await scoped("paid_media", t.id).list({"match_id": {"$in": match_ids}, "active": True}, sort=[("created_at", -1)], limit=8)
     others = [{"slug": o.slug, "name": o.name, "season": o.season_label} for o in await __import__("app.repositories.registry", fromlist=["tournaments"]).tournaments.list({"published": True}) if o.id != t.id and await scoped("clubs", o.id).find_one({"slug": club.slug})]
-    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": venue.public() if venue else None, "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others}
+    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": venue.public() if venue else None, "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others, "history": history}
 
 
 @router.get("/tournaments/{slug}/top11")
@@ -323,6 +326,33 @@ async def public_top11(slug: str, competition_id: Optional[str] = None, match_da
         o["competition"] = {"id": c.id, "name": c.name, "category": c.category, "series": c.series} if c else None
         out.append(o)
     return out
+
+
+@router.get("/legacy")
+async def public_hall_of_fame():
+    from ..services import legacy as svc
+
+    return await svc.hall_of_fame()
+
+
+@router.get("/legacy/clubs/{org_club_id}")
+async def public_club_history(org_club_id: str):
+    from ..services import legacy as svc
+
+    h = await svc.club_history(org_club_id)
+    if not h["club"]:
+        raise not_found("Società")
+    return h
+
+
+@router.get("/legacy/{slug}")
+async def public_season_archive(slug: str):
+    from ..services import legacy as svc
+
+    d = await svc.archive_for(slug)
+    if not d:
+        raise not_found("Albo d'oro")
+    return d
 
 
 @router.get("/tournaments/{slug}/weekly")
