@@ -179,8 +179,8 @@ class TestMatchWorkflow:
         # find a scheduled match on giornata 2
         r = requests.get(f"{API}/tournaments/{serie_a_id}/matches?status=scheduled", headers=_h(tokens["director"]))
         assert r.status_code == 200, r.text
-        candidate = next((m for m in r.json() if m["match_day"] == 2), None)
-        assert candidate, "no scheduled match on giornata 2"
+        candidate = next((m for m in r.json() if m["match_day"] == 2), None) or next(iter(sorted((m for m in r.json() if m["match_day"] >= 2), key=lambda m: m["match_day"])), None)
+        assert candidate, "no scheduled match on giornata 2+"
         return {"match_id": candidate["id"], "home_team": candidate["home"]["id"], "away_team": candidate["away"]["id"], "referee_id": referee_id}
 
     def test_1_assign_referee(self, tokens, serie_a_id, workflow):

@@ -1,0 +1,32 @@
+{
+  "summary": "FSL 2.0 fase 2 — full frontend QA. Verified: (1) Admin Impostazioni card price inputs (3.99/4.99), sponsor add/save/persistence after reload. (2) Player public page player-id-offer with premium/special canvas, price toggle (3,99 € → 4,99 €), buy button → /api/payments/checkout HTTP 200 with redirect to checkout.stripe.com (Speciale Top11/MVP €4,99 sandbox). (3) Admin FSL Weekly: generate → 4 items, draft → editorial form save (toast + preview weekly-title/intro/note updated), draft→review→publish (Direttore) transitions OK, editorial form hidden after publish, weekly-results/standings/scorers/mvp preview all rendered (weekly-top11 hidden as expected since no Top 11 published for that day). (4) Public /weekly page shows public-weekly card, detail public-weekly-detail with full weekly-issue; news filter news-filter-weekly present at /news?tipo=weekly. (5) Public Top 11 board: top11-board with all 11 slots, no horizontal overflow at 1920px nor 390px. (6) Admin Top 11 Giornata 1 board + all 3 downloads (fsl-top11-g1-4x5.png, 9x16, 1x1). (7) Studio: fulltime/mvp/standings/top11 templates render correct dims 1080x1350/1920/1080 with non-black pixels + PNG download OK. Fan notifications endpoint GET /api/me/notifications 200 (26 items, kinds: media/match/callup — no top11 kind since no new Top 11 published with fan's child). Regression: /tornei/la-serie-a-dei-bambini and admin overview load with 0 console errors; sidebar admin has FSL Weekly + Social Studio; public nav has TOP 11 + FSL WEEKLY.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Studio (matchday template)", "issue": "Al primo caricamento della pagina Social Studio, il template 'matchday' (default) NON renderizza il canvas (rimane 300x150 vuoto) e il pulsante studio-download è disabilitato. Causa: in Studio.jsx line 31, `days[0] ? String(days[0]) : ''` valuta il primo giorno come falsy quando la competizione parte da Giornata 0 (0 è falsy in JS), quindi lo stato `day` resta stringa vuota e l'useEffect di rendering si interrompe (line 45 early-return). Workaround: selezionare manualmente una giornata dal dropdown studio-day → il rendering parte correttamente. Fix suggerito: `days[0] != null ? String(days[0]) : ''` (idem stessa condizione dentro il primo useEffect).", "selector": "[data-testid=studio-template-matchday]", "priority": "MEDIUM"},
+      {"component": "Top11Public", "issue": "Con querystring ?competition_id=...&match_day=1 il link 'Tutte le giornate' (data-testid=public-top11-all) non viene renderizzato pur essendo `params.get('match_day')` = '1' (verificato tramite window.location.search). Il filtro giornata funziona (mostra 1 board), ma il link di ritorno manca. Ripetibile 100%. Sospetto: la condizione `{day && <Link ...>}` potrebbe essere valutata prima del mount del router o `useSearchParams` restituisce inizialmente null e non ri-rende (poiché items caricano dopo). Fix suggerito: forzare rerender leggendo `day` da `useLocation` o rimuovere l'accoppiamento con `items`.", "selector": "[data-testid=public-top11-all]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Studio", "issues": ["Console React warning: '<span> option ...' hydration warning generato dall'annotazione x-file-name che introduce uno <span> dentro <option> nel select studio-day. Non blocca la funzionalità ma inquina la console."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_fsl2_phase2.py", "/app/backend/tests/test_top11.py"],
+  "action_items": [
+    "Fix Studio.jsx matchday default: sostituire `days[0] ? ...` con `days[0] != null ? ...` per gestire Giornata 0 come valore iniziale valido (line 31 e verificare anche line 33 onclick).",
+    "Fix Top11Public.jsx: garantire che quando l'URL contiene ?match_day=... venga renderizzato il link public-top11-all dopo il primo mount (probabilmente serve una key/rerender)."
+  ],
+  "critical_code_review_comments": [
+    "Studio.jsx line 31: `days[0] ? String(days[0]) : \"\"` — bug classico JS quando il primo elemento è 0 (falsy). Applica anche a qualsiasi altro luogo dove si usa la stessa pattern per match_day.",
+    "Studio.jsx line 61: nel catch block il canvas viene sempre dimensionato correttamente prima di dipingere il messaggio d'errore — ottimo pattern.",
+    "Top11Public.jsx line 23: la logica del link di ritorno dipende esclusivamente da `day` derivato da useSearchParams; conviene testare esplicitamente con setSearchParams o incapsulare il rendering condizionale con `if (day) { ... }` per evitare edge case."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped, già coperto)", "frontend": "~92% (10/12 flussi al 100%; 2 minori: matchday default e link public-top11-all)"},
+  "test_credentials": "direttore@fsl.demo / Demo1234! (TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C), fan.notifiche@test.it / Password123",
+  "seed_data_creation": "Nessuna modifica ai dati di seed. Il numero FSL Weekly Giornata 2 è stato portato da bozza → pubblicato durante il test (crea articolo blog kind weekly come atteso). Sponsor 'QA Sponsor Test' aggiunto nelle Impostazioni per verifica persistenza (main agent può rimuoverlo se necessario).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Tutte le feature FSL 2.0 fase 2 funzionano in E2E tranne 2 UI bug minori (dettagliati sopra). La notifica top11 al genitore non è stata testabile perché non ci sono Top 11 in bozza complete (Giornata 2 e 9 sono incomplete e la publish restituisce 409 come atteso). Un nuovo numero FSL Weekly è pubblicato per Giornata 2 (Serie A campionato 2014 di La Serie A dei Bambini). Gli sponsor includono 'QA Sponsor Test'.",
+  "rca of the issue": "Studio matchday: `days[0] ? ... : ''` restituisce '' quando days=[0,1,...], quindi day resta empty e l'useEffect di rendering fa early-return (Studio.jsx:45). Public top11-all: link condizionato su `day` truthy da useSearchParams — funziona se navighi via `<Link>` interno, ma con direct URL entry il rendering iniziale può perdere il flag; verificare con React Router v6 se params sono disponibili al primo render sincrono."
+}
