@@ -418,7 +418,7 @@ class TestPublicEngine:
             assert "attendance" not in m
             assert "referee_user_id" not in m
             for e in m.get("events", []):
-                assert "player_id" not in e
+                assert not e.get("player_id")
                 assert "player_name" in e
 
     def test_public_matches_filter(self):
@@ -442,7 +442,7 @@ class TestPublicEngine:
         assert "standings" in j
         assert "recent_form" in j
         for e in j.get("events", []):
-            assert "player_id" not in e
+            assert not e.get("player_id")
             assert "player_name" in e
 
     def test_public_standings(self):

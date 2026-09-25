@@ -531,6 +531,8 @@ async def save_sheet(tournament_id: str, match_id: str, body: SheetIn, user: Cur
     if body.notes:
         patch["sheet_notes"] = body.notes
     rectify = m.status in FINAL
+    if rectify and body.close and not body.reason:
+        raise bad_request("La rettifica richiede una motivazione")
     if not body.close:
         if rectify:
             raise conflict("Gara ufficiale: per modificare usa «Rettifica e ripubblica» con motivazione")
@@ -550,8 +552,6 @@ async def save_sheet(tournament_id: str, match_id: str, body: SheetIn, user: Cur
     for pid in present:
         ratings.setdefault(pid, 6.0)
     patch["ratings"] = ratings
-    if rectify and not body.reason:
-        raise bad_request("La rettifica richiede una motivazione")
     if role == "referee":
         status, kind = "report_submitted", "referee_report"
     else:

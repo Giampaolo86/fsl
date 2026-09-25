@@ -29,6 +29,20 @@ def totp_now():
     return pyotp.TOTP(TOTP_SECRET).now()
 
 
+_SESS_FAN = None
+
+
+def _session_fan(c: httpx.Client):
+    """Account fan dedicato ai test di sessione: non disturba i token degli altri moduli."""
+    global _SESS_FAN
+    if not _SESS_FAN:
+        email = f"qa.sessions.{int(time.time())}@test.it"
+        r = c.post("/api/auth/register", json={"email": email, "password": "SessionTest2026", "full_name": "QA Sessions", "privacy_accepted": True}, headers={"X-Client": "api"})
+        assert r.status_code == 201, r.text
+        _SESS_FAN = (email, "SessionTest2026")
+    return _SESS_FAN
+
+
 def _login_with_mfa(c: httpx.Client, email: str, password: str):
     r = c.post("/api/auth/login", json={"email": email, "password": password}, headers={"X-Client": "api"})
     assert r.status_code == 200, r.text
@@ -93,13 +107,14 @@ class TestCookieSession:
 
     def test_logout_all_requires_csrf(self):
         with _client() as c:
-            _login_with_mfa(c, DIRETTORE, PWD)
+            email, pwd = _session_fan(c)
+            _login_with_mfa(c, email, pwd)
             r = c.post("/api/auth/logout-all")
             assert r.status_code == 403, r.text
             assert "CSRF" in r.text
 
         with _client() as c2:
-            _login_with_mfa(c2, DIRETTORE, PWD)
+            _login_with_mfa(c2, email, pwd)
             csrf = c2.cookies.get("csrf_token")
             r2 = c2.post("/api/auth/logout-all", headers={"X-CSRF-Token": csrf})
             assert r2.status_code == 200, r2.text
@@ -301,10 +316,11 @@ class TestSessionsAndMfa:
 
     def test_sessions_delete_other(self):
         with _client() as c1:
-            _login_with_mfa(c1, DIRETTORE, PWD)
+            email, pwd = _session_fan(c1)
+            _login_with_mfa(c1, email, pwd)
         time.sleep(1)
         with _client() as c2:
-            j = _login_with_mfa(c2, DIRETTORE, PWD)
+            j = _login_with_mfa(c2, email, pwd)
             token = j.get("access_token")
             r = c2.get("/api/auth/sessions", headers={"Authorization": f"Bearer {token}"})
             data = r.json()

@@ -122,7 +122,7 @@ export default function PlayerProfile({ mode = "public" }) {
 
         <section>
           <h2 className="fsl-section-title mb-3">Statistiche · gare ufficiali</h2>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">{[["Presenze", t.presences || 0], ["Gol", t.goal || 0], ["Assist", t.assist || 0], ["Media voto", fmtVote(card.avg_vote)], ["Media fanta", fmtVote(card.avg_fanta)], ["MVP", t.mvp || 0]].map(([l, v]) => <Stat key={l} label={l} value={v} />)}</div>
+          <div className="grid grid-cols-3 md:grid-cols-7 gap-3">{[["Presenze", t.presences || 0], ["Gol", t.goal || 0], ["Assist", t.assist || 0], ["Media voto", fmtVote(card.avg_vote)], ["Media fanta", fmtVote(card.avg_fanta)], ["MVP", t.mvp || 0], ["Top 11", card.top11_count || 0]].map(([l, v]) => <Stat key={l} label={l} value={v} />)}</div>
           <div className="mt-4"><div className="fsl-label mb-1.5">Badge ({card.badges?.length || 0})</div><BadgeChips list={card.badges || []} max={20} small={false} /></div>
         </section>
 

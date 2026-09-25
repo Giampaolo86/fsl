@@ -16,6 +16,7 @@ DEFS = {
     "porta_inviolata": ("Porta inviolata", "match", "Portiere presente senza gol subiti"),
     "para_rigori": ("Para-rigori", "match", "Almeno un rigore parato"),
     "mvp": ("MVP della partita", "match", "Miglior giocatore della gara"),
+    "top11": ("TOP 11 della giornata", "match", "Inserito nella formazione ideale pubblicata"),
     "top_player": ("Top Player della giornata", "match", "Miglior fantavoto della giornata"),
     "miglior_portiere": ("Miglior portiere della giornata", "match", "Miglior portiere della giornata"),
     "miglior_difensore": ("Miglior difensore della giornata", "match", "Miglior difensore della giornata"),

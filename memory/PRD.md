@@ -139,6 +139,10 @@ Super Admin (owner castellani.giampaolo@gmail.com), Direttore Torneo, Segreteria
 - [x] seed.py: niente reset password admin al riavvio (solo `ADMIN_FORCE_PASSWORD_RESET`), demo mai in produzione, login `@fsl.demo` bloccato in prod; CORS esplicito; header sicurezza; docs off in prod; env obbligatorie; Stripe key rimossa dal codice
 - [x] Test: `tests/test_auth_v2.py` 14/14, conftest adatta la suite pregressa (X-Client api + MFA QA); build frontend OK. Account QA: `qa.superadmin@fsl.demo` (vedi test_credentials.md)
 - [ ] Aperti: rotazione chiave Stripe test in git history, ~10 test pregressi obsoleti, email transazionali (stand-by)
+## Iterazione 22 (2026-06) · Suite test verde + mappatura FSL 2.0
+- [x] Test pregressi aggiornati alle regole attuali (MVP obbligatorio, PDF ammessi, scheda minori anonima, conteggi ≥, token acquisto demo → skip, xdist loadscope: test autosufficienti, race notifiche tollerata); rettifica: motivazione validata prima del tabellino. `pytest tests` → 246 pass / 5 skip / 0 fail
+- [x] Mappatura esistente vs FSL 2.0 in `/app/memory/FSL2_MAPPING.md` (Player ID, Weekly/Top 11, Social Studio, Legacy, My FSL, Time Capsule, navigazione, file/endpoint/migrazioni/rischi)
+- [ ] FASE 1 (Player ID + motore Top 11) in attesa di approvazione utente
 
 ## Stato implementazioni (check 2026-06)
 Completo e testato: Match Engine (calendario, tabellino unico, referti, rettifiche), classifiche/statistiche pubbliche, badge engine + premi (griglia ordinabile, premio speciale), social card gara, blog/news/interviste (tag società/gara/giocatori), shop foto/video (Stripe, anteprima video automatica), documenti società, import rosa Excel con approvazione, homepage società (editor società con approvazione + editor admin diretto, immagini di default, gallery), account genitore (preferiti, notifiche mirate, segnalazioni, «I miei bambini», acquisti), scheda giocatore («Mi presento», dicono di me, media taggati, foto con approvazione, cartolina), prodotti digitali 2,49 € (cartolina squadra, album stagione), registrazione società (codice invito + richiesta con approvazione), PWA + logo custom, responsive mobile.

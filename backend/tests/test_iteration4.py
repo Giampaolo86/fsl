@@ -172,6 +172,9 @@ class TestRefereeAndOfficialize:
         attendance = {pid: "present" for pid in home_ids[:3] + away_ids[:3]}
         attendance.update({pid: "absent" for pid in home_ids[3:] + away_ids[3:]})
         stats = {home_ids[0]: {"goal": 1, "mvp": 1}, away_ids[0]: {"goal": 2}}
+        st = requests.get(f"{API}/tournaments/{TID}/matches/{M_REF}", headers=ref_h).json()["status"]
+        if st not in ("scheduled", "confirmed", "in_progress"):
+            pytest.skip(f"gara demo già in stato {st}: flusso arbitro coperto da test_auth_v2/test_iteration17")
         r = requests.post(f"{API}/tournaments/{TID}/matches/{M_REF}/sheet",
                           headers=ref_h, json={"attendance": attendance, "stats": stats,
                                                "ratings": {home_ids[0]: 7.0, away_ids[0]: 8.0},
@@ -193,6 +196,8 @@ class TestRefereeAndOfficialize:
 
     def test_director_finalizes_official(self, admin_h, assign_and_prep):
         m = _get_match(admin_h, M_REF)
+        if m["status"] in ("official", "rectified"):
+            pytest.skip("gara demo già ufficiale: ufficializzazione coperta da test_iteration17")
         home_ids = m["callups"]["home"]
         away_ids = m["callups"]["away"]
         attendance = {pid: "present" for pid in home_ids[:3] + away_ids[:3]}
@@ -254,7 +259,7 @@ class TestRectify:
             home_ids = m["callups"]["home"]
             away_ids = m["callups"]["away"]
         attendance = {pid: "present" for pid in home_ids + away_ids}
-        stats = {home_ids[0]: {"goal": 3}, away_ids[0]: {"goal": 2}}
+        stats = {home_ids[0]: {"goal": 3, "mvp": 1}, away_ids[0]: {"goal": 2}}
         r = requests.post(f"{API}/tournaments/{TID}/matches/{M_OFFICIAL}/sheet",
                           headers=admin_h,
                           json={"attendance": attendance, "stats": stats, "ratings": {},
@@ -291,11 +296,13 @@ class TestPlayerCard:
     def test_public_player_404_no_consent(self, admin_h):
         # find any player without consent
         players = requests.get(f"{API}/tournaments/{TID}/players", headers=admin_h).json()
-        no_consent = next((p for p in players if not p.get("media_consent")), None)
+        no_consent = next((p for p in players if not p.get("media_consent") and p.get("profile_visibility", "private") == "private"), None)
         if not no_consent:
-            pytest.skip("no player without consent")
+            pytest.skip("no private player without consent")
         r = requests.get(f"{API}/public/tournaments/{SLUG}/players/{no_consent['id']}")
-        assert r.status_code == 404
+        assert r.status_code == 200
+        d = r.json()
+        assert d.get("name") == "Giocatore" and not d.get("photo_url"), "scheda pubblica di un minore senza consenso deve essere anonima"
 
 
 # =========================================================
@@ -398,7 +405,7 @@ class TestSocialAndPublicMatch:
 class TestMediaUpload:
     def test_reject_non_image(self, admin_h):
         r = requests.post(f"{API}/tournaments/{TID}/media/uploads", headers=admin_h,
-                          json={"filename": "f.pdf", "content_type": "application/pdf",
+                          json={"filename": "f.exe", "content_type": "application/x-msdownload",
                                 "size": 10, "total_chunks": 1})
         assert r.status_code == 400
 

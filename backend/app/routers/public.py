@@ -301,3 +301,25 @@ async def club_page(slug: str, club_slug: str):
     shop = await scoped("paid_media", t.id).list({"match_id": {"$in": match_ids}, "active": True}, sort=[("created_at", -1)], limit=8)
     others = [{"slug": o.slug, "name": o.name, "season": o.season_label} for o in await __import__("app.repositories.registry", fromlist=["tournaments"]).tournaments.list({"published": True}) if o.id != t.id and await scoped("clubs", o.id).find_one({"slug": club.slug})]
     return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": venue.public() if venue else None, "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others}
+
+
+@router.get("/tournaments/{slug}/top11")
+async def public_top11(slug: str, competition_id: Optional[str] = None, match_day: Optional[int] = None):
+    from ..core.db import db
+    from ..services import top11 as svc
+
+    t = await _published(slug)
+    q = {"tournament_id": t.id, "status": "published"}
+    if competition_id:
+        q["competition_id"] = competition_id
+    if match_day:
+        q["match_day"] = match_day
+    docs = await db.top11.find(q).sort([("published_at", -1)]).to_list(50)
+    comps = {c.id: c for c in await scoped("competitions", t.id).list(limit=200)}
+    out = []
+    for d in docs:
+        o = svc.out(d, public=True)
+        c = comps.get(d["competition_id"])
+        o["competition"] = {"id": c.id, "name": c.name, "category": c.category, "series": c.series} if c else None
+        out.append(o)
+    return out
