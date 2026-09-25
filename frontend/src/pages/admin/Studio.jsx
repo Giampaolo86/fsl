@@ -4,6 +4,7 @@ import { Download, Image as ImageIcon, LayoutTemplate, Share2 } from "lucide-rea
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { LoadingState } from "@/components/fsl/States";
+import { PublishToBlog } from "@/components/studio/PublishToBlog";
 import { FORMATS, TEMPLATES } from "@/components/studio/templates";
 import { api, apiError } from "@/lib/api";
 
@@ -68,6 +69,16 @@ export default function Studio() {
   const share = async () => { const b = await new Promise((res) => canvas.current.toBlob(res, "image/png")); const file = new File([b], fileName(), { type: "image/png" }); if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file], title: "Future Stars League" }); } catch (e) { if (e.name !== "AbortError") toast.error("Condivisione non riuscita"); } } else { download(); toast.info("Grafica scaricata"); } };
   if (!comps || !t) return <LoadingState />;
   const [W, H] = FORMATS[format];
+  const selMatch = matches.find((m) => m.id === matchId);
+  const mName = (x) => x?.club?.name || x?.name || "";
+  const dayLabel = tpl === "standings" ? "" : ` · Giornata ${day}`;
+  const blogDefaults = {
+    matchday: { title: `Matchday · ${comp?.name} · Giornata ${day}`, excerpt: `Le gare della giornata ${day} di ${comp?.name}: orari e campi.`, kind: "news" },
+    fulltime: { title: selMatch ? `${mName(selMatch.home)} ${selMatch.score?.home}-${selMatch.score?.away} ${mName(selMatch.away)}` : "Full Time", excerpt: `Il risultato finale della gara${dayLabel} di ${comp?.name}.`, kind: "match_story" },
+    mvp: { title: selMatch ? `MVP · ${mName(selMatch.home)} - ${mName(selMatch.away)}` : "MVP", excerpt: `Il migliore in campo della gara${dayLabel} di ${comp?.name}.`, kind: "match_story" },
+    standings: { title: `Classifica · ${comp?.name}`, excerpt: `La classifica ufficiale aggiornata di ${comp?.name}.`, kind: "news" },
+    top11: { title: `Top 11 · ${comp?.name} · Giornata ${top11s.find((k) => k.id === top11Id)?.match_day ?? ""}`, excerpt: `La formazione ideale della giornata di ${comp?.name}, in stile FIFA.`, kind: "news" },
+  }[tpl];
   return (
     <div data-testid="studio">
       <PageHeader kicker="FSL Social Studio" title="Grafiche ufficiali" subtitle="Libreria di template con i dati ufficiali del torneo: scegli il template, la giornata o la gara, lo sponsor e scarica nei tre formati social." />
@@ -93,7 +104,7 @@ export default function Studio() {
         <section className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-fsl-slate num">{W} × {H} px{rendering ? " · rendering…" : ""}</span>
-            <div className="ml-auto flex gap-2"><button className="btn-gold h-10" disabled={!ready} onClick={download} data-testid="studio-download"><Download className="h-4 w-4" /> Scarica PNG</button><button className="btn-primary h-10" disabled={!ready} onClick={share} data-testid="studio-share"><Share2 className="h-4 w-4" /> Condividi</button></div>
+            <div className="ml-auto flex flex-wrap gap-2"><button className="btn-gold h-10" disabled={!ready} onClick={download} data-testid="studio-download"><Download className="h-4 w-4" /> Scarica PNG</button><button className="btn-primary h-10" disabled={!ready} onClick={share} data-testid="studio-share"><Share2 className="h-4 w-4" /> Condividi</button><PublishToBlog tid={tid} slug={t.slug} canvasRef={canvas} disabled={!ready} defaults={{ ...blogDefaults, fileName: fileName().replace(/\.png$/, "") }} matchId={template.needs === "match" ? matchId : null} teamIds={template.needs === "match" && selMatch ? [selMatch.home.id, selMatch.away.id] : []} /></div>
           </div>
           <div className="fsl-card p-4 flex justify-center bg-ink-950/60"><canvas ref={canvas} className={`rounded-xl border border-white/15 shadow-elev ${format === "9:16" ? "max-h-[78vh]" : "max-h-[78vh]"} max-w-full h-auto w-auto`} aria-label="Anteprima grafica" data-testid="studio-canvas" /></div>
           <p className="text-xs text-fsl-slate flex items-center gap-1"><ImageIcon className="h-3.5 w-3.5" /> I nomi dei bambini compaiono per intero solo con il consenso delle famiglie; le grafiche usano solo dati ufficiali.</p>
