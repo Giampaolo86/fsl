@@ -126,6 +126,9 @@ async def reset_mfa(user_id: str, user: CurrentUser = Depends(require_roles("dir
         raise forbidden("Solo un Super Admin può azzerare la MFA di un Direttore")
     await users.update(target.id, {"mfa_enabled": False, "mfa_secret": None, "mfa_pending_secret": None, "mfa_recovery_codes": []}, user.id)
     revoked = await sessions.revoke_user_sessions(target.id, reason="mfa_reset")
+    from .auth import forget_devices
+
+    await forget_devices(target.id)
     await audit.record(user, "user.mfa_reset", "user", target.id, after={"sessions_revoked": revoked})
     return {"ok": True}
 

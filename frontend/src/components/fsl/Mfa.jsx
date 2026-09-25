@@ -44,18 +44,20 @@ export function MfaSetup({ begin, confirm, onDone, intro }) {
 
 export function MfaChallenge({ email, verify }) {
   const [code, setCode] = useState("");
+  const [remember, setRemember] = useState(true);
   const [recovery, setRecovery] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setError("");
-    try { const out = await verify(code); if (out.recovery_codes_left != null) toast.warning(`Codice di recupero usato: te ne restano ${out.recovery_codes_left}`); } catch (err) { setError(apiError(err)); } finally { setBusy(false); }
+    try { const out = await verify(code, remember); if (out.recovery_codes_left != null) toast.warning(`Codice di recupero usato: te ne restano ${out.recovery_codes_left}`); } catch (err) { setError(apiError(err)); } finally { setBusy(false); }
   };
   return (
     <form onSubmit={submit} className="space-y-5" data-testid="mfa-challenge">
       <div className="flex items-start gap-3 text-sm text-fsl-white/85"><KeyRound className="h-5 w-5 text-fsl-gold shrink-0 mt-0.5" /><p>Ciao <strong>{email}</strong>: {recovery ? "inserisci uno dei tuoi codici di recupero (formato XXXX-XXXX)." : "apri l'app Authenticator e inserisci il codice a 6 cifre."}</p></div>
       <label className="block"><span className="fsl-label">{recovery ? "Codice di recupero" : "Codice di verifica"}</span><CodeInput value={code} onChange={setCode} placeholder={recovery ? "AB12-CD34" : "123456"} /></label>
       {error && <p role="alert" className="text-sm text-fsl-danger" data-testid="mfa-error">{error}</p>}
+      {!recovery && <label className="flex items-start gap-2 text-xs text-fsl-white/85 cursor-pointer"><input type="checkbox" className="mt-0.5 accent-[#F4AE2B]" checked={remember} onChange={(e) => setRemember(e.target.checked)} data-testid="mfa-remember" /><span>Ricorda questo dispositivo per 30 giorni: al prossimo accesso da qui non ti chiederemo il codice.</span></label>}
       <button type="submit" disabled={busy || code.trim().length < 6} className="btn-primary w-full" data-testid="mfa-verify-submit">{busy ? "Verifica…" : "Conferma"}</button>
       <button type="button" className="text-xs text-fsl-slate hover:text-fsl-white underline w-full" onClick={() => { setRecovery(!recovery); setCode(""); setError(""); }} data-testid="mfa-toggle-recovery">{recovery ? "Ho di nuovo il telefono: usa il codice dell'app" : "Ho perso il telefono: usa un codice di recupero"}</button>
     </form>

@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
     return data;
   }, [adopt]);
 
-  const mfaVerify = useCallback(async (challenge, code) => { const { data } = await api.post("/auth/mfa/verify", { challenge, code }); adopt(data); return data; }, [adopt]);
+  const mfaVerify = useCallback(async (challenge, code, remember = false) => { const { data } = await api.post("/auth/mfa/verify", { challenge, code, remember }); adopt(data); return data; }, [adopt]);
   const mfaSetupConfirm = useCallback(async (challenge, code) => { const { data } = await api.post("/auth/mfa/setup/confirm", { challenge, code }); setCsrfToken(data.csrf_token); return data; }, []);
   const register = useCallback(async (body) => { const { data } = await api.post("/auth/register", body); adopt(data); return data; }, [adopt]);
   const googleSession = useCallback(async (sessionId) => { const { data } = await api.post("/auth/google/session", { session_id: sessionId }); if (data.mfa_required || data.mfa_setup_required) return data; adopt(data); return data; }, [adopt]);

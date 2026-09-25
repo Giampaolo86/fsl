@@ -10,7 +10,7 @@ import { isPathAllowed } from "@/routes/ProtectedRoute";
 
 const HERO = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?crop=entropy&cs=srgb&fm=jpg&q=80&w=1800";
 const AREAS = {
-  genitori: { icon: Heart, kicker: "Genitori e tifosi", title: "Area Genitori", short: "Segui tuo figlio, la sua squadra e il torneo: risultati, Top 11, foto e video.", desc: "Accedi con email e password. Nessun account Google necessario.", tone: "border-fsl-gold bg-fsl-gold/10" },
+  genitori: { icon: Heart, kicker: "Genitori e tifosi", title: "Genitori e tifosi", short: "Segui tuo figlio, la tua squadra del cuore e il torneo: risultati, Top 11, foto e video.", desc: "Accedi con email e password. Nessun account Google necessario.", tone: "border-fsl-gold bg-fsl-gold/10" },
   societa: { icon: Users, kicker: "Società", title: "Area Società", short: "Rose, convocazioni, foto giocatori, blog e vendite della tua società.", desc: "Entra con le credenziali create dall'organizzazione, con un codice invito o richiedendo l'accesso.", tone: "border-white/15 hover:border-fsl-gold/60" },
   arbitri: { icon: Flag, kicker: "Arbitri", title: "Area Arbitri", short: "Referti, tabellini e ufficializzazione delle gare che dirigi.", desc: "Usa le credenziali ricevute dall'organizzazione.", tone: "border-white/15 hover:border-fsl-gold/60" },
   staff: { icon: Settings, kicker: "Staff e operatori", title: "Control Room", short: "Admin, Direttore e Segreteria: tornei, motore gare, Studio, pagamenti.", desc: "Credenziali riservate con verifica in due passaggi.", tone: "border-white/15 hover:border-fsl-gold/60" },
@@ -44,7 +44,8 @@ export default function Login() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const area = new URLSearchParams(location.search).get("area") || inferArea(location.state?.from);
+  const qs = new URLSearchParams(location.search);
+  const area = qs.has("scegli") ? null : qs.get("area") || inferArea(location.state?.from);
   const A = AREAS[area] || null;
   const target = (u, fallback) => { const from = location.state?.from; return from && from !== "/login" && from !== "/registrati" && isPathAllowed(u, from) ? from : fallback; };
   const setupBegin = useCallback(() => mfaApi.setupBegin(step?.challenge), [step]);
@@ -89,7 +90,7 @@ export default function Login() {
             <div className="lg:hidden mb-10"><Logo /></div>
             <div className="fsl-kicker">{step.mfa_setup_required ? "Configura la sicurezza" : "Verifica in due passaggi"}</div>
             <h2 className="text-4xl font-extrabold mt-1 mb-6">{step.mfa_setup_required ? "Proteggi il tuo account" : "Inserisci il codice"}</h2>
-            {step.mfa_setup_required ? <MfaSetup begin={setupBegin} confirm={(code) => mfaSetupConfirm(step.challenge, code).then((d) => { pending.current = d; return d; })} onDone={() => { const d = pending.current; setSession(d); navigate(target(d.user, d.landing), { replace: true }); }} /> : <MfaChallenge email={step.email} verify={(code) => mfaVerify(step.challenge, code)} />}
+            {step.mfa_setup_required ? <MfaSetup begin={setupBegin} confirm={(code) => mfaSetupConfirm(step.challenge, code).then((d) => { pending.current = d; return d; })} onDone={() => { const d = pending.current; setSession(d); navigate(target(d.user, d.landing), { replace: true }); }} /> : <MfaChallenge email={step.email} verify={(code, remember) => mfaVerify(step.challenge, code, remember)} />}
             <button type="button" className="mt-6 text-xs text-fsl-slate hover:text-fsl-white underline" onClick={() => setStep(null)} data-testid="mfa-back">Torna al login</button>
           </div>
         ) : !A ? <AreaChooser state={location.state} /> : (
@@ -97,7 +98,7 @@ export default function Login() {
           <div className="lg:hidden mb-10">
             <Logo />
           </div>
-          <Link to="/login" state={location.state} className="inline-flex items-center gap-1 text-xs text-fsl-slate hover:text-fsl-white mb-4" data-testid="login-change-area"><ArrowLeft className="h-3.5 w-3.5" /> Cambia area</Link>
+          <Link to="/login?scegli" state={location.state} className="inline-flex items-center gap-1 text-xs text-fsl-slate hover:text-fsl-white mb-4" data-testid="login-change-area"><ArrowLeft className="h-3.5 w-3.5" /> Cambia area</Link>
           <div className="fsl-kicker flex items-center gap-2"><A.icon className="h-3.5 w-3.5 text-fsl-gold" /> {A.kicker}</div>
           <h2 className="text-4xl font-extrabold mt-1">{A.title}</h2>
           <p className="mt-2 text-sm text-fsl-slate">{A.desc}</p>
@@ -130,7 +131,7 @@ export default function Login() {
               <Link to="/registrati" className="btn-gold w-full" data-testid="login-register-link">Non hai un account? Registrati gratis</Link>
               <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-fsl-slate"><span className="h-px flex-1 bg-white/10" />oppure, se preferisci<span className="h-px flex-1 bg-white/10" /></div>
               <GoogleButton />
-              <p className="text-xs text-fsl-slate">L'area genitori è gratuita: segui tuo figlio e la sua squadra, ricevi gli avvisi, acquista foto, video e la Card Player ID.</p>
+              <p className="text-xs text-fsl-slate">L'area genitori e tifosi è gratuita: segui tuo figlio o la tua squadra, ricevi gli avvisi, acquista foto, video e la Card Player ID.</p>
             </div>
           )}
           {area === "societa" && (
@@ -139,7 +140,7 @@ export default function Login() {
               <div className="grid grid-cols-2 gap-2"><Link to="/registrati-societa" className="btn-ghost w-full text-xs" data-testid="login-register-club-link">Ho un codice invito</Link><Link to="/richiedi-accesso" className="btn-ghost w-full text-xs" data-testid="login-request-access-link">Richiedi accesso</Link></div>
             </div>
           )}
-          {(area === "staff" || area === "arbitri") && <p className="mt-6 text-xs text-fsl-slate">Accesso riservato: le credenziali sono rilasciate dall'organizzazione. Sei un genitore? <Link to="/login?area=genitori" className="text-fsl-gold hover:underline">Vai all'area genitori</Link>.</p>}
+          {(area === "staff" || area === "arbitri") && <p className="mt-6 text-xs text-fsl-slate">Accesso riservato: le credenziali sono rilasciate dall'organizzazione. Sei un genitore o un tifoso? <Link to="/login?area=genitori" className="text-fsl-gold hover:underline">Vai all'area genitori e tifosi</Link>.</p>}
         </form>
         )}
       </section>

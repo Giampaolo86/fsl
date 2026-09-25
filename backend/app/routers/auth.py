@@ -11,6 +11,7 @@ from ..core import sessions
 from ..core.db import db
 from ..core.deps import CurrentUser, get_current_user, load_current_user, mfa_is_required
 from ..core.errors import ApiError
+from ..core.security import COOKIE_SAMESITE, COOKIE_SECURE
 from ..core.security import (
     clear_auth_cookies,
     create_access_token,
@@ -97,6 +98,8 @@ async def _after_credentials(request: Request, response: Response, u: User, via:
     if u.status != "active":
         raise ApiError(403, "DISABLED", "Account disabilitato")
     if u.mfa_enabled:
+        if await _trusted_device(request, u.id):
+            return await _start_session(request, response, u, mfa_verified=True, via=f"{via}_trusted_device")
         return {"mfa_required": True, "challenge": create_mfa_token(u.id, "verify"), "email": u.email}
     if mfa_is_required(u):
         return {"mfa_setup_required": True, "challenge": create_mfa_token(u.id, "setup"), "email": u.email}
@@ -197,6 +200,40 @@ async def google_session(body: GoogleSessionIn, request: Request, response: Resp
 class MfaVerifyIn(BaseModel):
     challenge: str
     code: str
+    remember: bool = False
+
+
+TRUST_DAYS = 30
+TRUST_COOKIE = "mfa_trust"
+
+
+def _trust_hash(token: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+async def _trusted_device(request: Request, uid: str) -> bool:
+    tok = request.cookies.get(TRUST_COOKIE)
+    if not tok:
+        return False
+    d = await db.mfa_devices.find_one({"user_id": uid, "token_hash": _trust_hash(tok), "revoked_at": None})
+    if not d or d["expires_at"].replace(tzinfo=None) <= utcnow().replace(tzinfo=None):
+        return False
+    await db.mfa_devices.update_one({"_id": d["_id"]}, {"$set": {"last_used_at": utcnow()}})
+    return True
+
+
+async def _remember_device(request: Request, response: Response, uid: str) -> None:
+    import secrets
+
+    tok = secrets.token_urlsafe(32)
+    await db.mfa_devices.insert_one({"user_id": uid, "token_hash": _trust_hash(tok), "created_at": utcnow(), "expires_at": utcnow() + timedelta(days=TRUST_DAYS), "last_used_at": utcnow(), "ip": _ip(request), "user_agent": (request.headers.get("user-agent") or "")[:200], "revoked_at": None})
+    response.set_cookie(TRUST_COOKIE, tok, httponly=True, secure=COOKIE_SECURE, samesite=COOKIE_SAMESITE, max_age=TRUST_DAYS * 86400, path="/api/auth")
+
+
+async def forget_devices(uid: str) -> None:
+    await db.mfa_devices.update_many({"user_id": uid, "revoked_at": None}, {"$set": {"revoked_at": utcnow()}})
 
 
 @router.post("/mfa/verify")
@@ -211,7 +248,10 @@ async def mfa_verify(body: MfaVerifyIn, request: Request, response: Response):
     code = body.code.strip()
     if verify_totp(decrypt_secret(u.mfa_secret), code):
         await _clear(ident)
-        return await _start_session(request, response, u, mfa_verified=True, via="login_mfa")
+        out = await _start_session(request, response, u, mfa_verified=True, via="login_mfa")
+        if body.remember:
+            await _remember_device(request, response, u.id)
+        return out
     h = hash_recovery_code(code)
     if len(re.sub(r"[^A-Za-z0-9]", "", code)) == 8 and h in (u.mfa_recovery_codes or []):
         await users.update(u.id, {"mfa_recovery_codes": [c for c in u.mfa_recovery_codes if c != h]})
@@ -362,6 +402,7 @@ async def logout(request: Request, response: Response):
 @router.post("/logout-all")
 async def logout_all(response: Response, user: CurrentUser = Depends(get_current_user)):
     n = await sessions.revoke_user_sessions(user.id, except_sid=user.sid, reason="logout_all")
+    await forget_devices(user.id)
     await audit.record(user, "auth.logout_all", "user", user.id, after={"revoked": n})
     return {"ok": True, "revoked": n}
 
@@ -470,6 +511,7 @@ async def reset_password(body: ResetIn, request: Request, response: Response):
     await users.update(u.id, {"password_hash": hash_password(body.password), "password_changed_at": utcnow(), "must_change_password": False})
     await db.password_resets.update_one({"_id": doc["_id"]}, {"$set": {"used_at": utcnow()}})
     await sessions.revoke_user_sessions(u.id, reason="password_reset")
+    await forget_devices(u.id)
     await audit.record(None, "auth.reset_password", "user", u.id)
     return {"ok": True, "email": u.email}
 

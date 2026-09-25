@@ -27,7 +27,7 @@ export function ForgotPassword() {
         <div className="fsl-card p-5 space-y-3" data-testid="forgot-done">
           <Mail className="h-6 w-6 text-fsl-gold" />
           {done.assisted ? <p className="text-sm">Richiesta registrata. L'organizzazione FSL vede la tua richiesta e ti farà avere il link per reimpostare la password (via WhatsApp, SMS o email) tramite il tuo referente. Se non ricevi nulla, scrivi a <a href="mailto:info@futurestarsleague.it" className="text-fsl-gold">info@futurestarsleague.it</a>.</p> : <p className="text-sm">Se l'indirizzo è registrato riceverai entro pochi minuti un'email con il link per scegliere una nuova password (valido 24 ore). Controlla anche la cartella spam.</p>}
-          <Link to="/login?area=genitori" className="btn-ghost w-full" data-testid="forgot-back">Torna al login</Link>
+          <Link to="/login" className="btn-ghost w-full" data-testid="forgot-back">Torna al login</Link>
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4" data-testid="forgot-form">

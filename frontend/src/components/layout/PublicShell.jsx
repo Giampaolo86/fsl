@@ -25,9 +25,9 @@ function UserActions({ user, landing, onLogout, mobile = false, onNav }) {
   if (!user) {
     return (
       <>
-        <Link to="/login?area=genitori" onClick={onNav} className={mobile ? cls : "btn-gold h-11 px-5 uppercase font-display tracking-wide shadow-[0_8px_24px_-10px_rgba(244,174,43,0.9)]"} data-testid="public-fan-login-link"><Heart className="h-4 w-4" aria-hidden="true" /> Area Genitori</Link>
+        <Link to="/login?area=genitori" onClick={onNav} className={mobile ? cls : "btn-gold h-11 px-5 uppercase font-display tracking-wide shadow-[0_8px_24px_-10px_rgba(244,174,43,0.9)]"} data-testid="public-fan-login-link"><Heart className="h-4 w-4" aria-hidden="true" /> Genitori e tifosi</Link>
         <Link to="/login" onClick={onNav} className={mobile ? cls : "btn-ghost h-11 px-4 uppercase font-display tracking-wide hidden md:inline-flex"} data-testid="public-area-societa-link"><UserRound className="h-4 w-4" aria-hidden="true" /> Società e staff</Link>
-        {mobile && <Link to="/registrati" onClick={onNav} className={cls} data-testid="public-fan-register-link">Registrati gratis (genitori)</Link>}
+        {mobile && <Link to="/registrati" onClick={onNav} className={cls} data-testid="public-fan-register-link">Registrati gratis (genitori e tifosi)</Link>}
       </>
     );
   }
