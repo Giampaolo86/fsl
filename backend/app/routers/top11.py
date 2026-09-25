@@ -46,6 +46,24 @@ async def generate(tournament_id: str, body: GenerateIn, user: CurrentUser = Dep
     return out
 
 
+@router.get("/scorers")
+async def scorers(tournament_id: str, competition_id: str, match_day: int, user: CurrentUser = Depends(get_current_user)):
+    """Marcatori della giornata (solo tabellini ufficiali) per il poster del Social Studio."""
+    from collections import defaultdict
+
+    await require_tournament(tournament_id, user, roles=STAFF)
+    cands, _ = await svc.candidates(tournament_id, competition_id, match_day)
+    agg = defaultdict(lambda: {"goals": 0, "assists": 0, "c": None})
+    for c in cands:
+        if c["goals"] or c["assists"]:
+            a = agg[c["player_id"]]
+            a["goals"] += c["goals"]
+            a["assists"] += c["assists"]
+            a["c"] = c
+    out = [{"name": a["c"]["public_name"] if a["c"]["public_ok"] else "Giocatore", "photo_url": a["c"]["photo_url"] if a["c"]["public_ok"] else None, "team": a["c"]["team"], "club": a["c"].get("club", ""), "crest_url": a["c"].get("crest_url"), "colors": a["c"].get("colors"), "role": a["c"]["role"], "shirt_number": a["c"]["shirt_number"], "goals": a["goals"], "assists": a["assists"], "fanta": a["c"]["fanta"]} for a in agg.values() if a["goals"]]
+    return sorted(out, key=lambda x: (-x["goals"], -x["assists"], x["name"]))
+
+
 @router.get("")
 async def list_top11(tournament_id: str, competition_id: Optional[str] = None, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user, roles=STAFF)

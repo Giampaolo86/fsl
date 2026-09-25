@@ -108,6 +108,8 @@ let webpackConfig = {
 };
 
 webpackConfig.devServer = (devServerConfig) => {
+  // Overlay dev: ignora gli errori cross-origin senza dettagli ("Script error.") e i loop di ResizeObserver
+  devServerConfig.client = { ...(devServerConfig.client || {}), overlay: { errors: true, warnings: false, runtimeErrors: (err) => !/^Script error\.?$|ResizeObserver loop/.test(String((err && err.message) || err || "")) } };
   // Add health check endpoints if enabled
   if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
     const originalSetupMiddlewares = devServerConfig.setupMiddlewares;

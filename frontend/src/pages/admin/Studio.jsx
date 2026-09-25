@@ -34,7 +34,7 @@ export default function Studio() {
   const dayMatches = useMemo(() => matches.filter((m) => String(m.match_day) === day).sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at)), [matches, day]);
   const finalMatches = useMemo(() => dayMatches.filter((m) => FINAL.includes(m.status)), [dayMatches]);
   useEffect(() => { setMatchId(finalMatches[0]?.id || ""); }, [finalMatches]);
-  useEffect(() => { if (tpl === "fulltime" || tpl === "mvp") { const played = matches.filter((m) => FINAL.includes(m.status)).map((m) => m.match_day); if (played.length && !dayMatches.some((m) => FINAL.includes(m.status))) setDay(String(Math.max(...played))); } }, [tpl, matches, dayMatches]);
+  useEffect(() => { if (tpl === "fulltime" || tpl === "mvp" || tpl === "scorers") { const played = matches.filter((m) => FINAL.includes(m.status)).map((m) => m.match_day); if (played.length && !dayMatches.some((m) => FINAL.includes(m.status))) setDay(String(Math.max(...played))); } }, [tpl, matches, dayMatches]);
   const renderToken = useRef(0);
   const comp = comps?.find((c) => c.id === compId);
   const sponsors = t?.settings?.sponsors || [];
@@ -55,6 +55,7 @@ export default function Studio() {
       try {
         const opts = { sponsor, headline: headline.trim() || undefined };
         if (tpl === "matchday") await template.render(ctx, W, H, { tournament: t.name, competition: comp.name, match_day: day, matches: dayMatches.map((m) => ({ ...m, home: side(m.home), away: side(m.away) })) }, opts);
+        else if (tpl === "scorers") { const { data } = await api.get(`/tournaments/${tid}/top11/scorers`, { params: { competition_id: compId, match_day: Number(day) } }); await template.render(ctx, W, H, { tournament: t.name, competition: comp.name, match_day: day, rows: data }, opts); }
         else if (tpl === "standings") { const { data } = await api.get(`/tournaments/${tid}/standings`, { params: { competition_id: compId } }); const rows = data[0]?.rows || []; await template.render(ctx, W, H, { tournament: t.name, competition: comp.name, rows, match_day: Math.max(0, ...matches.filter((m) => FINAL.includes(m.status)).map((m) => m.match_day)) || null }, opts); }
         else if (tpl === "top11") { if (!top11Id) throw new Error("Nessuna Top 11 elaborata per questa competizione"); const { data } = await api.get(`/tournaments/${tid}/top11/${top11Id}`); await template.render(ctx, W, H, { doc: data, competition: comp }, opts); }
         else { if (!matchId) throw new Error("Nessuna gara ufficiale nella giornata selezionata"); const { data } = await api.get(`/tournaments/${tid}/matches/${matchId}/social`); await template.render(ctx, W, H, data, opts); }
@@ -76,6 +77,7 @@ export default function Studio() {
     matchday: { title: `Matchday · ${comp?.name} · Giornata ${day}`, excerpt: `Le gare della giornata ${day} di ${comp?.name}: orari e campi.`, kind: "news" },
     fulltime: { title: selMatch ? `${mName(selMatch.home)} ${selMatch.score?.home}-${selMatch.score?.away} ${mName(selMatch.away)}` : "Full Time", excerpt: `Il risultato finale della gara${dayLabel} di ${comp?.name}.`, kind: "match_story" },
     mvp: { title: selMatch ? `MVP · ${mName(selMatch.home)} - ${mName(selMatch.away)}` : "MVP", excerpt: `Il migliore in campo della gara${dayLabel} di ${comp?.name}.`, kind: "match_story" },
+    scorers: { title: `Marcatori · ${comp?.name} · Giornata ${day}`, excerpt: `I marcatori della giornata ${day} di ${comp?.name}.`, kind: "news" },
     standings: { title: `Classifica · ${comp?.name}`, excerpt: `La classifica ufficiale aggiornata di ${comp?.name}.`, kind: "news" },
     top11: { title: `Top 11 · ${comp?.name} · Giornata ${top11s.find((k) => k.id === top11Id)?.match_day ?? ""}`, excerpt: `La formazione ideale della giornata di ${comp?.name}, in stile FIFA.`, kind: "news" },
   }[tpl];

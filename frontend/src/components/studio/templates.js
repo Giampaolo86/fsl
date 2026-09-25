@@ -123,6 +123,35 @@ export async function renderStandings(ctx, W, H, d, opts) {
   await drawPosterFooter(ctx, W, H, opts.sponsor, "SOLO RISULTATI UFFICIALI · FSL");
 }
 
+export async function renderScorers(ctx, W, H, d, opts) {
+  await loadFonts(); await drawStadium(ctx, W, H);
+  const scale = H < 1200 ? 0.5 : H > 1400 ? 0.9 : 0.66;
+  const top = (await drawPosterHeader(ctx, W, { gold: (opts.headline || "Marcatori").toUpperCase(), white: "DELLA SETTIMANA", sub: d.competition, pill: `Giornata ${d.match_day}`, hand: ["Chi ha fatto", "la differenza"], y0: H > 1400 ? 60 : 30, scale })) + 20;
+  const rows = d.rows.slice(0, H > 1400 ? 10 : H < 1200 ? 5 : 8);
+  if (!rows.length) { ctx.fillStyle = SLATE; ctx.font = F(700, 40); ctx.textAlign = "center"; ctx.fillText("NESSUN GOL UFFICIALE NELLA GIORNATA", W / 2, H / 2); await drawPosterFooter(ctx, W, H, opts.sponsor); return; }
+  await preload(rows.flatMap((r) => [r.photo_url, r.crest_url]));
+  const fy = H - 130, rowH = Math.min(104, Math.floor((fy - top - 30) / rows.length));
+  const medal = ["#F4AE2B", "#C9D3DE", "#C8811A"];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i], y = top + i * rowH, h = rowH - 10, podium = i < 3;
+    ctx.save(); if (podium) { ctx.shadowColor = medal[i]; ctx.shadowBlur = 20; }
+    ctx.fillStyle = podium ? "rgba(6,18,32,0.94)" : "rgba(3,19,31,0.82)"; ctx.beginPath(); ctx.roundRect(60, y, W - 120, h, 14); ctx.fill(); ctx.strokeStyle = podium ? medal[i] : "rgba(244,174,43,0.45)"; ctx.lineWidth = podium ? 3 : 1.5; ctx.stroke(); ctx.restore();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = podium ? medal[i] : "rgba(255,255,255,0.85)"; ctx.font = F(800, h * 0.5); ctx.fillText(String(i + 1), 100, y + h / 2 + 1);
+    const ps = h - 16, px = 140, py = y + 8; const img = await loadImg(r.photo_url);
+    ctx.save(); ctx.beginPath(); ctx.arc(px + ps / 2, py + ps / 2, ps / 2, 0, Math.PI * 2); ctx.clip(); ctx.fillStyle = r.colors?.primary || "#0B57D9"; ctx.fillRect(px, py, ps, ps); if (img) ctx.drawImage(img, px, py, ps, ps); else { ctx.fillStyle = "#fff"; ctx.font = F(800, ps * 0.5); ctx.fillText(String(r.shirt_number ?? "?"), px + ps / 2, py + ps / 2 + 2); } ctx.restore();
+    ctx.strokeStyle = podium ? medal[i] : "rgba(255,255,255,0.3)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px + ps / 2, py + ps / 2, ps / 2, 0, Math.PI * 2); ctx.stroke();
+    const [first, last] = splitName(r.name); ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = `600 ${Math.min(18, h * 0.22)}px Inter, Arial, sans-serif`; ctx.fillText(first.toUpperCase(), px + ps + 22, y + h * 0.3);
+    ctx.fillStyle = WHITE; ctx.font = F(800, Math.min(40, h * 0.46)); ctx.fillText(fit(ctx, (last || first).toUpperCase(), 420), px + ps + 22, y + h * 0.62);
+    const cx = W - 60 - 300; await crest(ctx, { name: r.club || r.team, colors: r.colors, crest_url: r.crest_url }, cx, y + h / 2 - 18, 36);
+    ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.font = `600 ${Math.min(16, h * 0.2)}px Inter, Arial, sans-serif`; ctx.textAlign = "left"; ctx.fillText(fit(ctx, (r.club || r.team).toUpperCase(), 150), cx + 44, y + h / 2 + 1);
+    ctx.fillStyle = "rgba(244,174,43,0.14)"; ctx.beginPath(); ctx.roundRect(W - 60 - 92, y + 8, 80, h - 16, 10); ctx.fill(); ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.textAlign = "center"; ctx.fillStyle = GOLD; ctx.font = F(800, Math.min(48, h * 0.58)); ctx.fillText(String(r.goals), W - 60 - 52, y + h / 2 - 4);
+    ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "600 11px Inter, Arial, sans-serif"; ctx.fillText(r.goals === 1 ? "GOL" : "GOL", W - 60 - 52, y + h - 16);
+  }
+  ctx.textBaseline = "top"; await drawPosterFooter(ctx, W, H, opts.sponsor, "SOLO TABELLINI UFFICIALI · FSL");
+}
+
 export async function renderTop11Template(ctx, W, H, d, opts) {
   await renderTop11(ctx, W, H, d.doc, d.competition, { sponsor: opts.sponsor ? { name: opts.sponsor.name, logo: opts.sponsor.logo_url } : null });
 }
@@ -132,5 +161,6 @@ export const TEMPLATES = [
   { key: "fulltime", label: "Full Time", desc: "Risultato finale, marcatori e MVP", needs: "match", render: renderFullTime },
   { key: "mvp", label: "MVP", desc: "Card speciale del migliore in campo", needs: "match", render: renderMvp },
   { key: "standings", label: "Classifica", desc: "Classifica ufficiale aggiornata", needs: "comp", render: renderStandings },
+  { key: "scorers", label: "Marcatori", desc: "I marcatori della giornata in stile poster", needs: "day", render: renderScorers },
   { key: "top11", label: "Top 11", desc: "La formazione ideale in stile FIFA", needs: "top11", render: renderTop11Template },
 ];

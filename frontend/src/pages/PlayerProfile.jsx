@@ -106,6 +106,7 @@ export default function PlayerProfile({ mode = "public" }) {
           </div>
         )}
         {idPreview && <PlayerIdOffer preview={idPreview} onBuy={buyCard} busy={buyingCard} />}
+        {(card.public_ok || card.can_edit) && (slug || card?.tournament?.slug) && <Link to={`/tornei/${slug || card.tournament.slug}/giocatori/${playerId}/capsule`} className="fsl-card p-4 flex items-center gap-4 hover:border-fsl-gold/50 transition-colors" data-testid="player-capsule-link"><span className="h-12 w-12 rounded-2xl bg-fsl-gold/15 border border-fsl-gold/40 inline-flex items-center justify-center font-display font-extrabold text-fsl-gold">TC</span><div className="flex-1"><div className="font-display font-extrabold uppercase text-lg leading-none">FSL Time Capsule</div><div className="text-xs text-fsl-slate mt-1">L'album digitale della stagione: numeri, partite, momenti Top 11, badge e foto · anteprima</div></div><span className="text-fsl-gold text-sm font-bold">Apri →</span></Link>}
         {(card.public_ok || card.can_edit) && <section><h2 className="fsl-section-title mb-3">La mia cartolina</h2><PlayerPostcard card={card} colors={card.club?.colors} /></section>}
         {(card.public_ok || card.can_edit) && (
           <section className="relative overflow-hidden rounded-2xl border border-fsl-gold/30 bg-navy-800 p-6 md:p-8 grid md:grid-cols-[1fr_auto] items-center gap-6" data-testid="album-offer">

@@ -78,6 +78,53 @@ async def upload_photo(tournament_id: str, player_id: str, file: UploadFile = Fi
     return p2.public()
 
 
+@router.post("/players/photos/bulk")
+async def upload_photos_bulk(tournament_id: str, files: list[UploadFile] = File(...), club_id: Optional[str] = None, user: CurrentUser = Depends(get_current_user)):
+    """Caricamento massivo: abbina ogni file al giocatore per numero di maglia (10.jpg), nome (mario-rossi.jpg / rossi_mario.jpg) o id."""
+    import re
+    import unicodedata
+
+    from .extras import can_edit_player
+
+    t, role = await require_tournament(tournament_id, user, roles={"super_admin", "director", "secretary", "club_manager"}, writable=True)
+    repo = scoped("players", tournament_id)
+    q = {"club_id": club_id} if club_id else {}
+    if role == "club_manager":
+        q["club_id"] = user.club_in(tournament_id)
+    players = await repo.list(q, limit=2000)
+    norm = lambda x: re.sub(r"[^a-z0-9]+", "", unicodedata.normalize("NFKD", x or "").encode("ascii", "ignore").decode().lower())  # noqa: E731
+    by_name, by_num, by_id = {}, {}, {p.id: p for p in players}
+    for p in players:
+        by_name.setdefault(norm(p.first_name + p.last_name), []).append(p)
+        by_name.setdefault(norm(p.last_name + p.first_name), []).append(p)
+        if p.shirt_number is not None:
+            by_num.setdefault(str(p.shirt_number), []).append(p)
+    results = []
+    for f in files:
+        stem = re.sub(r"\.[a-z0-9]+$", "", (f.filename or "").lower()).strip()
+        key = norm(stem)
+        cands = by_id.get(stem, None) and [by_id[stem]] or by_num.get(re.sub(r"\D", "", stem) if stem.isdigit() else "", []) or by_name.get(key, [])
+        if len(cands) != 1:
+            results.append({"file": f.filename, "status": "ambiguo" if len(cands) > 1 else "non_trovato", "candidates": [f"{p.first_name} {p.last_name}" for p in cands[:5]]})
+            continue
+        p = cands[0]
+        if not (f.content_type or "").startswith("image/"):
+            results.append({"file": f.filename, "status": "non_immagine", "player": f"{p.first_name} {p.last_name}"})
+            continue
+        if not await can_edit_player(user, tournament_id, p):
+            results.append({"file": f.filename, "status": "non_autorizzato", "player": f"{p.first_name} {p.last_name}"})
+            continue
+        data = await f.read()
+        if len(data) > 8 * 1024 * 1024:
+            results.append({"file": f.filename, "status": "troppo_grande", "player": f"{p.first_name} {p.last_name}"})
+            continue
+        m = await _store(tournament_id, _square(data), "image/jpeg", "player.jpg", user.id, p.club_id)
+        await repo.update(p.id, {"photo_url": f"/api/media/{m.id}", "photo_pending_url": None, "photo_pending_by": None}, user.id)
+        await audit.record(user, "player.photo", "player", p.id, tournament_id, after={"media_id": m.id, "bulk": True})
+        results.append({"file": f.filename, "status": "ok", "player": f"{p.first_name} {p.last_name}", "player_id": p.id, "photo_url": f"/api/media/{m.id}"})
+    return {"results": results, "ok": sum(r["status"] == "ok" for r in results), "total": len(results)}
+
+
 @router.post("/players/{player_id}/photo/review")
 async def review_photo(tournament_id: str, player_id: str, body: dict, user: CurrentUser = Depends(get_current_user)):
     from .extras import can_edit_player

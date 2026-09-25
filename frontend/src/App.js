@@ -17,6 +17,7 @@ import Studio from "@/pages/admin/Studio";
 import { WeeklyDetail, WeeklyList } from "@/pages/public/WeeklyPublic";
 import { ClubHistory, HallOfFame, SeasonArchive } from "@/pages/public/HallOfFame";
 import Legacy from "@/pages/admin/Legacy";
+import TimeCapsule from "@/pages/public/TimeCapsule";
 import { TabbedSection } from "@/components/fsl/SectionTabs";
 import Hub from "@/pages/admin/Hub";
 import NewTournament from "@/pages/admin/NewTournament";
@@ -173,6 +174,7 @@ function AppRoutes() {
                 <Route path="squadre" element={<PublicClubs />} />
                 <Route path="squadre/:clubSlug" element={<PublicClubHome />} />
                 <Route path="giocatori/:playerId" element={<PlayerProfile mode="public" />} />
+                <Route path="giocatori/:playerId/capsule" element={<TimeCapsule />} />
                 <Route path="prodotti/:token" element={<DigitalProduct />} />
                 <Route path="classifiche" element={<PublicStandingsLive />} />
                 <Route path="regolamento" element={<PublicRules />} />

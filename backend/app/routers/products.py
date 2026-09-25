@@ -187,3 +187,32 @@ async def team_card_preview(slug: str, team_id: str):
     d = await team_card_payload(t, tm)
     d["preview"] = True
     return d
+
+
+@router.get("/public/tournaments/{slug}/players/{player_id}/capsule")
+async def time_capsule(slug: str, player_id: str, request: Request):
+    """FSL Time Capsule: album digitale della stagione (anteprima). Solo dati ufficiali; nomi completi solo con consenso o per il genitore abbinato."""
+    from .extras import can_edit_player
+    from .fans import optional_user
+
+    t = await _tournament(slug)
+    p = await scoped("players", t.id).get(player_id)
+    if not p:
+        raise not_found("Giocatore")
+    user = await optional_user(request)
+    full = bool(user and await can_edit_player(user, t.id, p))
+    if not (p.profile_visibility == "public" and p.media_consent) and not full:
+        raise forbidden("La Time Capsule è disponibile solo con il consenso della famiglia o per il genitore abbinato")
+    card = await player_card_payload(t, p, False, full)
+    album = await album_payload(t, p, full)
+    hist = card.get("history") or []
+    best = max(hist, key=lambda h: (h.get("fanta") or 0), default=None)
+    chapters = [
+        {"key": "cover", "title": "La mia stagione", "subtitle": f"{t.name} · {t.season_label or ''}".strip(" ·")},
+        {"key": "numbers", "title": "I miei numeri", "subtitle": "Presenze, gol, assist, media fantavoto"},
+        {"key": "matches", "title": "Partita per partita", "subtitle": f"{len(hist)} gare ufficiali"},
+        {"key": "top11", "title": "I momenti Top 11", "subtitle": f"{len(card.get('top11') or [])} presenze nella formazione ideale"},
+        {"key": "badges", "title": "Badge e riconoscimenti", "subtitle": f"{len(card.get('badges') or [])} badge conquistati"},
+        {"key": "gallery", "title": "Foto e ricordi", "subtitle": f"{len(album['photos'])} immagini"},
+    ]
+    return {"tournament": album["tournament"], "card": card, "history": hist, "best_match": best, "top11": card.get("top11") or [], "badges": card.get("badges") or [], "photos": album["photos"], "posts": album["posts"][:12], "chapters": chapters, "full": full, "preview": True, "product": {"printable": False, "note": "Versione stampabile in arrivo: al momento l'album è consultabile online e scaricabile come Card Player ID."}}

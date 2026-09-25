@@ -90,6 +90,41 @@ async def my_children(user: CurrentUser = Depends(get_current_user)):
 
 
 # ---------- acquisti ----------
+@router.get("/me/feed")
+async def my_feed(user: CurrentUser = Depends(get_current_user)):
+    """Feed personale: prossime gare, risultati, FSL Weekly e Top 11 delle squadre seguite e dei figli abbinati."""
+    from ..core.db import db
+
+    fav = user.favorites or {}
+    now = datetime.now(timezone.utc)
+    items, followed_teams = [], {}
+    for t in await tournaments.list({"published": True}):
+        teams = {tm.id: tm for tm in await scoped("teams", t.id).list(limit=1000)}
+        clubs = {c.id: c for c in await scoped("clubs", t.id).list(limit=500)}
+        kids = await scoped("players", t.id).list({"guardian_emails": user.email.lower()}, limit=20)
+        fav_players = await scoped("players", t.id).list({"_id": {"$in": [__import__("bson").ObjectId(x) for x in fav.get("players", []) if len(x) == 24]}}, limit=50) if fav.get("players") else []
+        tids = {p.team_id for p in kids + fav_players if p.team_id} | {x for x in fav.get("teams", []) if x in teams}
+        if not tids:
+            continue
+        followed_teams[t.id] = tids
+        comps = {teams[x].competition_id for x in tids if x in teams}
+        q = {"$or": [{"home_team_id": {"$in": list(tids)}}, {"away_team_id": {"$in": list(tids)}}]}
+        for m in await scoped("matches", t.id).list({**q, "status": {"$in": ["scheduled", "confirmed", "in_progress"]}, "kickoff_at": {"$gte": now.strftime("%Y-%m-%dT%H:%M")}}, sort=[("kickoff_at", 1)], limit=6):
+            items.append({"type": "upcoming", "date": m.kickoff_at, "match": await _slim_match(t, m, teams, clubs), "link": f"/tornei/{t.slug}/partite/{m.id}"})
+        for m in await scoped("matches", t.id).list({**q, "status": {"$in": FINAL}}, sort=[("kickoff_at", -1)], limit=6):
+            items.append({"type": "result", "date": m.kickoff_at, "match": await _slim_match(t, m, teams, clubs), "link": f"/tornei/{t.slug}/partite/{m.id}"})
+        compn = {c.id: c.name for c in await scoped("competitions", t.id).list(limit=200)}
+        for w in await db.weekly_issues.find({"tournament_id": t.id, "competition_id": {"$in": list(comps)}, "status": "published"}, {"content": 0}).sort([("published_at", -1)]).to_list(3):
+            items.append({"type": "weekly", "date": w["published_at"].isoformat() if hasattr(w["published_at"], "isoformat") else str(w["published_at"]), "title": w["editorial"]["title"], "subtitle": f"{compn.get(w['competition_id'], '')} · Giornata {w['match_day']}", "excerpt": w["editorial"].get("intro", "")[:180], "link": f"/tornei/{t.slug}/weekly/{w['_id']}"})
+        mine = {p.id for p in kids + fav_players}
+        for d in await db.top11.find({"tournament_id": t.id, "competition_id": {"$in": list(comps)}, "status": "published"}).sort([("match_day", -1)]).to_list(3):
+            picks = [s["player"] for s in d["lineup"] if s.get("player") and (s["player"]["player_id"] in mine or s["player"].get("team_id") in tids)]
+            items.append({"type": "top11", "date": d.get("published_at").isoformat() if hasattr(d.get("published_at"), "isoformat") else str(d.get("published_at") or ""), "title": f"Top 11 · Giornata {d['match_day']}", "subtitle": compn.get(d["competition_id"], ""), "picks": [{"name": p.get("public_name") if p.get("public_ok") else "Giocatore", "role": p.get("role"), "fanta": p.get("fanta"), "team": p.get("team"), "mine": p["player_id"] in mine} for p in picks], "link": f"/tornei/{t.slug}/top11?competition_id={d['competition_id']}&match_day={d['match_day']}"})
+    upcoming = sorted([i for i in items if i["type"] == "upcoming"], key=lambda i: i["date"])[:6]
+    rest = sorted([i for i in items if i["type"] != "upcoming"], key=lambda i: i["date"] or "", reverse=True)[:20]
+    return {"upcoming": upcoming, "timeline": rest, "following": sum(len(v) for v in followed_teams.values())}
+
+
 @router.get("/me/purchases")
 async def my_purchases(user: CurrentUser = Depends(get_current_user)):
     from ..models.domain import PaidMedia, Purchase
