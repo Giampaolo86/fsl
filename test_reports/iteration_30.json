@@ -1,0 +1,25 @@
+{
+  "summary": "Iteration 30 QA — Social Studio save flow (desktop download vs mobile preview dialog), custom external base image, sticker composition + download, remove/reset, publish draft, and 18-club-crest showcase seed fix. Backend pytest /app/backend/tests/test_iteration30.py: 2/2 passed (all 18 demo clubs on la-serie-a-dei-bambini now have crest_is_placeholder=false with crest_url under /api/media/…; sampled 3 crests return 200 image/png). Frontend Playwright (chromium): Desktop 1440x900 login as direttore@fsl.demo + TOTP → /admin/t/{TID}/studio: studio-back link visible (href=/admin/t/{tid}); studio-download triggers a Playwright download event (fsl-matchday-campionato-2014-serie-a-4x5.png), URL still contains /studio, canvas still present. Custom base image (600x400 solid red PNG) uploaded via studio-base-image-input → studio-base-image-thumb visible, canvas re-renders after 'rendering…' clears, center pixel becomes [220,30,30,255] confirming cover-fit; studio-sticker-mvp adds a layer (header text ‘1 livelli’); second studio-download works with base+sticker; studio-base-image-remove hides thumb; studio-reset toasts 'Post base ripristinato'. Mobile emulation (iPhone UA, 390x844, is_mobile=True, has_touch=True): studio-download → studio-save-preview dialog appears with studio-save-preview-img naturalWidth=1080; studio-save-download triggers a download; studio-save-back closes dialog and studio remains. With a custom base image uploaded on mobile ctx, studio-publish → studio-publish-mode-draft → studio-publish-submit produced toast 'Bozza creata nel blog Apri blog'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": [
+    {"screen": "Admin Studio (all pages using <select><option>{expr}</select>)", "issues": ["React hydration warning: '<span> cannot be a child of <option>' emitted for select-with-dynamic-children patterns (studio-day, studio-competition, etc.). Non-blocking but pollutes console; consider avoiding wrapper spans inside <option> or disabling the dev instrumentation wrapper for option children."]}
+  ]},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration30.py",
+    "/app/test_reports/pytest/iteration30.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SaveImage.jsx isTouch() uses a UA regex — will also treat iPad Pro (masquerading as Mac) or Android tablets in desktop-mode as touch. Consider matchMedia('(pointer: coarse)') as a supplementary signal.",
+    "SaveImage.jsx useSaveImage: setPreview({url,file}) creates ObjectURL, and close() revokes only current preview. If user opens preview twice without closing (edge case), stale ObjectURL from previous preview is leaked. Minor.",
+    "Studio.jsx line 74: fillStyle '#03131F' is hardcoded — consider centralising the studio background color (also duplicated in error fallback line 85 as '#041E32').",
+    "Studio.jsx: baseImage effect returns early without composing layers on top of the uploaded image because it commits the plain uploaded image as baseRef, then compositing effect draws layers on top — verified working. But the ‘Ripristina post base’ toast fires from reset() even if nothing was set; harmless."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration30.py"],
+  "success_rate": {"backend": "100% (2/2)", "frontend": "100% on all requested scenarios"},
+  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "seed_data_creation": "Created 1 draft blog post via studio-publish flow (kind=news, title 'Matchday · Campionato 2014 Serie A · Giornata 0'). Main agent may want to delete it if pristine seed state matters.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Studio flow is fully functional end-to-end. The 18-clubs crest fix (seed_showcase.py) is verified — all 18 demo clubs (excluding qa-* and nuova-polisportiva-*) return crest_is_placeholder=false. When testing Studio in Playwright: use context.expect_download for the download button; for mobile, create a separate context with is_mobile+has_touch+iPhone UA (already patterned in this run) — the app relies on UA regex for the isTouch branch. The <select><option> hydration warning is pre-existing and orthogonal to this iteration."
+}
