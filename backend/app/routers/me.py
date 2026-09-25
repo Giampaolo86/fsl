@@ -2,7 +2,6 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends
 
-from ..core.db import db
 from ..core.deps import CurrentUser, get_current_user
 from ..core.errors import forbidden, not_found
 from ..repositories.registry import scoped, tournaments

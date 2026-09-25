@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation, useParams } from "react-router-dom";
-import { Archive, Award, BarChart3, Calendar, ClipboardList, CreditCard, FileText, Grid3X3, Image, LayoutGrid, LogOut, Menu, Phone, Settings, Shield, ShoppingBag, Ticket, Trophy, UserCog, Users, X } from "lucide-react";
+import { Link, NavLink, Outlet, useLocation, useParams } from "react-router-dom";
+import { Archive, Award, BarChart3, Calendar, ClipboardList, CreditCard, FileText, Grid3X3, Image, LayoutGrid, LogOut, Menu, Phone, Settings, Shield, ShoppingBag, Ticket, Trophy, UserCog, Users, X, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { TournamentSwitcher } from "@/components/fsl/TournamentSwitcher";
 import { OfflineBanner } from "@/components/fsl/States";
@@ -100,7 +100,8 @@ export default function AdminShell() {
         <div className="text-sm font-semibold truncate" data-testid="sidebar-user-name">
           {user.full_name}
         </div>
-        <button onClick={logout} className="mt-3 flex items-center gap-2 text-xs text-fsl-slate hover:text-fsl-white transition-colors" data-testid="logout-button">
+        <Link to="/sicurezza" className="mt-3 flex items-center gap-2 text-xs text-fsl-slate hover:text-fsl-white transition-colors" data-testid="security-link"><ShieldCheck className="h-3.5 w-3.5" /> Sicurezza account</Link>
+        <button onClick={logout} className="mt-2 flex items-center gap-2 text-xs text-fsl-slate hover:text-fsl-white transition-colors" data-testid="logout-button">
           <LogOut className="h-4 w-4" aria-hidden="true" /> Log out
         </button>
       </div>

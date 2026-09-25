@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
-import { Facebook, Heart, Instagram, LogOut, Menu, UserRound, X, Youtube } from "lucide-react";
+import { Facebook, Heart, Instagram, LogOut, Menu, ShieldCheck, UserRound, X, Youtube } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { NotificationsBell } from "@/components/fsl/NotificationsBell";
 import { useAuth } from "@/context/AuthContext";
@@ -34,6 +34,7 @@ function UserActions({ user, landing, onLogout, mobile = false, onNav }) {
     return (
       <>
         <NavLink to="/account" onClick={onNav} className={({ isActive }) => `${cls} ${isActive && !mobile ? "border-fsl-gold/60" : ""}`} data-testid="public-fan-account-link"><Heart className="h-4 w-4" aria-hidden="true" /> I miei preferiti</NavLink>
+        <Link to="/sicurezza" onClick={onNav} className={cls} data-testid="public-fan-security"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> Sicurezza</Link>
         <button type="button" onClick={onLogout} className={cls} data-testid="public-fan-logout"><LogOut className="h-4 w-4" aria-hidden="true" /> Esci</button>
       </>
     );

@@ -1,6 +1,6 @@
 import uuid
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Optional
 
 from ..core.errors import bad_request, conflict

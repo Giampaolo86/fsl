@@ -1,5 +1,5 @@
-import { NavLink, Outlet } from "react-router-dom";
-import { CalendarDays, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, LogOut, Newspaper, Shield, Users } from "lucide-react";
+import { Link, NavLink, Outlet } from "react-router-dom";
+import { CalendarDays, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, LogOut, Newspaper, Shield, Users, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { OfflineBanner } from "@/components/fsl/States";
@@ -31,6 +31,7 @@ export default function ClubShell() {
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden sm:inline text-fsl-slate" data-testid="club-shell-user">{user.full_name}</span>
             <NotificationsBell />
+            <Link to="/sicurezza" className="h-11 w-11 rounded-md inline-flex items-center justify-center text-fsl-slate hover:text-fsl-white" aria-label="Sicurezza account" title="Sicurezza account" data-testid="security-link"><ShieldCheck className="h-4 w-4" /></Link>
             <button onClick={logout} className="btn-ghost h-11" data-testid="logout-button">
               <LogOut className="h-4 w-4" aria-hidden="true" /> <span className="hidden sm:inline">Esci</span>
             </button>

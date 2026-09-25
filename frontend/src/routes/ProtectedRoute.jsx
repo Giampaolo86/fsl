@@ -25,6 +25,7 @@ export function ProtectedRoute({ roles, children }) {
   const location = useLocation();
   if (checking) return <LoadingState label="Verifica sessione…" full />;
   if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  if (user.must_change_password && location.pathname !== "/cambia-password") return <Navigate to="/cambia-password" replace />;
   if (!canAccess(user, roles)) return <Navigate to={landingFor(user)} replace />;
   return children;
 }

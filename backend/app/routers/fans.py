@@ -5,9 +5,8 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
-from ..core.deps import CurrentUser, get_current_user, load_current_user, require_tournament
+from ..core.deps import CurrentUser, get_current_user, require_tournament
 from ..core.errors import bad_request, conflict, forbidden, not_found
-from ..core.security import decode_token
 from ..models.domain import ErrorReport
 from ..repositories.registry import Repository, scoped, tournaments, users
 from ..services import audit
@@ -18,12 +17,8 @@ FINAL = ["official", "rectified"]
 
 
 async def optional_user(request: Request) -> Optional[CurrentUser]:
-    token = request.cookies.get("access_token") or (request.headers.get("Authorization", "")[7:] if request.headers.get("Authorization", "").startswith("Bearer ") else None)
-    if not token:
-        return None
     try:
-        payload = decode_token(token)
-        return await load_current_user(payload["sub"])
+        return await get_current_user(request)
     except Exception:  # noqa: BLE001
         return None
 

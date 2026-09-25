@@ -9,6 +9,7 @@ import PublicShell from "@/components/layout/PublicShell";
 import ClubShell from "@/components/layout/ClubShell";
 import RefereeShell from "@/components/layout/RefereeShell";
 import Login from "@/pages/Login";
+import ChangePassword, { SecurityPage } from "@/pages/Security";
 import Hub from "@/pages/admin/Hub";
 import NewTournament from "@/pages/admin/NewTournament";
 import Overview from "@/pages/admin/Overview";
@@ -73,6 +74,8 @@ function AppRoutes() {
   return (
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/cambia-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
+              <Route path="/sicurezza" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
               <Route path="/registrati" element={<Register />} />
               <Route path="/registrati-societa" element={<RegisterClub />} />
               <Route path="/richiedi-accesso" element={<RequestAccess />} />

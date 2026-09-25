@@ -7,14 +7,14 @@ from pydantic import BaseModel, EmailStr
 
 from ..core.deps import CurrentUser, get_current_user, load_current_user, require_tournament
 from ..core.errors import bad_request, conflict, not_found
-from ..core.security import hash_password
+from ..core.security import hash_password, password_problem
 from ..models.base import utcnow
 from ..models.domain import AccessRequest, Club, ClubInvite, TournamentMembership, User
 from ..repositories.base import Repository
 from ..repositories.registry import memberships, scoped, tournaments, users
 from ..services import audit
 from ..services.tournaments import slugify
-from .auth import _issue
+from .auth import _start_session
 
 router = APIRouter(tags=["registration"])
 STAFF = {"super_admin", "director", "secretary"}
@@ -80,8 +80,9 @@ class RegisterClubIn(BaseModel):
 async def register_club(body: RegisterClubIn, request: Request, response: Response):
     if not body.privacy_accepted:
         raise bad_request("Devi accettare l'informativa privacy")
-    if len(body.password) < 8:
-        raise bad_request("La password deve avere almeno 8 caratteri")
+    problem = password_problem(body.password, body.email)
+    if problem:
+        raise bad_request(problem)
     if len(body.full_name.strip()) < 2:
         raise bad_request("Inserisci nome e cognome")
     inv = await _valid_invite(body.code)
@@ -95,7 +96,7 @@ async def register_club(body: RegisterClubIn, request: Request, response: Respon
     await invites.update(inv.id, {"used_by": u.id, "used_at": utcnow()}, u.id)
     current = await load_current_user(u.id)
     await audit.record(current, "auth.register_club", "user", u.id, inv.tournament_id, ip=request.client.host if request.client else None, after={"club_id": inv.club_id})
-    return _issue(response, current)
+    return await _start_session(request, response, u, mfa_verified=False, via="register_club")
 
 
 # ---------- richiesta libera ----------

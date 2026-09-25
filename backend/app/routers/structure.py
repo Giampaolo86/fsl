@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from ..core.deps import WRITE_ROLES, CurrentUser, get_current_user, require_tournament
-from ..core.errors import conflict, forbidden, not_found
+from ..core.errors import conflict, not_found
 from ..models.domain import Club, Field_, Team, Venue
 from ..repositories.registry import scoped
 from ..services import audit

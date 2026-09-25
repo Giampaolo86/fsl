@@ -1,16 +1,19 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { GoogleButton } from "@/components/fsl/GoogleButton";
+import { MfaChallenge, MfaSetup, mfaApi } from "@/components/fsl/Mfa";
 import { apiError } from "@/lib/api";
 import { isPathAllowed } from "@/routes/ProtectedRoute";
 
 const HERO = "https://images.unsplash.com/photo-1574629810360-7efbbe195018?crop=entropy&cs=srgb&fm=jpg&q=80&w=1800";
 
 export default function Login() {
-  const { user, landing, login } = useAuth();
+  const { user, landing, login, mfaVerify, mfaSetupConfirm, setSession } = useAuth();
+  const [step, setStep] = useState(null);
+  const pending = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -20,6 +23,7 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
 
   const target = (u, fallback) => { const from = location.state?.from; return from && from !== "/login" && from !== "/registrati" && isPathAllowed(u, from) ? from : fallback; };
+  const setupBegin = useCallback(() => mfaApi.setupBegin(step?.challenge), [step]);
   if (user) return <Navigate to={target(user, landing)} replace />;
 
   const submit = async (e) => {
@@ -28,6 +32,7 @@ export default function Login() {
     setError("");
     try {
       const data = await login(email, password);
+      if (data.mfa_required || data.mfa_setup_required) { setStep(data); return; }
       navigate(target(data.user, data.landing), { replace: true });
     } catch (err) {
       setError(apiError(err));
@@ -55,6 +60,15 @@ export default function Login() {
         </div>
       </section>
       <section className="flex items-center justify-center p-6 sm:p-12">
+        {step ? (
+          <div className="w-full max-w-sm animate-rise" data-testid="login-mfa-step">
+            <div className="lg:hidden mb-10"><Logo /></div>
+            <div className="fsl-kicker">{step.mfa_setup_required ? "Configura la sicurezza" : "Verifica in due passaggi"}</div>
+            <h2 className="text-4xl font-extrabold mt-1 mb-6">{step.mfa_setup_required ? "Proteggi il tuo account" : "Inserisci il codice"}</h2>
+            {step.mfa_setup_required ? <MfaSetup begin={setupBegin} confirm={(code) => mfaSetupConfirm(step.challenge, code).then((d) => { pending.current = d; return d; })} onDone={() => { const d = pending.current; setSession(d); navigate(target(d.user, d.landing), { replace: true }); }} /> : <MfaChallenge email={step.email} verify={(code) => mfaVerify(step.challenge, code)} />}
+            <button type="button" className="mt-6 text-xs text-fsl-slate hover:text-fsl-white underline" onClick={() => setStep(null)} data-testid="mfa-back">Torna al login</button>
+          </div>
+        ) : (
         <form onSubmit={submit} className="w-full max-w-sm animate-rise" data-testid="login-form">
           <div className="lg:hidden mb-10">
             <Logo />
@@ -94,6 +108,7 @@ export default function Login() {
           <div className="mt-3 grid grid-cols-2 gap-2"><Link to="/registrati-societa" className="btn-ghost w-full text-xs" data-testid="login-register-club-link">Ho un codice invito</Link><Link to="/richiedi-accesso" className="btn-ghost w-full text-xs" data-testid="login-request-access-link">Richiedi accesso</Link></div>
           <p className="mt-6 text-xs text-fsl-slate">Admin, Direttore, Segreteria e Arbitri usano le credenziali ricevute. Le società entrano con le credenziali create dall'organizzazione, con un codice invito o richiedendo l'accesso. Genitori e tifosi si registrano liberamente.</p>
         </form>
+        )}
       </section>
     </div>
   );

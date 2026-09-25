@@ -3,8 +3,9 @@ import os
 
 from .core.db import db
 from .core.security import hash_password, verify_password
+from .models.base import utcnow
 from .models.domain import Club, Organization, Team, TournamentMembership, User
-from .repositories.registry import memberships, organizations, scoped, settings_repo, tournaments, users
+from .repositories.registry import memberships, organizations, scoped, tournaments, users
 from .services import audit
 from .services.tournaments import competition_code, create_tournament, slugify
 
@@ -49,12 +50,25 @@ async def upsert_user(email: str, password: str, full_name: str, role: str, is_s
     email = email.lower()
     existing = await users.find_one({"email": email})
     if existing:
-        if not verify_password(password, existing.password_hash):
-            await users.update(existing.id, {"password_hash": hash_password(password)})
+        if is_super_admin and os.environ.get("ADMIN_FORCE_PASSWORD_RESET", "false").lower() == "true" and not verify_password(password, existing.password_hash):
+            await users.update(existing.id, {"password_hash": hash_password(password), "password_changed_at": utcnow()})
+            logging.getLogger("fsl").warning("Password Super Admin reimpostata da .env (ADMIN_FORCE_PASSWORD_RESET): rimuovi il flag")
         return existing
     return await users.insert(
-        User(email=email, password_hash=hash_password(password), full_name=full_name, role=role, is_super_admin=is_super_admin, mfa_required=role in ("super_admin", "director"))
+        User(email=email, password_hash=hash_password(password), full_name=full_name, role=role, is_super_admin=is_super_admin, mfa_required=role in ("super_admin", "director"), password_changed_at=utcnow())
     )
+
+
+async def enroll_demo_mfa(*demo_users):
+    """Account demo con MFA pre-configurata (secret da QA_TOTP_SECRET): mai in produzione."""
+    secret = os.environ.get("QA_TOTP_SECRET")
+    if not secret or os.environ.get("APP_ENV") == "production":
+        return
+    from .core.security import encrypt_secret
+
+    for u in demo_users:
+        if not u.mfa_enabled:
+            await users.update(u.id, {"mfa_enabled": True, "mfa_secret": encrypt_secret(secret), "mfa_recovery_codes": []})
 
 
 async def ensure_membership(user: User, tournament_id: str, role: str, club_id=None):
@@ -104,8 +118,11 @@ async def seed_all():
 
     actor = await load_current_user(admin.id)
 
-    if os.environ.get("SEED_DEMO", "true").lower() != "true":
+    if os.environ.get("APP_ENV") == "production" or os.environ.get("SEED_DEMO", "false").lower() != "true":
         return
+    qa_admin = await upsert_user("qa.superadmin@fsl.demo", "Demo1234!", "QA Super Admin", "super_admin", is_super_admin=True)
+    demo_director = await users.find_one({"email": "direttore@fsl.demo"})
+    await enroll_demo_mfa(*[u for u in (qa_admin, demo_director) if u])
     if await tournaments.find_one({"slug": "la-serie-a-dei-bambini"}):
         await seed_match_engine(actor)
         return

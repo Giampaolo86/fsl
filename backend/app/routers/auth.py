@@ -1,13 +1,36 @@
+import os
+import re
 from datetime import timedelta
+from typing import Optional
 
+import jwt
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, EmailStr
 
+from ..core import sessions
 from ..core.db import db
-from ..core.deps import CurrentUser, get_current_user, load_current_user
+from ..core.deps import CurrentUser, get_current_user, load_current_user, mfa_is_required
 from ..core.errors import ApiError
-from ..core.security import clear_auth_cookies, create_access_token, create_refresh_token, decode_token, set_auth_cookies, verify_password
+from ..core.security import (
+    clear_auth_cookies,
+    create_access_token,
+    create_mfa_token,
+    create_refresh_token,
+    decode_token,
+    decrypt_secret,
+    encrypt_secret,
+    hash_password,
+    hash_recovery_code,
+    new_recovery_codes,
+    new_totp_secret,
+    password_problem,
+    set_auth_cookies,
+    totp_uri,
+    verify_password,
+    verify_totp,
+)
 from ..models.base import utcnow
+from ..models.domain import User
 from ..repositories.registry import users
 from ..services import audit
 
@@ -15,14 +38,18 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 MAX_ATTEMPTS = 5
 LOCK_MINUTES = 15
+MAX_EMAIL_ATTEMPTS = 20
+MAX_MFA_ATTEMPTS = 6
 
 
-class LoginIn(BaseModel):
-    email: EmailStr
-    password: str
+def _ip(request: Request) -> Optional[str]:
+    fwd = request.headers.get("x-forwarded-for")
+    return (fwd.split(",")[0].strip() if fwd else None) or (request.client.host if request.client else None)
 
 
 def _landing(user: CurrentUser) -> str:
+    if user.must_change_password:
+        return "/cambia-password"
     if user.is_super_admin or user.role in ("director", "secretary"):
         return "/admin"
     if user.role == "referee":
@@ -32,29 +59,86 @@ def _landing(user: CurrentUser) -> str:
     return "/societa"
 
 
+def _demo_blocked(email: str) -> bool:
+    return os.environ.get("APP_ENV") == "production" and email.endswith("@fsl.demo")
+
+
+# ---------- brute force ----------
+async def _locked(identifier: str, limit: int) -> bool:
+    a = await db.login_attempts.find_one({"identifier": identifier})
+    return bool(a and a.get("count", 0) >= limit and a.get("expires_at") and a["expires_at"].replace(tzinfo=utcnow().tzinfo) > utcnow())
+
+
+async def _fail(identifier: str):
+    await db.login_attempts.update_one({"identifier": identifier}, {"$inc": {"count": 1}, "$set": {"expires_at": utcnow() + timedelta(minutes=LOCK_MINUTES)}}, upsert=True)
+
+
+async def _clear(*identifiers: str):
+    await db.login_attempts.delete_many({"identifier": {"$in": list(identifiers)}})
+
+
+# ---------- session issue ----------
+async def _start_session(request: Request, response: Response, u: User, mfa_verified: bool, via: str) -> dict:
+    current = await load_current_user(u.id)
+    if not current:
+        raise ApiError(403, "DISABLED", "Account disabilitato")
+    sid, jti, csrf = await sessions.create_session(u.id, _ip(request), request.headers.get("user-agent"), mfa_verified)
+    set_auth_cookies(response, create_access_token(u.id, u.email, sid), create_refresh_token(u.id, sid, jti), csrf)
+    await users.update(u.id, {"last_login_at": utcnow()})
+    current.sid = sid
+    await audit.record(current, f"auth.{via}", "user", u.id, ip=_ip(request))
+    out = {"user": current.to_public(), "landing": _landing(current), "csrf_token": csrf}
+    if request.headers.get("X-Client") == "api":
+        out["access_token"] = create_access_token(u.id, u.email, sid)
+    return out
+
+
+async def _after_credentials(request: Request, response: Response, u: User, via: str) -> dict:
+    if u.status != "active":
+        raise ApiError(403, "DISABLED", "Account disabilitato")
+    if u.mfa_enabled:
+        return {"mfa_required": True, "challenge": create_mfa_token(u.id, "verify"), "email": u.email}
+    if mfa_is_required(u):
+        return {"mfa_setup_required": True, "challenge": create_mfa_token(u.id, "setup"), "email": u.email}
+    return await _start_session(request, response, u, mfa_verified=False, via=via)
+
+
+def _challenge_user_id(token: str, purpose: str) -> str:
+    try:
+        payload = decode_token(token, expected_type="mfa")
+    except jwt.ExpiredSignatureError:
+        raise ApiError(401, "CHALLENGE_EXPIRED", "Tempo scaduto: accedi di nuovo")
+    except jwt.InvalidTokenError:
+        raise ApiError(401, "INVALID_TOKEN", "Richiesta non valida")
+    if payload.get("purpose") != purpose:
+        raise ApiError(401, "INVALID_TOKEN", "Richiesta non valida")
+    return payload["sub"]
+
+
+# ---------- login / register / google ----------
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
+
+
 @router.post("/login")
 async def login(body: LoginIn, request: Request, response: Response):
     email = body.email.lower()
-    identifier = f"{request.client.host if request.client else 'unknown'}:{email}"
-    attempt = await db.login_attempts.find_one({"identifier": identifier})
-    if attempt and attempt.get("count", 0) >= MAX_ATTEMPTS and attempt.get("expires_at") and attempt["expires_at"].replace(tzinfo=utcnow().tzinfo) > utcnow():
+    ident_ip = f"{_ip(request) or 'unknown'}:{email}"
+    ident_email = f"email:{email}"
+    if _demo_blocked(email):
+        raise ApiError(401, "INVALID_CREDENTIALS", "Email o password non corretti")
+    if await _locked(ident_ip, MAX_ATTEMPTS) or await _locked(ident_email, MAX_EMAIL_ATTEMPTS):
         raise ApiError(429, "LOCKED", "Troppi tentativi. Riprova tra 15 minuti")
     user = await users.find_one({"email": email})
-    if not user or not verify_password(body.password, user.password_hash) or user.status != "active":
-        await db.login_attempts.update_one(
-            {"identifier": identifier},
-            {"$inc": {"count": 1}, "$set": {"expires_at": utcnow() + timedelta(minutes=LOCK_MINUTES)}},
-            upsert=True,
-        )
+    if not user or not verify_password(body.password, user.password_hash):
+        await _fail(ident_ip)
+        await _fail(ident_email)
         raise ApiError(401, "INVALID_CREDENTIALS", "Email o password non corretti")
-    await db.login_attempts.delete_one({"identifier": identifier})
-    await users.update(user.id, {"last_login_at": utcnow()})
-    current = await load_current_user(user.id)
-    access = create_access_token(user.id, user.email)
-    refresh = create_refresh_token(user.id)
-    set_auth_cookies(response, access, refresh)
-    await audit.record(current, "auth.login", "user", user.id, ip=request.client.host if request.client else None)
-    return {"user": current.to_public(), "access_token": access, "landing": _landing(current)}
+    if user.status != "active":
+        raise ApiError(403, "DISABLED", "Account disabilitato: contatta l'organizzazione")
+    await _clear(ident_ip, ident_email)
+    return await _after_credentials(request, response, user, "login")
 
 
 class RegisterIn(BaseModel):
@@ -64,30 +148,20 @@ class RegisterIn(BaseModel):
     privacy_accepted: bool = False
 
 
-def _issue(response: Response, current: CurrentUser):
-    access = create_access_token(current.id, current.email)
-    set_auth_cookies(response, access, create_refresh_token(current.id))
-    return {"user": current.to_public(), "access_token": access, "landing": _landing(current)}
-
-
 @router.post("/register", status_code=201)
 async def register(body: RegisterIn, request: Request, response: Response):
-    from ..core.security import hash_password
-    from ..models.domain import User
-
     if not body.privacy_accepted:
         raise ApiError(400, "PRIVACY", "Accetta l'informativa privacy per continuare")
-    if len(body.password) < 8:
-        raise ApiError(400, "WEAK_PASSWORD", "La password deve avere almeno 8 caratteri")
+    email = body.email.lower()
+    problem = password_problem(body.password, email)
+    if problem:
+        raise ApiError(400, "WEAK_PASSWORD", problem)
     if len(body.full_name.strip()) < 2:
         raise ApiError(400, "NAME", "Inserisci nome e cognome")
-    email = body.email.lower()
     if await users.find_one({"email": email}):
         raise ApiError(409, "EMAIL_TAKEN", "Esiste già un account con questa email: accedi")
-    u = await users.insert(User(email=email, password_hash=hash_password(body.password), full_name=body.full_name.strip(), role="fan"))
-    current = await load_current_user(u.id)
-    await audit.record(current, "auth.register", "user", u.id, ip=request.client.host if request.client else None)
-    return _issue(response, current)
+    u = await users.insert(User(email=email, password_hash=hash_password(body.password), full_name=body.full_name.strip(), role="fan", password_changed_at=utcnow()))
+    return await _start_session(request, response, u, mfa_verified=False, via="register")
 
 
 class GoogleSessionIn(BaseModel):
@@ -100,55 +174,237 @@ async def google_session(body: GoogleSessionIn, request: Request, response: Resp
 
     import httpx
 
-    from ..core.security import hash_password
-    from ..models.domain import User
-
+    if await _locked(f"google:{_ip(request) or 'unknown'}", MAX_ATTEMPTS * 4):
+        raise ApiError(429, "LOCKED", "Troppi tentativi. Riprova più tardi")
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get("https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data", headers={"X-Session-ID": body.session_id})
     if r.status_code != 200:
+        await _fail(f"google:{_ip(request) or 'unknown'}")
         raise ApiError(401, "GOOGLE_SESSION", "Sessione Google non valida o scaduta")
     data = r.json()
     email = (data.get("email") or "").lower()
-    if not email:
+    if not email or _demo_blocked(email):
         raise ApiError(401, "GOOGLE_SESSION", "Email Google non disponibile")
     user = await users.find_one({"email": email})
     if not user:
-        user = await users.insert(User(email=email, password_hash=hash_password(secrets.token_urlsafe(24)), full_name=data.get("name") or email.split("@")[0], role="fan", picture=data.get("picture"), auth_provider="google"))
-    else:
-        await users.update(user.id, {"picture": data.get("picture") or user.picture, "last_login_at": utcnow()})
-    if user.status != "active":
-        raise ApiError(403, "DISABLED", "Account disabilitato")
-    current = await load_current_user(user.id)
-    await audit.record(current, "auth.google", "user", user.id, ip=request.client.host if request.client else None)
-    return _issue(response, current)
+        user = await users.insert(User(email=email, password_hash=hash_password(secrets.token_urlsafe(32)), full_name=data.get("name") or email.split("@")[0], role="fan", picture=data.get("picture"), auth_provider="google", password_changed_at=utcnow()))
+    elif data.get("picture") and data.get("picture") != user.picture:
+        user = await users.update(user.id, {"picture": data.get("picture")})
+    return await _after_credentials(request, response, user, "google")
 
 
+# ---------- MFA ----------
+class MfaVerifyIn(BaseModel):
+    challenge: str
+    code: str
+
+
+@router.post("/mfa/verify")
+async def mfa_verify(body: MfaVerifyIn, request: Request, response: Response):
+    uid = _challenge_user_id(body.challenge, "verify")
+    ident = f"mfa:{uid}"
+    if await _locked(ident, MAX_MFA_ATTEMPTS):
+        raise ApiError(429, "LOCKED", "Troppi codici errati. Riprova tra 15 minuti")
+    u = await users.get(uid)
+    if not u or not u.mfa_enabled or not u.mfa_secret:
+        raise ApiError(401, "INVALID_TOKEN", "Richiesta non valida")
+    code = body.code.strip()
+    if verify_totp(decrypt_secret(u.mfa_secret), code):
+        await _clear(ident)
+        return await _start_session(request, response, u, mfa_verified=True, via="login_mfa")
+    h = hash_recovery_code(code)
+    if len(re.sub(r"[^A-Za-z0-9]", "", code)) == 8 and h in (u.mfa_recovery_codes or []):
+        await users.update(u.id, {"mfa_recovery_codes": [c for c in u.mfa_recovery_codes if c != h]})
+        await _clear(ident)
+        out = await _start_session(request, response, u, mfa_verified=True, via="login_recovery_code")
+        out["recovery_codes_left"] = len(u.mfa_recovery_codes) - 1
+        return out
+    await _fail(ident)
+    raise ApiError(401, "MFA_INVALID", "Codice non valido")
+
+
+class MfaChallengeIn(BaseModel):
+    challenge: str
+
+
+async def _begin_setup(u: User) -> dict:
+    secret = new_totp_secret()
+    await users.update(u.id, {"mfa_pending_secret": encrypt_secret(secret)})
+    return {"secret": secret, "otpauth_uri": totp_uri(secret, u.email), "issuer": "Future Stars League", "email": u.email}
+
+
+async def _confirm_setup(u: User, code: str, actor: Optional[CurrentUser]) -> list[str]:
+    if not u.mfa_pending_secret:
+        raise ApiError(400, "MFA_NO_SETUP", "Avvia prima la configurazione")
+    if not verify_totp(decrypt_secret(u.mfa_pending_secret), code):
+        raise ApiError(400, "MFA_INVALID", "Codice non valido: controlla l'ora del telefono e riprova")
+    codes = new_recovery_codes()
+    await users.update(u.id, {"mfa_enabled": True, "mfa_secret": u.mfa_pending_secret, "mfa_pending_secret": None, "mfa_recovery_codes": [hash_recovery_code(c) for c in codes]})
+    if actor:
+        await audit.record(actor, "auth.mfa_enabled", "user", u.id)
+    return codes
+
+
+@router.post("/mfa/setup/begin")
+async def mfa_setup_begin(body: MfaChallengeIn):
+    uid = _challenge_user_id(body.challenge, "setup")
+    u = await users.get(uid)
+    if not u or u.status != "active" or u.mfa_enabled:
+        raise ApiError(401, "INVALID_TOKEN", "Richiesta non valida")
+    return await _begin_setup(u)
+
+
+@router.post("/mfa/setup/confirm")
+async def mfa_setup_confirm(body: MfaVerifyIn, request: Request, response: Response):
+    uid = _challenge_user_id(body.challenge, "setup")
+    u = await users.get(uid)
+    if not u or u.status != "active" or u.mfa_enabled:
+        raise ApiError(401, "INVALID_TOKEN", "Richiesta non valida")
+    codes = await _confirm_setup(u, body.code, None)
+    out = await _start_session(request, response, await users.get(uid), mfa_verified=True, via="mfa_enrolled")
+    out["recovery_codes"] = codes
+    return out
+
+
+@router.post("/mfa/enable/begin")
+async def mfa_enable_begin(user: CurrentUser = Depends(get_current_user)):
+    u = await users.get(user.id)
+    if u.mfa_enabled:
+        raise ApiError(409, "MFA_ALREADY", "La verifica in due passaggi è già attiva")
+    return await _begin_setup(u)
+
+
+class CodeIn(BaseModel):
+    code: str
+
+
+@router.post("/mfa/enable/confirm")
+async def mfa_enable_confirm(body: CodeIn, user: CurrentUser = Depends(get_current_user)):
+    u = await users.get(user.id)
+    if u.mfa_enabled:
+        raise ApiError(409, "MFA_ALREADY", "La verifica in due passaggi è già attiva")
+    codes = await _confirm_setup(u, body.code, user)
+    await db.sessions.update_one({"_id": user.sid}, {"$set": {"mfa_verified": True}})
+    return {"ok": True, "recovery_codes": codes}
+
+
+class MfaDisableIn(BaseModel):
+    password: str
+    code: str
+
+
+@router.post("/mfa/disable")
+async def mfa_disable(body: MfaDisableIn, user: CurrentUser = Depends(get_current_user)):
+    u = await users.get(user.id)
+    if mfa_is_required(u):
+        raise ApiError(403, "MFA_MANDATORY", "Per il tuo ruolo la verifica in due passaggi è obbligatoria")
+    if not u.mfa_enabled or not verify_password(body.password, u.password_hash) or not verify_totp(decrypt_secret(u.mfa_secret), body.code):
+        raise ApiError(401, "MFA_INVALID", "Password o codice non validi")
+    await users.update(u.id, {"mfa_enabled": False, "mfa_secret": None, "mfa_recovery_codes": []})
+    await audit.record(user, "auth.mfa_disabled", "user", u.id)
+    return {"ok": True}
+
+
+@router.post("/mfa/recovery/regenerate")
+async def mfa_recovery_regenerate(body: CodeIn, user: CurrentUser = Depends(get_current_user)):
+    u = await users.get(user.id)
+    if not u.mfa_enabled or not verify_totp(decrypt_secret(u.mfa_secret), body.code):
+        raise ApiError(401, "MFA_INVALID", "Codice non valido")
+    codes = new_recovery_codes()
+    await users.update(u.id, {"mfa_recovery_codes": [hash_recovery_code(c) for c in codes]})
+    await audit.record(user, "auth.mfa_recovery_regenerated", "user", u.id)
+    return {"recovery_codes": codes}
+
+
+# ---------- session lifecycle ----------
 @router.post("/refresh")
 async def refresh(request: Request, response: Response):
     token = request.cookies.get("refresh_token")
     if not token:
         raise ApiError(401, "UNAUTHENTICATED", "Sessione assente")
     try:
-        payload = decode_token(token)
-    except Exception:
+        payload = decode_token(token, expected_type="refresh")
+    except jwt.InvalidTokenError:
+        clear_auth_cookies(response)
         raise ApiError(401, "INVALID_TOKEN", "Sessione non valida")
-    if payload.get("type") != "refresh":
-        raise ApiError(401, "INVALID_TOKEN", "Sessione non valida")
+    jti = await sessions.rotate_session(payload.get("sid", ""), payload.get("jti", ""))
+    if not jti:
+        clear_auth_cookies(response)
+        raise ApiError(401, "SESSION_REVOKED", "Sessione terminata: accedi di nuovo")
     current = await load_current_user(payload["sub"])
     if not current:
+        await sessions.revoke_session(payload["sid"], reason="user_disabled")
+        clear_auth_cookies(response)
         raise ApiError(401, "USER_NOT_FOUND", "Utente non trovato")
-    access = create_access_token(current.id, current.email)
-    set_auth_cookies(response, access, token)
-    return {"access_token": access, "user": current.to_public(), "landing": _landing(current)}
+    s = await sessions.get_session(payload["sid"])
+    set_auth_cookies(response, create_access_token(current.id, current.email, payload["sid"]), create_refresh_token(current.id, payload["sid"], jti), s["csrf"])
+    current.sid = payload["sid"]
+    return {"user": current.to_public(), "landing": _landing(current), "csrf_token": s["csrf"]}
 
 
 @router.post("/logout")
-async def logout(response: Response, user: CurrentUser = Depends(get_current_user)):
+async def logout(request: Request, response: Response):
     clear_auth_cookies(response)
-    await audit.record(user, "auth.logout", "user", user.id)
+    token = request.cookies.get("access_token") or request.cookies.get("refresh_token")
+    if token:
+        try:
+            payload = jwt.decode(token, os.environ["JWT_SECRET"], algorithms=["HS256"], options={"verify_exp": False})
+            if payload.get("sid"):
+                await sessions.revoke_session(payload["sid"], reason="logout")
+                current = await load_current_user(payload["sub"])
+                if current:
+                    await audit.record(current, "auth.logout", "user", current.id)
+        except jwt.InvalidTokenError:
+            pass
+    return {"ok": True}
+
+
+@router.post("/logout-all")
+async def logout_all(response: Response, user: CurrentUser = Depends(get_current_user)):
+    n = await sessions.revoke_user_sessions(user.id, except_sid=user.sid, reason="logout_all")
+    await audit.record(user, "auth.logout_all", "user", user.id, after={"revoked": n})
+    return {"ok": True, "revoked": n}
+
+
+@router.get("/sessions")
+async def my_sessions(user: CurrentUser = Depends(get_current_user)):
+    return {"current": user.sid, "items": await sessions.list_user_sessions(user.id)}
+
+
+@router.delete("/sessions/{sid}")
+async def revoke_one(sid: str, user: CurrentUser = Depends(get_current_user)):
+    s = await sessions.get_session(sid)
+    if not s or s["user_id"] != user.id:
+        raise ApiError(404, "NOT_FOUND", "Sessione non trovata")
+    await sessions.revoke_session(sid, reason="user_revoked")
     return {"ok": True}
 
 
 @router.get("/me")
 async def me(user: CurrentUser = Depends(get_current_user)):
-    return {"user": user.to_public(), "landing": _landing(user)}
+    s = await sessions.get_session(user.sid)
+    return {"user": user.to_public(), "landing": _landing(user), "csrf_token": s["csrf"] if s else None}
+
+
+# ---------- password ----------
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/password/change")
+async def change_password(body: ChangePasswordIn, user: CurrentUser = Depends(get_current_user)):
+    u = await users.get(user.id)
+    if not verify_password(body.current_password, u.password_hash):
+        raise ApiError(401, "INVALID_CREDENTIALS", "Password attuale non corretta")
+    problem = password_problem(body.new_password, u.email)
+    if problem:
+        raise ApiError(400, "WEAK_PASSWORD", problem)
+    if verify_password(body.new_password, u.password_hash):
+        raise ApiError(400, "WEAK_PASSWORD", "La nuova password deve essere diversa da quella attuale")
+    await users.update(u.id, {"password_hash": hash_password(body.new_password), "must_change_password": False, "password_changed_at": utcnow()})
+    n = await sessions.revoke_user_sessions(u.id, except_sid=user.sid, reason="password_changed")
+    await audit.record(user, "auth.password_changed", "user", u.id, after={"other_sessions_revoked": n})
+    current = await load_current_user(u.id)
+    current.sid = user.sid
+    return {"ok": True, "user": current.to_public(), "landing": _landing(current)}

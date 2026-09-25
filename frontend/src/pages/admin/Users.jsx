@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, UserCog } from "lucide-react";
+import { KeyRound, Plus, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { AccessRequests } from "@/components/fsl/ClubOnboarding";
 import { PageHeader } from "@/components/fsl/Primitives";
@@ -50,15 +50,16 @@ export default function UsersPage() {
       <AccessRequests tournaments={tournaments || []} canApprove={canCreate} />
       <div className="fsl-card overflow-x-auto">
         <table className="w-full table-dark" data-testid="users-table">
-          <thead><tr><th>Utente</th><th>Ruolo</th><th>Tornei assegnati</th><th>MFA</th><th>Stato</th></tr></thead>
+          <thead><tr><th>Utente</th><th>Ruolo</th><th>Tornei assegnati</th><th>MFA</th><th>Stato</th><th className="text-right">Azioni</th></tr></thead>
           <tbody>
             {list.map((u) => (
               <tr key={u.id} data-testid={`user-row-${u.email}`}>
                 <td><div className="font-semibold">{u.full_name}</div><div className="text-xs text-fsl-slate">{u.email}</div></td>
                 <td><span className="inline-flex items-center gap-1.5 text-xs"><UserCog className="h-3.5 w-3.5 text-fsl-gold" /> {u.role_label}</span></td>
                 <td className="text-xs text-fsl-slate">{u.is_super_admin ? "Tutti i tornei" : u.memberships.map((m) => m.tournament_name).filter(Boolean).join(", ") || "—"}</td>
-                <td className="text-xs text-fsl-slate" title="Verifica in due passaggi non ancora disponibile">Non attiva</td>
-                <td className="text-xs"><span className={u.status === "active" ? "text-fsl-success" : "text-fsl-danger"}>● {u.status === "active" ? "Attivo" : "Disabilitato"}</span></td>
+                <td className="text-xs" data-testid={`user-mfa-${u.email}`}>{u.mfa_enabled ? <span className="text-fsl-success">Attiva</span> : u.mfa_required ? <span className="text-fsl-warning">Da configurare al login</span> : <span className="text-fsl-slate">Non attiva</span>}</td>
+                <td className="text-xs"><span className={u.status === "active" ? "text-fsl-success" : "text-fsl-danger"}>● {u.status === "active" ? "Attivo" : "Disabilitato"}</span>{u.must_change_password && <div className="text-[10px] text-fsl-slate">password temporanea</div>}</td>
+                <td className="text-right">{canCreate && u.id !== user.id && <UserActions u={u} me={user} onChanged={load} />}</td>
               </tr>
             ))}
           </tbody>
@@ -71,7 +72,7 @@ export default function UsersPage() {
           <div className="grid gap-3">
             <label><span className="fsl-label">Nome completo</span><input className="fsl-input mt-1" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} data-testid="user-name-input" /></label>
             <label><span className="fsl-label">Email</span><input type="email" className="fsl-input mt-1" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="user-email-input" /></label>
-            <label><span className="fsl-label">Password (min 8)</span><input type="password" className="fsl-input mt-1" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="user-password-input" /></label>
+            <label><span className="fsl-label">Password iniziale (min 10, lettere e numeri · l'utente dovrà cambiarla)</span><input type="password" className="fsl-input mt-1" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="user-password-input" /></label>
             <label><span className="fsl-label">Ruolo</span>
               <select className="fsl-input mt-1" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value, club_id: "" })} data-testid="user-role-select">
                 {Object.entries(ROLE_LABELS).filter(([k]) => k !== "super_admin" || user.is_super_admin).map(([k, l]) => <option key={k} value={k}>{l}</option>)}

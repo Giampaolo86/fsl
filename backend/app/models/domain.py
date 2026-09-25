@@ -25,10 +25,23 @@ class User(BaseDocument):
     is_super_admin: bool = False
     status: Literal["active", "disabled"] = "active"
     mfa_required: bool = False
+    mfa_enabled: bool = False
+    mfa_secret: Optional[str] = None
+    mfa_pending_secret: Optional[str] = None
+    mfa_recovery_codes: list[str] = []
+    must_change_password: bool = False
+    password_changed_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
     picture: Optional[str] = None
     auth_provider: str = "password"
     favorites: dict = {"tournaments": [], "teams": [], "players": []}
+
+    def safe(self) -> dict:
+        d = self.public()
+        for k in ("password_hash", "mfa_secret", "mfa_pending_secret", "mfa_recovery_codes"):
+            d.pop(k, None)
+        d["mfa_required"] = self.mfa_required or self.role in ("super_admin", "director") or self.is_super_admin
+        return d
 
 
 class TournamentMembership(BaseDocument):

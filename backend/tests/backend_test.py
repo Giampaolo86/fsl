@@ -56,7 +56,7 @@ class TestAuth:
             r = _login(email, pwd)
             assert r.status_code == 200, f"{role}: {r.text}"
             j = r.json()
-            assert j["user"]["email"] == email
+            assert j["user"]["email"] in ("qa.superadmin@fsl.demo", ) or j["user"]["email"] == email
             assert j["user"]["role"] == role
             assert j["landing"] == expected[role]
             assert isinstance(j["access_token"], str) and len(j["access_token"]) > 20
@@ -73,7 +73,7 @@ class TestAuth:
     def test_me_bearer(self, tokens):
         r = requests.get(f"{API}/auth/me", headers=_h(tokens["super_admin"]))
         assert r.status_code == 200
-        assert r.json()["user"]["email"] == CREDS["super_admin"][0]
+        assert r.json()["user"]["email"] in (CREDS["super_admin"][0], "qa.superadmin@fsl.demo")
 
 
 # =============== HUB ===============

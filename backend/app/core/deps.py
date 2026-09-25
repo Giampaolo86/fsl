@@ -1,3 +1,4 @@
+import hmac
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -6,6 +7,7 @@ from fastapi import Depends, Request
 
 from ..core.errors import ApiError, forbidden, not_found, read_only, scope_denied
 from ..core.security import decode_token
+from ..core.sessions import get_session, revoke_session
 from ..repositories.registry import memberships, tournaments, users
 
 WRITE_ROLES = {"super_admin", "director"}
@@ -21,6 +23,10 @@ class CurrentUser:
     memberships: list = field(default_factory=list)
     picture: Optional[str] = None
     favorites: dict = field(default_factory=lambda: {"tournaments": [], "teams": [], "players": []})
+    sid: Optional[str] = None
+    mfa_enabled: bool = False
+    mfa_required: bool = False
+    must_change_password: bool = False
 
     def role_in(self, tournament_id: str) -> Optional[str]:
         if self.is_super_admin:
@@ -49,7 +55,14 @@ class CurrentUser:
             "memberships": self.memberships,
             "picture": self.picture,
             "favorites": self.favorites,
+            "mfa_enabled": self.mfa_enabled,
+            "mfa_required": self.mfa_required,
+            "must_change_password": self.must_change_password,
         }
+
+
+def mfa_is_required(user) -> bool:
+    return bool(user.mfa_required or user.is_super_admin or user.role in ("super_admin", "director"))
 
 
 async def load_current_user(user_id: str) -> Optional[CurrentUser]:
@@ -66,29 +79,44 @@ async def load_current_user(user_id: str) -> Optional[CurrentUser]:
         role=user.role,
         is_super_admin=user.is_super_admin,
         memberships=[{"tournament_id": m.tournament_id, "role": m.role, "club_id": m.club_id} for m in ms],
+        mfa_enabled=user.mfa_enabled,
+        mfa_required=mfa_is_required(user),
+        must_change_password=user.must_change_password,
     )
 
 
+UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+
+
 async def get_current_user(request: Request) -> CurrentUser:
-    token = request.cookies.get("access_token")
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:] if auth.startswith("Bearer ") else None
+    from_cookie = False
     if not token:
-        auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            token = auth[7:]
+        token = request.cookies.get("access_token")
+        from_cookie = bool(token)
     if not token:
         raise ApiError(401, "UNAUTHENTICATED", "Accesso richiesto")
     try:
-        payload = decode_token(token)
+        payload = decode_token(token, expected_type="access")
     except jwt.ExpiredSignatureError:
         raise ApiError(401, "TOKEN_EXPIRED", "Sessione scaduta")
     except jwt.InvalidTokenError:
         raise ApiError(401, "INVALID_TOKEN", "Token non valido")
-    if payload.get("type") != "access":
-        raise ApiError(401, "INVALID_TOKEN", "Token non valido")
+    session = await get_session(payload.get("sid", ""))
+    if not session or session["user_id"] != payload["sub"]:
+        raise ApiError(401, "SESSION_REVOKED", "Sessione terminata: accedi di nuovo")
+    if from_cookie and request.method in UNSAFE:
+        header = request.headers.get("X-CSRF-Token", "")
+        if not header or not hmac.compare_digest(header, session.get("csrf", "")):
+            raise ApiError(403, "CSRF", "Richiesta non valida (CSRF)")
     user = await load_current_user(payload["sub"])
     if not user:
+        await revoke_session(session["_id"], reason="user_disabled")
         raise ApiError(401, "USER_NOT_FOUND", "Utente non trovato o disabilitato")
+    user.sid = session["_id"]
     return user
+
 
 
 def require_roles(*roles: str):
