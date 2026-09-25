@@ -8,13 +8,18 @@ export class ErrorBoundary extends React.Component {
     return { error };
   }
 
+  static canReload() {
+    const last = Number(sessionStorage.getItem("fsl-reloaded") || 0);
+    return Date.now() - last > 60_000;
+  }
+
   static isStale(error) {
     return /ChunkLoadError|Loading chunk|Loading CSS chunk|dynamically imported module|Unexpected token '<'|Importing a module script failed/.test(String(error?.message || error));
   }
 
   async componentDidCatch(error) {
-    if (ErrorBoundary.isStale(error) && !sessionStorage.getItem("fsl-reloaded")) {
-      sessionStorage.setItem("fsl-reloaded", "1");
+    if (ErrorBoundary.isStale(error) && ErrorBoundary.canReload()) {
+      sessionStorage.setItem("fsl-reloaded", String(Date.now()));
       try { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); } catch { /* no cache API */ }
       try { const regs = await navigator.serviceWorker?.getRegistrations?.(); await Promise.all((regs || []).map((r) => r.update())); } catch { /* no sw */ }
       window.location.reload();
@@ -25,7 +30,7 @@ export class ErrorBoundary extends React.Component {
 
   render() {
     if (!this.state.error) return this.props.children;
-    if (ErrorBoundary.isStale(this.state.error) && !sessionStorage.getItem("fsl-reloaded")) {
+    if (ErrorBoundary.isStale(this.state.error) && ErrorBoundary.canReload()) {
       return <div className="min-h-screen bg-navy-900 text-fsl-white flex items-center justify-center p-6" data-testid="app-updating"><div className="text-center"><RefreshCw className="h-8 w-8 mx-auto text-fsl-gold animate-spin" /><div className="mt-4 font-display font-extrabold uppercase text-xl">Aggiornamento in corso…</div><p className="mt-1 text-sm text-fsl-slate">Stiamo caricando la nuova versione dell'app.</p></div></div>;
     }
     return (

@@ -64,7 +64,9 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
-    "test": "craco test"
+    "test": "craco test",
+    "prebuild": "node scripts/build-id.js",
+    "prestart": "node scripts/build-id.js"
   },
   "browserslist": {
     "production": [
