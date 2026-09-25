@@ -13,7 +13,7 @@ function Crest({ p, size }) {
   return <span className="inline-flex items-center justify-center rounded-full overflow-hidden shrink-0 bg-white/95" style={{ width: size, height: size }}>{p.crest_url ? <img src={mediaUrl(p.crest_url)} alt="" className="h-full w-full object-contain p-[1px]" draggable={false} /> : <span className="font-display font-extrabold" style={{ fontSize: size * 0.42, color: p.colors?.primary || "#0B57D9" }}>{initials}</span>}</span>;
 }
 
-export function StadiumCard({ player: p, size = "md", width, offRole = false, label, onClick, to, overlay, disabled, testId, className = "" }) {
+export function StadiumCard({ player: p, size = "md", width, offRole = false, label, onClick, to, disabled, testId, className = "" }) {
   const s = sizeFor(width || SIZE_W[size]), W = s.w, H = Math.round(W * 1.17);
   const [first, last] = splitName(p?.name || "");
   const Tag = to ? Link : onClick ? "button" : "div";
@@ -40,7 +40,6 @@ export function StadiumCard({ player: p, size = "md", width, offRole = false, la
         </div>
       </div>
       {offRole && <span className="absolute -top-2 right-2 h-4 px-1.5 rounded-full bg-fsl-warning text-ink-950 text-[8px] font-bold uppercase" title="Ruolo reale, inserito per completare il modulo">Jolly</span>}
-      {overlay}
     </Tag>
   );
 }

@@ -53,7 +53,7 @@ export function Top11Board({ doc, competition, tournamentName, editable = false,
       <div ref={ref} className={`relative px-2 sm:px-3 ${compact || isMobile ? "pt-6 pb-4 space-y-3" : "pt-10 sm:pt-12 pb-8 space-y-4 sm:space-y-6"}`} data-testid="top11-board-rows">
         {rows.map((row, i) => (
           <div key={i} className="flex justify-center" style={{ gap }}>
-            {row.map((s, j) => <div key={s.slot} className="animate-rise" style={{ animationDelay: `${(i * 4 + j) * 60}ms` }}><StadiumCard player={s.player} width={cardW} offRole={s.off_role} label={GROUP_LABEL[s.slot_group]} to={s.player && linkTo ? linkTo(s.player) : undefined} onClick={!s.player && editable ? () => onPick?.(s) : undefined} overlay={replaceBtn(s)} testId={`top11-slot-${s.slot}`} /></div>)}
+            {row.map((s, j) => <div key={s.slot} className="relative animate-rise" style={{ animationDelay: `${(i * 4 + j) * 60}ms` }}><StadiumCard player={s.player} width={cardW} offRole={s.off_role} label={GROUP_LABEL[s.slot_group]} to={s.player && linkTo ? linkTo(s.player) : undefined} testId={`top11-slot-${s.slot}`} />{replaceBtn(s)}</div>)}
           </div>
         ))}
       </div>
