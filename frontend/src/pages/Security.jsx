@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, KeyRound, LogOut, Monitor, ShieldCheck, ShieldOff } from "lucide-react";
+import { ArrowLeft, KeyRound, LogOut, Monitor, ShieldCheck, ShieldOff, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { Logo } from "@/components/fsl/Logo";
 import { MfaSetup, RecoveryCodes, mfaApi } from "@/components/fsl/Mfa";
@@ -94,6 +94,25 @@ function Sessions() {
   );
 }
 
+const deviceLabel = (ua = "") => (/iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "Dispositivo") + (/Chrome|CriOS/.test(ua) ? " · Chrome" : /Safari/.test(ua) ? " · Safari" : /Firefox/.test(ua) ? " · Firefox" : "");
+
+function TrustedDevices({ user }) {
+  const [items, setItems] = useState(null);
+  const load = useCallback(() => api.get("/auth/mfa/devices").then((r) => setItems(r.data)).catch(() => setItems([])), []);
+  useEffect(() => { if (user.mfa_enabled) load(); }, [load, user.mfa_enabled]);
+  if (!user.mfa_enabled || !items) return null;
+  const forget = async (d) => { try { await api.delete(`/auth/mfa/devices/${d.id}`); toast.success("Dispositivo dimenticato: al prossimo accesso da lì servirà il codice"); load(); } catch (e) { toast.error(apiError(e)); } };
+  return (
+    <div className="fsl-card p-5" data-testid="trusted-devices-card">
+      <div className="font-display font-bold uppercase mb-1">Dispositivi ricordati</div>
+      <p className="text-xs text-fsl-slate mb-3">Da questi dispositivi il codice di verifica non viene richiesto per 30 giorni («Ricorda questo dispositivo» al login).</p>
+      {items.length === 0 ? <p className="text-sm text-fsl-slate" data-testid="trusted-devices-empty">Nessun dispositivo ricordato.</p> : (
+        <ul className="divide-y divide-white/[0.06]">{items.map((d) => <li key={d.id} className="py-2 flex items-center gap-3 text-sm" data-testid={`trusted-device-${d.id}`}><Smartphone className="h-4 w-4 text-fsl-gold shrink-0" /><span className="flex-1 min-w-0"><span className="font-semibold">{deviceLabel(d.user_agent)}</span>{d.current && <span className="ml-2 text-[10px] uppercase tracking-wider text-fsl-gold">questo dispositivo</span>}<span className="block text-[11px] text-fsl-slate">Ricordato il {fmtDate(d.created_at)} · ultimo accesso {fmtDate(d.last_used_at)} · scade il {fmtDate(d.expires_at)}{d.ip ? ` · IP ${d.ip}` : ""}</span></span><button type="button" className="btn-ghost h-8 text-xs" onClick={() => forget(d)} data-testid={`trusted-device-forget-${d.id}`}><ShieldOff className="h-3.5 w-3.5" /> Dimentica</button></li>)}</ul>
+      )}
+    </div>
+  );
+}
+
 export function SecuritySettings() {
   const { user } = useAuth();
   return (
@@ -102,6 +121,7 @@ export function SecuritySettings() {
       <MfaCard user={user} />
       <section><SectionTitle>Cambia password</SectionTitle><div className="fsl-card p-5"><PasswordForm /></div></section>
       <Sessions />
+      <TrustedDevices user={user} />
     </div>
   );
 }

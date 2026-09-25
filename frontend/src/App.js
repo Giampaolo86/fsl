@@ -9,6 +9,7 @@ import PublicShell from "@/components/layout/PublicShell";
 import ClubShell from "@/components/layout/ClubShell";
 import RefereeShell from "@/components/layout/RefereeShell";
 import Login from "@/pages/Login";
+import ChildCodesSheet from "@/pages/admin/ChildCodesSheet";
 import ChangePassword, { SecurityPage } from "@/pages/Security";
 import Top11Admin from "@/pages/admin/Top11";
 import Top11Public from "@/pages/public/Top11Public";
@@ -130,6 +131,7 @@ function AppRoutes() {
                 <Route path="referti" element={<Matches mode="reports" />} />
                 <Route path="classifiche" element={<Standings />} />
                 <Route path="rose" element={<Rosters />} />
+                <Route path="rose/codici" element={<ChildCodesSheet />} />
                 <Route path="ticket" element={<Tickets />} />
                 <Route path="premi" element={<Awards />} />
                 <Route path="top11" element={<AdminWeeklyHub tab="top11"><Top11Admin /></AdminWeeklyHub>} />
@@ -147,6 +149,7 @@ function AppRoutes() {
                 <Route index element={<ClubDashboard />} />
                 <Route path="squadre" element={<ClubTeams />} />
                 <Route path="rose" element={<Rosters clubMode />} />
+                <Route path="rose/codici" element={<ChildCodesSheet mode="club" />} />
                 <Route path="calendario" element={<ClubCalendar />} />
                 <Route path="partite/:matchId" element={<ClubMatch />} />
                 <Route path="segnalazioni" element={<ClubReports />} />

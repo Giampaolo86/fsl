@@ -541,3 +541,22 @@ async def reset_link_for_user(body: AssistIn, request: Request, user: CurrentUse
     token = await create_reset(u, requested_by=user.id)
     await audit.record(user, "auth.reset_link_issued", "user", u.id)
     return {"link": f"{os.environ.get('FRONTEND_URL') or request.headers.get('origin') or ''}/reimposta-password?token={token}", "expires_hours": RESET_HOURS, "email": u.email}
+
+
+# ---------- dispositivi fidati (MFA) ----------
+@router.get("/mfa/devices")
+async def list_trusted_devices(request: Request, user: CurrentUser = Depends(get_current_user)):
+    cur = _trust_hash(request.cookies.get(TRUST_COOKIE) or "")
+    docs = await db.mfa_devices.find({"user_id": user.id, "revoked_at": None, "expires_at": {"$gt": utcnow()}}).sort([("last_used_at", -1)]).to_list(50)
+    return [{"id": str(d["_id"]), "created_at": d["created_at"], "last_used_at": d.get("last_used_at"), "expires_at": d["expires_at"], "ip": d.get("ip"), "user_agent": d.get("user_agent"), "current": d["token_hash"] == cur} for d in docs]
+
+
+@router.delete("/mfa/devices/{device_id}")
+async def forget_trusted_device(device_id: str, user: CurrentUser = Depends(get_current_user)):
+    from bson import ObjectId
+
+    res = await db.mfa_devices.update_one({"_id": ObjectId(device_id), "user_id": user.id, "revoked_at": None}, {"$set": {"revoked_at": utcnow()}}) if len(device_id) == 24 else None
+    if not res or res.modified_count == 0:
+        raise ApiError(404, "NOT_FOUND", "Dispositivo non trovato")
+    await audit.record(user, "auth.trusted_device_forgotten", "user", user.id)
+    return {"ok": True}

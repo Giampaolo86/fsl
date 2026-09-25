@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { profileLink } from "@/pages/PlayerProfile";
-import { Plus, Ticket, Users } from "lucide-react";
+import { Plus, Printer, Ticket, Users } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { BulkPhotoUpload } from "@/components/fsl/BulkPhotoUpload";
@@ -93,7 +93,7 @@ export function Rosters({ clubMode = false }) {
   const toggleConsent = async (p) => { try { await api.patch(`/tournaments/${tid}/players/${p.id}`, { media_consent: !p.media_consent, profile_visibility: !p.media_consent ? "public" : "private" }); api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data)); } catch (e) { toast.error(apiError(e)); } };
   return (
     <div>
-      <PageHeader kicker="Rose, documenti e idoneità" title="Rose" subtitle="Anagrafica privata (anno di nascita mai pubblico). Nome e foto compaiono sul sito solo con consenso immagine attivo." actions={<><BulkPhotoUpload tid={tid} clubId={teams.find((tm) => tm.id === teamId)?.club_id} onDone={() => api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data))} /><select className="fsl-input w-64" value={teamId} onChange={(e) => setTeamId(e.target.value)} data-testid="roster-team-select">{teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}</select>{teamId && <button className="btn-primary" onClick={() => setOpen(true)} data-testid="roster-add-button"><Plus className="h-4 w-4" /> Giocatore</button>}</>} />
+      <PageHeader kicker="Rose, documenti e idoneità" title="Rose" subtitle="Anagrafica privata (anno di nascita mai pubblico). Nome e foto compaiono sul sito solo con consenso immagine attivo." actions={<><Link to={clubMode ? "/societa/rose/codici" : `/admin/t/${tid}/rose/codici${teams.find((tm) => tm.id === teamId)?.club_id ? `?club=${teams.find((tm) => tm.id === teamId).club_id}` : ""}`} className="btn-ghost h-10" data-testid="child-codes-link"><Printer className="h-4 w-4" /> Codici figlio (PDF)</Link><BulkPhotoUpload tid={tid} clubId={teams.find((tm) => tm.id === teamId)?.club_id} onDone={() => api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data))} /><select className="fsl-input w-64" value={teamId} onChange={(e) => setTeamId(e.target.value)} data-testid="roster-team-select">{teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}</select>{teamId && <button className="btn-primary" onClick={() => setOpen(true)} data-testid="roster-add-button"><Plus className="h-4 w-4" /> Giocatore</button>}</>} />
       {clubMode ? <RosterImportClub tid={tid} teamId={teamId} /> : <RosterImportAdmin tid={tid} onImported={() => api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data))} />}
       {!players ? <LoadingState /> : players.length === 0 ? <EmptyState icon={Users} title="Rosa vuota" description="Aggiungi i giocatori per abilitare convocazioni ed eventi." /> : (
         <div className="fsl-card overflow-x-auto"><table className="w-full table-dark" data-testid="roster-table"><thead><tr><th>N.</th><th>Foto</th><th>Giocatore</th><th>Ruolo</th><th>Anno</th><th>Badge</th><th>Stato</th><th>Consenso immagine</th><th title="Codice riservato da consegnare ai genitori per abbinarsi al figlio">Codice figlio</th></tr></thead><tbody>

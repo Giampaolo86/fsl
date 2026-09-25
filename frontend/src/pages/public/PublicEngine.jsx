@@ -137,7 +137,7 @@ export function PublicStandingsLive() {
 
 export function PublicStats() {
   const { data: home } = usePublicTournament();
-  const { data, error } = useSlugData("/stats");
+  const { slug, data, error } = useSlugData("/stats");
   if (error) return <Wrap><ErrorState message={apiError(error)} /></Wrap>;
   if (!data || !home) return <LoadingState full />;
   return (
