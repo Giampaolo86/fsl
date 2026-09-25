@@ -147,6 +147,7 @@ class Player(BaseDocument):
     guardian_emails: list[str] = []
     photo_pending_url: Optional[str] = None
     photo_pending_by: Optional[str] = None
+    link_code: Optional[str] = None
 
 
 MatchStatus = Literal["draft", "scheduled", "confirmed", "in_progress", "finished", "report_submitted", "official", "under_review", "rectified", "postponed", "cancelled"]

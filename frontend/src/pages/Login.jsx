@@ -123,6 +123,7 @@ export default function Login() {
             <button type="submit" disabled={busy} className="btn-primary w-full" data-testid="login-submit-button">
               <LogIn className="h-4 w-4" aria-hidden="true" /> {busy ? "Accesso in corso…" : "Accedi"}
             </button>
+            <p className="text-right text-xs"><Link to="/password-dimenticata" className="text-fsl-slate hover:text-fsl-gold underline" data-testid="login-forgot-link">Password dimenticata?</Link></p>
           </div>
           {area === "genitori" && (
             <div className="mt-6 space-y-3">

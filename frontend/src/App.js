@@ -33,6 +33,7 @@ import BlogManager from "@/pages/admin/Blog";
 import Documents from "@/pages/club/Documents";
 import { PaymentCancel, PaymentSuccess, Sales } from "@/pages/Payments";
 import Register, { AuthCallback } from "@/pages/Register";
+import { ForgotPassword, ResetPassword } from "@/pages/PasswordReset";
 import { RegisterClub, RequestAccess } from "@/pages/RegisterClub";
 import FanAccount from "@/pages/FanAccount";
 import PlayerProfile from "@/pages/PlayerProfile";
@@ -101,6 +102,8 @@ function AppRoutes() {
               <Route path="/cambia-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
               <Route path="/sicurezza" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
               <Route path="/registrati" element={<Register />} />
+              <Route path="/password-dimenticata" element={<ForgotPassword />} />
+              <Route path="/reimposta-password" element={<ResetPassword />} />
               <Route path="/registrati-societa" element={<RegisterClub />} />
               <Route path="/richiedi-accesso" element={<RequestAccess />} />
               <Route path="/payment/success" element={<PaymentSuccess />} />

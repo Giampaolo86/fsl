@@ -408,3 +408,94 @@ async def change_password(body: ChangePasswordIn, user: CurrentUser = Depends(ge
     current = await load_current_user(u.id)
     current.sid = user.sid
     return {"ok": True, "user": current.to_public(), "landing": _landing(current)}
+
+
+# ---------- recupero password ----------
+import hashlib  # noqa: E402
+import secrets  # noqa: E402
+
+from ..services import mailer  # noqa: E402
+
+RESET_HOURS = 24
+
+
+class ForgotIn(BaseModel):
+    email: EmailStr
+
+
+class ResetIn(BaseModel):
+    token: str
+    password: str
+
+
+def _reset_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+async def create_reset(u: User, requested_by: str = "user") -> str:
+    token = secrets.token_urlsafe(32)
+    await db.password_resets.update_many({"user_id": u.id, "used_at": None}, {"$set": {"used_at": utcnow(), "superseded": True}})
+    await db.password_resets.insert_one({"user_id": u.id, "email": u.email, "full_name": u.full_name, "role": u.role, "token_hash": _reset_hash(token), "created_at": utcnow(), "expires_at": utcnow() + timedelta(hours=RESET_HOURS), "used_at": None, "requested_by": requested_by, "emailed": False})
+    return token
+
+
+@router.post("/forgot-password")
+async def forgot_password(body: ForgotIn, request: Request):
+    email = body.email.lower().strip()
+    if await _locked(f"forgot:{_ip(request)}", MAX_EMAIL_ATTEMPTS):
+        raise ApiError(429, "TOO_MANY", "Troppe richieste: riprova più tardi")
+    await _fail(f"forgot:{_ip(request)}")
+    u = await users.find_one({"email": email})
+    emailed = False
+    if u and u.status == "active":
+        token = await create_reset(u)
+        link = f"{os.environ.get('FRONTEND_URL') or request.headers.get('origin') or ''}/reimposta-password?token={token}"
+        emailed = await mailer.send(email, "Future Stars League · reimposta la password", f"Ciao {u.full_name},\n\nper scegliere una nuova password apri questo link (valido {RESET_HOURS} ore):\n{link}\n\nSe non hai richiesto tu il reset, ignora questa email.", f"<p>Ciao {u.full_name},</p><p>per scegliere una nuova password apri questo link (valido {RESET_HOURS} ore):</p><p><a href=\"{link}\" style=\"background:#F4AE2B;color:#03131F;padding:10px 18px;border-radius:8px;font-weight:700;text-decoration:none\">Reimposta la password</a></p><p style=\"color:#667\">Se non hai richiesto tu il reset, ignora questa email.</p>")
+        await db.password_resets.update_one({"token_hash": _reset_hash(token)}, {"$set": {"emailed": emailed}})
+        await audit.record(None, "auth.forgot_password", "user", u.id, after={"emailed": emailed})
+    return {"ok": True, "emailed": emailed if u else False, "assisted": not mailer.configured()}
+
+
+@router.post("/reset-password")
+async def reset_password(body: ResetIn, request: Request, response: Response):
+    problem = password_problem(body.password)
+    if problem:
+        raise ApiError(400, "WEAK_PASSWORD", problem)
+    doc = await db.password_resets.find_one({"token_hash": _reset_hash(body.token), "used_at": None})
+    if not doc or doc["expires_at"].replace(tzinfo=None) < utcnow().replace(tzinfo=None):
+        raise ApiError(400, "INVALID_TOKEN", "Link non valido o scaduto: richiedi un nuovo reset")
+    u = await users.get(doc["user_id"])
+    if not u or u.status != "active":
+        raise ApiError(400, "INVALID_TOKEN", "Link non valido")
+    await users.update(u.id, {"password_hash": hash_password(body.password), "password_changed_at": utcnow(), "must_change_password": False})
+    await db.password_resets.update_one({"_id": doc["_id"]}, {"$set": {"used_at": utcnow()}})
+    await sessions.revoke_user_sessions(u.id, reason="password_reset")
+    await audit.record(None, "auth.reset_password", "user", u.id)
+    return {"ok": True, "email": u.email}
+
+
+@router.get("/reset-requests")
+async def reset_requests(user: CurrentUser = Depends(get_current_user)):
+    if user.role not in ("super_admin", "director", "secretary"):
+        raise ApiError(403, "FORBIDDEN", "Non autorizzato")
+    docs = await db.password_resets.find({"used_at": None, "expires_at": {"$gt": utcnow()}}).sort([("created_at", -1)]).to_list(100)
+    return [{"id": str(d["_id"]), "email": d["email"], "full_name": d.get("full_name"), "role": d.get("role"), "created_at": d["created_at"], "expires_at": d["expires_at"], "emailed": d.get("emailed", False)} for d in docs]
+
+
+class AssistIn(BaseModel):
+    email: EmailStr
+
+
+@router.post("/reset-requests/link")
+async def reset_link_for_user(body: AssistIn, request: Request, user: CurrentUser = Depends(get_current_user)):
+    """Staff: genera un link di reset da consegnare all'utente (fallback senza email)."""
+    if user.role not in ("super_admin", "director", "secretary"):
+        raise ApiError(403, "FORBIDDEN", "Non autorizzato")
+    u = await users.find_one({"email": body.email.lower().strip()})
+    if not u:
+        raise ApiError(404, "NOT_FOUND", "Utente non trovato")
+    if u.role in ("super_admin", "director") and user.role != "super_admin":
+        raise ApiError(403, "FORBIDDEN", "Solo il super admin può assistere un altro amministratore")
+    token = await create_reset(u, requested_by=user.id)
+    await audit.record(user, "auth.reset_link_issued", "user", u.id)
+    return {"link": f"{os.environ.get('FRONTEND_URL') or request.headers.get('origin') or ''}/reimposta-password?token={token}", "expires_hours": RESET_HOURS, "email": u.email}

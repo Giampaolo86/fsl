@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Baby, Download, Flag, Heart, Trophy, Users, Sparkles, Newspaper } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
+import { LinkChildButton } from "@/components/fsl/AccountTools";
 import { LoadingState } from "@/components/fsl/States";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
@@ -48,6 +49,7 @@ export default function FanAccount() {
   const [purchases, setPurchases] = useState([]);
   const [reports, setReports] = useState([]);
   const [children, setChildren] = useState([]);
+  const navigate = useNavigate();
   const [feed, setFeed] = useState(null);
   useEffect(() => { api.get("/me/feed").then((r) => setFeed(r.data)).catch(() => setFeed({ upcoming: [], timeline: [], following: 0 })); }, []);
   useEffect(() => { api.get("/me/shortcuts").then((r) => setSc(r.data)).catch(() => setSc({ tournaments: [], teams: [], players: [] })); api.get("/me/purchases").then((r) => setPurchases(r.data)).catch(() => {}); api.get("/me/reports").then((r) => setReports(r.data)).catch(() => {}); api.get("/me/children").then((r) => setChildren(r.data)).catch(() => {}); }, [user?.favorites]);
@@ -56,7 +58,7 @@ export default function FanAccount() {
   return (
     <div className="text-fsl-white">
       <div className="mx-auto max-w-[1200px] px-6 py-8 space-y-8" data-testid="fan-account">
-        <div><div className="fsl-kicker">Area genitori e tifosi</div><h1 className="text-4xl sm:text-5xl font-extrabold leading-[0.95]">Ciao {user.full_name.split(" ")[0]}, i tuoi preferiti</h1><p className="mt-2 text-sm text-fsl-slate max-w-2xl">Scorciatoie immediate alle prossime partite di tornei, squadre e giocatori che segui. Naviga liberamente il portale e aggiungi preferiti con il cuore ♥ da tornei, società e schede giocatore.</p><div className="mt-4 flex flex-wrap gap-2"><Link to="/" className="btn-gold" data-testid="fan-explore"><Trophy className="h-4 w-4" /> Esplora i tornei</Link></div></div>
+        <div><div className="fsl-kicker">Area genitori e tifosi</div><h1 className="text-4xl sm:text-5xl font-extrabold leading-[0.95]">Ciao {user.full_name.split(" ")[0]}, i tuoi preferiti</h1><p className="mt-2 text-sm text-fsl-slate max-w-2xl">Scorciatoie immediate alle prossime partite di tornei, squadre e giocatori che segui. Naviga liberamente il portale e aggiungi preferiti con il cuore ♥ da tornei, società e schede giocatore.</p><div className="mt-4 flex flex-wrap gap-2"><LinkChildButton onLinked={(d) => { api.get("/me/children").then((r) => setChildren(r.data)).catch(() => {}); if (d.tournament_slug) navigate(`/tornei/${d.tournament_slug}/giocatori/${d.player_id}`); }} /><Link to="/" className="btn-ghost" data-testid="fan-explore"><Trophy className="h-4 w-4" /> Esplora i tornei</Link></div></div>
         {feed && (feed.upcoming.length > 0 || feed.timeline.length > 0) && <MyFeed feed={feed} />}
         {children.length > 0 && <section data-testid="fan-children"><h2 className="fsl-section-title mb-3 flex items-center gap-2"><Baby className="h-5 w-5 text-fsl-gold" /> I miei bambini</h2><p className="text-xs text-fsl-slate mb-3">Abbinati dalla società alla tua email: puoi compilare la loro scheda «Mi presento».</p><div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">{children.map((c) => <Link key={c.id} to={`/tornei/${c.tournament_slug}/giocatori/${c.id}`} className="fsl-card p-4 flex items-center gap-3 hover:border-fsl-gold/60 transition-colors" data-testid={`fan-child-${c.id}`}>{c.photo_url ? <img src={mediaUrl(c.photo_url)} alt="" className="h-14 w-14 rounded-xl object-cover border border-fsl-gold/50" /> : <span className="h-14 w-14 rounded-xl bg-navy-700 inline-flex items-center justify-center font-display font-extrabold text-xl">{c.name[0]}</span>}<div className="min-w-0 flex-1"><div className="font-display font-bold uppercase truncate"><span className="num text-fsl-gold mr-1">{c.shirt_number ?? ""}</span>{c.name}</div><div className="text-xs text-fsl-slate truncate">{c.team} · {c.tournament_name}</div><div className="text-[10px] uppercase text-fsl-gold mt-1">Apri e compila la scheda →</div></div><ClubCrest club={c.club} size={32} /></Link>)}</div></section>}
         {empty && children.length === 0 && <div className="fsl-card-gold p-6 text-center space-y-3" data-testid="fan-empty"><Heart className="h-8 w-8 mx-auto text-fsl-gold" /><p className="text-sm">Non segui ancora nulla. Apri un torneo, una società o la scheda di un giocatore e tocca «Segui».</p><Link to="/" className="btn-ghost">Vai ai tornei</Link></div>}

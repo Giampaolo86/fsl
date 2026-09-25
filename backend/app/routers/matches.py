@@ -9,7 +9,7 @@ from ..core.deps import CurrentUser, get_current_user, require_tournament
 from ..core.errors import bad_request, conflict, forbidden, not_found
 from ..models.domain import ErrorReport, Match, MatchEvent, MatchReportVersion, Player
 from ..repositories.registry import scoped, settings_repo, users
-from ..services import audit, engine
+from ..services import audit, engine, linkcodes
 
 router = APIRouter(prefix="/tournaments/{tournament_id}", tags=["matches"])
 OPS = {"super_admin", "director"}
@@ -193,6 +193,21 @@ async def list_players(tournament_id: str, team_id: Optional[str] = None, club_i
     return [p.public() for p in await scoped("players", tournament_id).list(f, sort=[("shirt_number", 1), ("last_name", 1)])]
 
 
+@router.post("/players/{player_id}/link-code")
+async def regenerate_link_code(tournament_id: str, player_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Rigenera il codice figlio (revoca il precedente). Riservato a staff e società."""
+    t, role = await require_tournament(tournament_id, user, roles=STAFF | {"club_manager"}, writable=True)
+    p = await scoped("players", tournament_id).get(player_id)
+    if not p:
+        raise not_found("Giocatore")
+    if role == "club_manager" and p.club_id != user.club_in(tournament_id):
+        raise forbidden("Puoi gestire solo i giocatori della tua società")
+    code = linkcodes.new_code()
+    await scoped("players", tournament_id).update(p.id, {"link_code": code}, user.id)
+    await audit.record(user, "player.link_code", "player", p.id, tournament_id)
+    return {"link_code": code}
+
+
 @router.post("/players", status_code=201)
 async def create_player(tournament_id: str, body: PlayerIn, user: CurrentUser = Depends(get_current_user)):
     t, role = await require_tournament(tournament_id, user, roles=STAFF | {"club_manager"}, writable=True)
@@ -201,7 +216,7 @@ async def create_player(tournament_id: str, body: PlayerIn, user: CurrentUser = 
         raise not_found("Squadra")
     if role == "club_manager" and team.club_id != user.club_in(tournament_id):
         raise forbidden("Puoi gestire solo le rose della tua società")
-    p = await scoped("players", tournament_id).insert(Player(tournament_id=tournament_id, club_id=team.club_id, **body.model_dump()), user.id)
+    p = await scoped("players", tournament_id).insert(Player(tournament_id=tournament_id, club_id=team.club_id, link_code=linkcodes.new_code(), **body.model_dump()), user.id)
     await audit.record(user, "player.create", "player", p.id, tournament_id, after={"team_id": team.id, "name": f"{p.first_name} {p.last_name[:1]}."})
     return p.public()
 
@@ -298,7 +313,7 @@ async def get_match(tournament_id: str, match_id: str, user: CurrentUser = Depen
         raise forbidden("Gara non della tua società")
     d = (await _enrich(tournament_id, [m]))[0]
     players = await scoped("players", tournament_id).list({"team_id": {"$in": [m.home_team_id, m.away_team_id]}}, sort=[("shirt_number", 1)])
-    d["players"] = {"home": [p.public() for p in players if p.team_id == m.home_team_id], "away": [p.public() for p in players if p.team_id == m.away_team_id]}
+    d["players"] = {"home": [{**p.public(), "link_code": None} for p in players if p.team_id == m.home_team_id], "away": [{**p.public(), "link_code": None} for p in players if p.team_id == m.away_team_id]}
     d["report_versions"] = [v.public() for v in await scoped("report_versions", tournament_id).list({"match_id": m.id}, sort=[("version", -1)])]
     d["tickets"] = [e.public() for e in await scoped("error_reports", tournament_id).list({"match_id": m.id}, sort=[("created_at", -1)])] if role != "referee" else []
     d["can_edit_match"] = role in OPS or (role == "referee" and m.status not in FINAL + ("report_submitted",))

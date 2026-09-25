@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from ..core.deps import CurrentUser, get_current_user, require_tournament
 from ..core.errors import bad_request, conflict, forbidden, not_found
+from ..services.linkcodes import new_code
 from ..models.domain import Player, RosterImport
 from ..repositories.registry import scoped
 from ..services import audit
@@ -234,7 +235,7 @@ async def approve(tournament_id: str, import_id: str, body: ApproveIn, user: Cur
             await players.update(p.id, {"role": c["role"], "shirt_number": c["shirt_number"], "birth_year": c["birth_year"] or p.birth_year, "status": "active"}, user.id)
             updated += 1
         else:
-            await players.insert(Player(tournament_id=tournament_id, club_id=imp.club_id, team_id=imp.team_id, **c), user.id)
+            await players.insert(Player(link_code=new_code(), tournament_id=tournament_id, club_id=imp.club_id, team_id=imp.team_id, **c), user.id)
             created += 1
     imp2 = await repo.update(imp.id, {"status": "approved", "rows": rows, "note": body.note, "reviewed_by": user.id, "imported_count": created + updated}, user.id)
     await audit.record(user, "roster_import.approve", "roster_import", imp.id, tournament_id, after={"mode": body.mode, "created": created, "updated": updated})

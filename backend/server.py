@@ -93,6 +93,9 @@ async def startup():
 
     await legacy_indexes()
     await seed_all()
+    from app.services.linkcodes import ensure_link_codes
+
+    await ensure_link_codes()
     try:
         storage.init_storage()
     except Exception as e:  # noqa: BLE001

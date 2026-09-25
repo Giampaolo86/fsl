@@ -78,6 +78,31 @@ async def shortcuts(user: CurrentUser = Depends(get_current_user)):
 
 
 # ---------- figli abbinati (email del genitore) ----------
+class LinkCodeIn(BaseModel):
+    code: str
+
+
+@router.post("/me/children/link", status_code=201)
+async def link_child(body: LinkCodeIn, user: CurrentUser = Depends(get_current_user)):
+    """Il genitore (o zio, fratello…) inserisce il codice figlio consegnato dalla società/organizzazione."""
+    from ..core.db import db
+    from ..services.linkcodes import normalize
+
+    code = normalize(body.code)
+    if len(code) != 9:
+        raise bad_request("Il codice è di 9 caratteri (lettere e numeri)")
+    doc = await db.players.find_one({"link_code": code, "deleted_at": None})
+    if not doc:
+        raise bad_request("Codice non valido: controlla con la società o l'organizzazione")
+    email = user.email.lower()
+    if email in [e.lower() for e in doc.get("guardian_emails") or []]:
+        raise conflict("Sei già abbinato a questo atleta")
+    await db.players.update_one({"_id": doc["_id"]}, {"$addToSet": {"guardian_emails": email}})
+    t = await tournaments.get(doc["tournament_id"])
+    await audit.record(user, "player.guardian_link", "player", str(doc["_id"]), doc["tournament_id"], after={"via": "link_code"})
+    return {"player_id": str(doc["_id"]), "name": f"{doc.get('first_name', '')} {doc.get('last_name', '')}".strip(), "tournament_slug": t.slug if t else None, "tournament": t.name if t else None}
+
+
 @router.get("/me/children")
 async def my_children(user: CurrentUser = Depends(get_current_user)):
     out = []
