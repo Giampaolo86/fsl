@@ -101,16 +101,17 @@ export default function PlayerProfile({ mode = "public" }) {
                 {card.can_edit === "guardian" && <span className="text-xs text-fsl-gold">Sei abbinato come genitore/tutore</span>}
               </div>
             </div>
-            <div className="relative flex justify-center lg:justify-end min-h-[300px]">
-              <span className="absolute -top-6 left-1/2 -translate-x-1/2 lg:left-auto lg:-right-6 num font-display font-extrabold text-[240px] sm:text-[300px] leading-none text-white/10 select-none pointer-events-none" style={{ textShadow: "0 0 40px rgba(255,255,255,0.1)" }} aria-hidden>{card.shirt_number ?? ""}</span>
+            <div className="relative flex justify-center lg:justify-end min-h-[320px] lg:-my-10">
+              <span className="absolute top-0 left-1/2 -translate-x-[70%] num font-display font-extrabold text-[260px] sm:text-[340px] leading-none select-none pointer-events-none" style={{ color: "rgba(255,255,255,0.14)", textShadow: "0 0 60px rgba(255,255,255,0.12), 0 0 2px rgba(255,255,255,0.4)" }} aria-hidden>{card.shirt_number ?? ""}</span>
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-6 h-40 w-[80%] rounded-full pointer-events-none" style={{ background: "radial-gradient(ellipse at center, rgba(244,174,43,0.45) 0%, rgba(244,174,43,0) 70%)", filter: "blur(18px)" }} aria-hidden />
               <div className="relative">
-                {card.photo_url ? <img src={mediaUrl(card.photo_url)} alt="" className="relative h-72 w-72 sm:h-80 sm:w-80 object-cover rounded-[28px]" style={{ maskImage: "linear-gradient(180deg,#000 70%,transparent 100%)", WebkitMaskImage: "linear-gradient(180deg,#000 70%,transparent 100%)", filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.6))" }} data-testid="player-profile-photo" /> : <div className="relative h-72 w-72 sm:h-80 sm:w-80 rounded-[28px] border border-fsl-gold/40 bg-ink-950/60 flex items-center justify-center"><User className="h-24 w-24 text-white/20" /></div>}
+                {card.photo_url ? <img src={mediaUrl(card.photo_url)} alt="" className="relative h-[340px] sm:h-[420px] lg:h-[460px] w-auto max-w-[360px] object-contain object-bottom" style={{ maskImage: "linear-gradient(180deg,#000 82%,transparent 100%)", WebkitMaskImage: "linear-gradient(180deg,#000 82%,transparent 100%)", filter: "drop-shadow(0 24px 40px rgba(0,0,0,0.7)) drop-shadow(0 0 18px rgba(244,174,43,0.25))" }} data-testid="player-profile-photo" /> : <div className="relative h-72 w-72 sm:h-80 sm:w-80 rounded-[28px] border border-fsl-gold/40 bg-ink-950/60 flex items-center justify-center"><User className="h-24 w-24 text-white/20" /></div>}
                 {card.can_edit && <label className="absolute bottom-3 right-3 h-11 w-11 rounded-full bg-fsl-gold text-ink-950 inline-flex items-center justify-center cursor-pointer shadow-elev hover:scale-105 transition-transform" title="Carica foto (ritaglio quadrato automatico)"><input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(e.target.files[0])} disabled={uploading} data-testid="player-photo-input" />{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}</label>}
-                <Signature className="absolute -right-6 bottom-8 hidden sm:block">{card.name}</Signature>
               </div>
             </div>
-            <div className="flex lg:flex-col items-center lg:items-end justify-between gap-6">
+            <div className="flex lg:flex-col items-center lg:items-end justify-between gap-6 lg:gap-4">
               <HandClaim />
+              <Signature className="hidden lg:block text-right pr-2">{first}<br />{last}</Signature>
               <OvrBox value={card.avg_fanta == null ? "–" : Number(card.avg_fanta).toFixed(1)} testId="player-ovr" />
             </div>
           </div>
@@ -152,7 +153,7 @@ export default function PlayerProfile({ mode = "public" }) {
                       <td className="px-2 py-2.5 num text-fsl-slate whitespace-nowrap"><Link to={matchTo(h.match_id)}>{fmtDate(h.kickoff_at)}</Link></td>
                       <td className="px-2 py-2.5"><Link to={matchTo(h.match_id)} className="inline-flex items-center gap-2 min-w-0"><ClubCrest club={{ name: h.opponent, crest_url: h.opponent_crest_url, colors: h.opponent_colors }} size={22} /><span className="truncate font-semibold">{h.opponent}</span></Link></td>
                       <td className="px-2 py-2.5 text-center whitespace-nowrap"><span className="inline-flex items-center gap-1.5" title={RESULT_LABEL[h.result]}><ResultDot r={h.result} /><span className="num font-bold">{h.score}</span></span></td>
-                      <td className="px-2 py-2.5 text-center num font-display font-extrabold text-base text-white">{fmtVote(h.fanta)}</td>
+                      <td className="px-2 py-2.5 text-center num font-display font-extrabold text-base text-white">{h.fanta == null ? "–" : Number(h.fanta).toFixed(1)}</td>
                       <td className="px-2 py-2.5 text-right"><span className="inline-flex flex-wrap justify-end gap-1">{h.badges.slice(0, 2).map((b) => <span key={b} className="inline-flex h-6 items-center gap-1 rounded-md border border-fsl-gold/70 bg-fsl-gold/10 px-1.5 text-[9px] font-extrabold uppercase text-fsl-gold">{b === "mvp" ? <Trophy className="h-3 w-3" /> : <Star className="h-3 w-3" />}{b === "muro" ? "Clean sheet" : b}</span>)}{h.badges.length === 0 && <span className="text-fsl-slate">-</span>}</span></td>
                     </tr>
                   ))}

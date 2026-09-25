@@ -110,6 +110,15 @@ async def seed_clubs(t, club_rows, actor, competition_code_for_teams=None):
     return created
 
 
+async def _showcase():
+    try:
+        from .seed_showcase import seed_showcase
+
+        await seed_showcase()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("showcase seed failed: %s", e)
+
+
 async def seed_all():
     admin_email = os.environ["ADMIN_EMAIL"]
     admin_password = os.environ["ADMIN_PASSWORD"]
@@ -127,6 +136,7 @@ async def seed_all():
     if await tournaments.find_one({"slug": "la-serie-a-dei-bambini"}):
         await seed_match_engine(actor)
         await seed_legacy_demo()
+        await _showcase()
         return
 
     org = await organizations.find_one({"slug": "future-stars-league"})
@@ -222,6 +232,7 @@ async def seed_all():
     logger.info("demo seed completed")
     await seed_match_engine(actor)
     await seed_legacy_demo()
+    await _showcase()
 
 
 async def seed_legacy_demo():

@@ -52,7 +52,7 @@ export function OvrBox({ value, label = "Forma stagionale", kicker = "OVR", test
 
 export function StatTile({ icon: Icon, value, label, testId }) {
   return (
-    <div className="relative min-w-0" data-testid={testId}>
+    <div className="relative min-w-0" style={{ filter: "drop-shadow(0 0 10px rgba(244,174,43,0.35))" }} data-testid={testId}>
       <div className="absolute inset-0" style={{ clipPath: OCT, background: "linear-gradient(160deg,#FFE9A8 0%,#F4AE2B 45%,#B8741A 75%,#FFD97A 100%)" }} />
       <div className="absolute inset-[2px] flex flex-col items-center justify-center text-center py-3" style={{ clipPath: OCT, background: "linear-gradient(180deg,#0E2238 0%,#061220 100%)" }}>
         <Icon className="h-5 w-5 text-fsl-gold" />
@@ -105,12 +105,12 @@ export function MediaCard({ p, to }) {
 
 export function MediaStrip({ items = [], onBuy, testId }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3" data-testid={testId}>
+    <div className="grid grid-cols-2 md:grid-cols-[1.25fr_1fr_1fr_1fr_1fr] gap-3" data-testid={testId}>
       {items.slice(0, 5).map((it) => (
-        <button key={it.id} type="button" onClick={() => onBuy?.(it)} className="group relative overflow-hidden rounded-xl border border-white/10 aspect-[4/3] bg-navy-800 text-left" data-testid={`media-strip-${it.id}`}>
+        <button key={it.id} type="button" onClick={() => onBuy?.(it)} className={`group relative overflow-hidden rounded-xl border aspect-[4/3] bg-navy-800 text-left ${it.kind === "video" ? "border-fsl-gold/70 shadow-[0_0_20px_rgba(244,174,43,0.2)]" : "border-white/10"}`} data-testid={`media-strip-${it.id}`}>
           {it.preview_url ? <img src={mediaUrl(it.preview_url)} alt="" className="absolute inset-0 h-full w-full object-cover blur-[1.5px] group-hover:blur-0 transition-[filter]" /> : <img src={STADIUM_BG} alt="" className="absolute inset-0 h-full w-full object-cover opacity-50" />}
-          {it.kind === "video" && <span className="absolute inset-0 flex items-center justify-center"><span className="h-12 w-12 rounded-full border-2 border-fsl-gold bg-ink-950/70 inline-flex items-center justify-center"><Play className="h-5 w-5 text-fsl-gold fill-fsl-gold" /></span></span>}
-          <div className="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-ink-950 to-transparent"><div className="text-[11px] font-semibold truncate">{it.title}</div><div className="text-[10px] text-fsl-gold num">{Number(it.price).toFixed(2).replace(".", ",")} €</div></div>
+          {it.kind === "video" && <span className="absolute inset-0 flex items-center justify-center"><span className="h-14 w-14 rounded-full border-2 border-fsl-gold bg-ink-950/70 inline-flex items-center justify-center shadow-[0_0_24px_rgba(244,174,43,0.5)]"><Play className="h-6 w-6 text-fsl-gold fill-fsl-gold" /></span></span>}
+          <div className="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-ink-950 to-transparent flex items-end justify-between gap-2"><div className="min-w-0"><div className="text-[11px] font-semibold truncate">{it.title}</div><div className="text-[10px] text-fsl-gold num">{Number(it.price).toFixed(2).replace(".", ",")} €</div></div>{it.kind === "video" && <span className="shrink-0 rounded bg-ink-950/80 border border-white/20 px-1.5 py-0.5 text-[10px] num">{it.duration || "02:18"}</span>}</div>
         </button>
       ))}
     </div>

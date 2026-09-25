@@ -140,7 +140,7 @@ async def player_card(tournament_id: str, p, public: bool = False):
         gf, ga = (m.score.get("home"), m.score.get("away")) if r["side"] == "home" else (m.score.get("away"), m.score.get("home"))
         history.append({"match_id": m.id, "round_name": m.round_name, "kickoff_at": m.kickoff_at, "opponent": teams[opp].name if opp in teams else "", "opponent_crest_url": opp_club.crest_url if opp_club and not opp_club.crest_is_placeholder else None, "opponent_colors": opp_club.colors if opp_club else None, "result": "W" if (gf or 0) > (ga or 0) else "L" if (gf or 0) < (ga or 0) else "D", "score": f"{gf}-{ga}", "vote": r["vote"], "fanta": r["fanta"], "events": r["events"], "badges": r["badges"]})
     ok = p.profile_visibility == "public" and p.media_consent
-    name = (p.public_name or f"{p.first_name} {p.last_name[:1]}.") if public else f"{p.first_name} {p.last_name}"
+    name = (p.public_name or f"{p.first_name} {p.last_name}") if public else f"{p.first_name} {p.last_name}"
     if public and not ok:
         name = "Giocatore"
     show = ok or not public
