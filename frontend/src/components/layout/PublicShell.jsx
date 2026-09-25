@@ -8,8 +8,8 @@ import { api } from "@/lib/api";
 
 const NAV = (slug, main) =>
   slug
-    ? [["Home", `/tornei/${slug}`], ["Partite", `/tornei/${slug}/partite`], ["Classifiche", `/tornei/${slug}/classifiche`], ["Squadre", `/tornei/${slug}/squadre`], ["Statistiche", `/tornei/${slug}/statistiche`], ["Top 11", `/tornei/${slug}/top11`], ["FSL Weekly", `/tornei/${slug}/weekly`], ["News", `/tornei/${slug}/news`], ["Regolamento", `/tornei/${slug}/regolamento`]]
-    : [["Home", "/"], ["Tornei", { pathname: "/", hash: "#tornei" }], ["Classifiche", main ? `/tornei/${main}/classifiche` : "/tornei"], ["News", main ? `/tornei/${main}/news` : "/tornei"], ["Albo d'oro", "/albo-doro"], ["Media", { pathname: "/", hash: "#media" }], ["Contatti", { pathname: "/", hash: "#contatti" }]];
+    ? [["Home", `/tornei/${slug}`], ["Partite", `/tornei/${slug}/partite`], ["Classifiche", `/tornei/${slug}/classifiche`], ["Squadre", `/tornei/${slug}/squadre`], ["Statistiche", `/tornei/${slug}/statistiche`], ["FSL Weekly", `/tornei/${slug}/weekly`], ["News", `/tornei/${slug}/news`], ["Regolamento", `/tornei/${slug}/regolamento`]]
+    : [["Home", "/"], ["Tornei", "/tornei"], ["Classifiche", main ? `/tornei/${main}/classifiche` : "/tornei"], ["News", main ? `/tornei/${main}/news` : "/tornei"], ["Albo d'oro", "/albo-doro"], ["Media", { pathname: "/", hash: "#media" }], ["Contatti", { pathname: "/", hash: "#contatti" }]];
 
 const TikTok = ({ className }) => <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true"><path d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 0 1-2.59 2.5 2.6 2.6 0 0 1-2.6-2.6 2.6 2.6 0 0 1 3.4-2.47V9.66a5.72 5.72 0 0 0-.8-.06 5.7 5.7 0 0 0-5.7 5.7 5.7 5.7 0 0 0 5.7 5.7 5.7 5.7 0 0 0 5.7-5.7V9.01a7.35 7.35 0 0 0 4.3 1.38V7.3a4.3 4.3 0 0 1-3.26-1.48Z" /></svg>;
 const SOCIAL = [[Instagram, "Instagram"], [Youtube, "YouTube"], [TikTok, "TikTok"], [Facebook, "Facebook"]];

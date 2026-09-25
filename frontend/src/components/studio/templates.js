@@ -1,5 +1,5 @@
 import { GOLD, INK, NAVY, SLATE, WHITE, drawFifaCard, fmt1, loadFonts, loadImg, preload, splitName } from "@/components/fsl/FifaCard";
-import { renderTop11 } from "@/components/fsl/Top11Board";
+import { drawPosterFooter, drawPosterHeader, drawStadium, renderTop11 } from "@/components/fsl/Top11Board";
 
 const F = (w, s, fam = '"Barlow Condensed", "Arial Narrow", sans-serif') => `${w} ${s}px ${fam}`;
 const fit = (ctx, t, max) => { let s = t || ""; while (ctx.measureText(s).width > max && s.length > 2) s = `${s.slice(0, -2)}…`; return s; };
@@ -91,23 +91,36 @@ export async function renderMvp(ctx, W, H, s, opts) {
 }
 
 export async function renderStandings(ctx, W, H, d, opts) {
-  await loadFonts(); bg(ctx, W, H);
-  await header(ctx, W, `${d.tournament} · ${d.competition}`, opts.headline || "Classifica", d.match_day ? `Dopo la giornata ${d.match_day}` : "Aggiornata ai risultati ufficiali");
-  const rows = d.rows.slice(0, H > 1400 ? 20 : H < 1200 ? 10 : 14);
-  const top = 300, rowH = Math.min(64, (H - top - 120) / Math.max(rows.length, 1));
-  ctx.font = "600 16px Inter, Arial, sans-serif"; ctx.fillStyle = SLATE; ctx.textAlign = "right"; ctx.textBaseline = "middle";
-  [["PG", W - 380], ["V", W - 310], ["N", W - 250], ["P", W - 190], ["DR", W - 130], ["PT", W - 70]].forEach(([l, x]) => ctx.fillText(l, x, top - 22));
+  await loadFonts(); await drawStadium(ctx, W, H);
+  const scale = H < 1200 ? 0.5 : H > 1400 ? 0.9 : 0.66;
+  const top = (await drawPosterHeader(ctx, W, { gold: (opts.headline || "Classifica").toUpperCase(), white: "SETTIMANALE", sub: "I leader del campionato", pill: d.match_day ? `Giornata ${d.match_day}` : d.competition, y0: H > 1400 ? 60 : 30, scale })) + 20;
+  const rows = d.rows.slice(0, H > 1400 ? 18 : H < 1200 ? 10 : 12);
+  await preload(rows.map((r) => r.club?.crest_url));
+  const fy = H - 130, avail = fy - top - 40, rowH = Math.min(78, Math.floor((avail - 44) / Math.max(rows.length, 1)));
+  const cols = [["PT", 640], ["PG", 720], ["V", 786], ["N", 848], ["P", 910], ["GF", 972], ["GS", 1034]];
+  ctx.fillStyle = "rgba(3,19,31,0.85)"; ctx.beginPath(); ctx.roundRect(560, top, W - 560 - 40, 40, 8); ctx.fill(); ctx.strokeStyle = "rgba(244,174,43,0.7)"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.font = "700 20px Inter, Arial, sans-serif";
+  cols.forEach(([l, x], i) => { ctx.fillStyle = i === 0 ? GOLD : "rgba(255,255,255,0.85)"; ctx.fillText(l, x, top + 20); if (i) { ctx.fillStyle = "rgba(244,174,43,0.35)"; ctx.fillRect(x - 31, top + 8, 1, 24); } });
+  const medal = ["#F4AE2B", "#C9D3DE", "#C8811A"];
   for (let i = 0; i < rows.length; i++) {
-    const r = rows[i], y = top + i * rowH;
-    ctx.fillStyle = i < 3 ? "rgba(244,174,43,0.10)" : i % 2 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.07)"; ctx.beginPath(); ctx.roundRect(60, y, W - 120, rowH - 6, 12); ctx.fill();
-    ctx.textAlign = "left"; ctx.fillStyle = i < 3 ? GOLD : SLATE; ctx.font = F(800, 30); ctx.fillText(String(i + 1), 80, y + (rowH - 6) / 2);
-    ctx.fillStyle = r.club?.colors?.primary || "#0B57D9"; ctx.beginPath(); ctx.arc(140, y + (rowH - 6) / 2, 12, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = WHITE; ctx.font = F(700, 30); ctx.fillText(fit(ctx, r.name.toUpperCase(), 380), 168, y + (rowH - 6) / 2);
-    ctx.textAlign = "right"; ctx.font = "600 22px Inter, Arial, sans-serif"; ctx.fillStyle = SLATE;
-    [[r.PG, W - 380], [r.V, W - 310], [r.N, W - 250], [r.P, W - 190], [r.DR > 0 ? `+${r.DR}` : r.DR, W - 130]].forEach(([v, x]) => ctx.fillText(String(v), x, y + (rowH - 6) / 2));
-    ctx.fillStyle = GOLD; ctx.font = F(800, 34); ctx.fillText(String(r.PT), W - 70, y + (rowH - 6) / 2);
+    const r = rows[i], y = top + 52 + i * rowH, h = rowH - 8, podium = i < 3;
+    ctx.save(); if (podium) { ctx.shadowColor = medal[i]; ctx.shadowBlur = 22; }
+    ctx.fillStyle = podium ? "rgba(6,18,32,0.94)" : "rgba(3,19,31,0.82)"; ctx.beginPath(); ctx.roundRect(60, y, W - 120, h, 12); ctx.fill();
+    ctx.strokeStyle = podium ? medal[i] : "rgba(244,174,43,0.45)"; ctx.lineWidth = podium ? 3 : 1.5; ctx.stroke(); ctx.restore();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (podium) { ctx.fillStyle = medal[i]; ctx.beginPath(); ctx.arc(110, y + h / 2, h * 0.36, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = INK; ctx.font = F(800, h * 0.5); ctx.fillText(String(i + 1), 110, y + h / 2 + 1); if (i === 0) { ctx.fillStyle = GOLD; ctx.font = `700 ${h * 0.36}px Inter, Arial, sans-serif`; ctx.fillText("♛", 110, y - 2); } }
+    else { ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = F(800, h * 0.5); ctx.fillText(String(i + 1), 110, y + h / 2 + 1); }
+    ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(160, y + 8, 1, h - 16);
+    await crest(ctx, { name: r.club?.name || r.name, short_name: r.club?.short_name, colors: r.club?.colors, crest_url: r.club?.crest_url }, 176, y + h / 2 - h * 0.34, h * 0.68);
+    ctx.textAlign = "left"; ctx.fillStyle = WHITE; ctx.font = F(800, Math.min(34, h * 0.5)); ctx.fillText(fit(ctx, (r.club?.name || r.name).toUpperCase(), 360), 176 + h * 0.68 + 18, y + h / 2 + 1);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(244,174,43,0.14)"; ctx.beginPath(); ctx.roundRect(608, y + 6, 64, h - 12, 8); ctx.fill(); ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = GOLD; ctx.font = F(800, Math.min(38, h * 0.56)); ctx.fillText(String(r.PT), 640, y + h / 2 + 1);
+    ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.font = F(600, Math.min(28, h * 0.42));
+    [[r.PG, 720], [r.V, 786], [r.N, 848], [r.P, 910], [r.GF, 972], [r.GS, 1034]].forEach(([v, x]) => { ctx.fillText(String(v), x, y + h / 2 + 1); ctx.fillStyle = "rgba(255,255,255,0.1)"; ctx.fillRect(x - 31, y + 10, 1, h - 20); ctx.fillStyle = "rgba(255,255,255,0.92)"; });
   }
-  ctx.textBaseline = "top"; await footer(ctx, W, H, opts.sponsor);
+  ctx.textBaseline = "top";
+  await drawPosterFooter(ctx, W, H, opts.sponsor, "SOLO RISULTATI UFFICIALI · FSL");
 }
 
 export async function renderTop11Template(ctx, W, H, d, opts) {

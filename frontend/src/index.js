@@ -26,6 +26,10 @@ root.render(
 );
 
 if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
-  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").then((reg) => reg.update?.()).catch(() => {});
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (refreshing || !navigator.serviceWorker.controller) return; refreshing = true; window.location.reload(); });
+  });
 }
 

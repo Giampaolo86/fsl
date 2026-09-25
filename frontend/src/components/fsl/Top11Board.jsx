@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Download, Trophy } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { GOLD, INK, loadFonts, loadImg, preload } from "@/components/fsl/FifaCard";
@@ -32,20 +33,30 @@ export function Top11Header({ doc, competition, compact }) {
   );
 }
 
+function useWidth(ref) {
+  const [w, setW] = useState(0);
+  useEffect(() => { if (!ref.current) return; const ro = new ResizeObserver(([e]) => setW(e.contentRect.width)); ro.observe(ref.current); return () => ro.disconnect(); }, [ref]);
+  return w;
+}
+
 export function Top11Board({ doc, competition, tournamentName, editable = false, onPick, compact = false }) {
   const rows = rowsOf(doc);
-  const size = compact ? "sm" : "md";
+  const ref = useRef(null);
+  const bw = useWidth(ref);
+  const gap = bw < 480 ? 8 : compact ? 10 : 20;
+  const cardW = bw ? Math.max(78, Math.min(compact ? 112 : 150, Math.floor((bw - 16 - gap * 3) / 4))) : compact ? 112 : 150;
+  const isMobile = bw > 0 && bw < 480;
   return (
     <Pitch className="rounded-3xl border border-white/10 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]" testId="top11-board">
-      <Top11Header doc={doc} competition={competition} compact={compact} />
-      <div className={`relative px-3 ${compact ? "pt-6 pb-4 space-y-3" : "pt-10 sm:pt-12 pb-8 space-y-4 sm:space-y-6"}`} data-testid="top11-board-rows">
+      <Top11Header doc={doc} competition={competition} compact={compact || isMobile} />
+      <div ref={ref} className={`relative px-2 sm:px-3 ${compact || isMobile ? "pt-6 pb-4 space-y-3" : "pt-10 sm:pt-12 pb-8 space-y-4 sm:space-y-6"}`} data-testid="top11-board-rows">
         {rows.map((row, i) => (
-          <div key={i} className={`flex justify-center flex-wrap ${compact ? "gap-2" : "gap-3 sm:gap-6"}`}>
-            {row.map((s, j) => <div key={s.slot} className="animate-rise" style={{ animationDelay: `${(i * 4 + j) * 60}ms` }}><StadiumCard player={s.player} size={size} offRole={s.off_role} label={GROUP_LABEL[s.slot_group]} onClick={editable ? () => onPick?.(s) : undefined} testId={`top11-slot-${s.slot}`} /></div>)}
+          <div key={i} className="flex justify-center" style={{ gap }}>
+            {row.map((s, j) => <div key={s.slot} className="animate-rise" style={{ animationDelay: `${(i * 4 + j) * 60}ms` }}><StadiumCard player={s.player} width={cardW} offRole={s.off_role} label={GROUP_LABEL[s.slot_group]} onClick={editable ? () => onPick?.(s) : undefined} testId={`top11-slot-${s.slot}`} /></div>)}
           </div>
         ))}
       </div>
-      <div className={`relative mx-3 mb-3 flex items-center justify-between gap-3 rounded-xl border border-fsl-gold/40 bg-ink-950/80 backdrop-blur px-4 ${compact ? "h-10 text-[9px]" : "h-12 sm:h-14 text-[10px] sm:text-xs"} font-sans font-semibold tracking-[0.18em] uppercase text-fsl-white/90`}>
+      <div className={`relative mx-3 mb-3 flex items-center justify-between gap-3 rounded-xl border border-fsl-gold/40 bg-ink-950/80 backdrop-blur px-4 ${compact || isMobile ? "h-10 text-[9px]" : "h-12 sm:h-14 text-[10px] sm:text-xs"} font-sans font-semibold tracking-[0.18em] uppercase text-fsl-white/90`}>
         <span className="inline-flex items-center gap-2 truncate"><Trophy className="h-4 w-4 text-fsl-gold shrink-0" /><span className="truncate">{doc.sponsor ? <>Presented by <b className="text-fsl-gold">{doc.sponsor}</b></> : <>Scopri tornei, classifiche e highlights su <b className="text-fsl-gold">Future Stars League</b></>}</span></span>
         <span className="num text-fsl-slate shrink-0">{doc.formation}</span>
       </div>
@@ -60,7 +71,7 @@ export async function drawStadium(ctx, W, H) {
   const v = ctx.createLinearGradient(0, 0, 0, H); v.addColorStop(0, "rgba(3,19,31,0.6)"); v.addColorStop(0.3, "rgba(3,19,31,0.15)"); v.addColorStop(0.7, "rgba(3,19,31,0.1)"); v.addColorStop(1, "rgba(3,19,31,0.92)"); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
 }
 
-export async function drawTop11Header(ctx, W, doc, competition, y0 = 50, scale = 1) {
+export async function drawPosterHeader(ctx, W, { gold, white, sub, pill, hand = ["Il futuro", "scende", "in campo"], y0 = 50, scale = 1 }) {
   const s = scale;
   ctx.textBaseline = "top";
   const logo = await loadImg("/brand/logo.png");
@@ -70,16 +81,34 @@ export async function drawTop11Header(ctx, W, doc, competition, y0 = 50, scale =
   ctx.fillStyle = GOLD; ctx.font = `700 ${18 * s}px Inter, Arial, sans-serif`; ctx.fillText("L A   S E R I E   A   D E L   F U T U R O", x0 + lw + 18 * s, y0 + 62 * s);
   ctx.textAlign = "center";
   const g = ctx.createLinearGradient(0, y0 + 110 * s, 0, y0 + 260 * s); g.addColorStop(0, "#FFF0B8"); g.addColorStop(0.5, "#F4AE2B"); g.addColorStop(1, "#C8811A");
-  ctx.fillStyle = g; ctx.font = `800 ${190 * s}px "Barlow Condensed", "Arial Narrow", sans-serif`; ctx.fillText("TOP 11", W / 2, y0 + 96 * s);
-  ctx.fillStyle = "#fff"; ctx.font = `800 ${140 * s}px "Barlow Condensed", "Arial Narrow", sans-serif`; ctx.fillText("SETTIMANALE", W / 2, y0 + 262 * s);
+  ctx.fillStyle = g; ctx.font = `800 ${(gold.length > 7 ? 150 : 190) * s}px "Barlow Condensed", "Arial Narrow", sans-serif`; ctx.fillText(gold, W / 2, y0 + (gold.length > 7 ? 120 : 96) * s);
+  ctx.fillStyle = "#fff"; ctx.font = `800 ${140 * s}px "Barlow Condensed", "Arial Narrow", sans-serif`; ctx.fillText(white, W / 2, y0 + 262 * s);
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = `500 ${22 * s}px Inter, Arial, sans-serif`; const sub = (competition?.name || "I MIGLIORI DELLA SETTIMANA").toUpperCase().split("").join(" "); ctx.fillText(sub, W / 2, y0 + 398 * s);
-  const sw = ctx.measureText(sub).width; ctx.fillStyle = "rgba(244,174,43,0.8)"; ctx.fillRect(W / 2 - sw / 2 - 110 * s, y0 + 410 * s, 90 * s, 2); ctx.fillRect(W / 2 + sw / 2 + 20 * s, y0 + 410 * s, 90 * s, 2);
-  ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.fillStyle = "rgba(3,19,31,0.75)"; ctx.beginPath(); ctx.roundRect(W / 2 - 110 * s, y0 + 438 * s, 220 * s, 46 * s, 8 * s); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = GOLD; ctx.font = `800 ${20 * s}px Inter, Arial, sans-serif`; ctx.textBaseline = "middle"; ctx.fillText(`G I O R N A T A   ${doc.match_day}`, W / 2, y0 + 461 * s); ctx.textBaseline = "top";
-  ctx.save(); ctx.translate(W - 110 * s, y0 + 140 * s); ctx.rotate(-0.18); ctx.fillStyle = GOLD; ctx.font = `700 ${44 * s}px Caveat, cursive`; ctx.textAlign = "center"; ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 10; ["Il futuro", "scende", "in campo"].forEach((l, i) => ctx.fillText(l, 0, i * 44 * s)); ctx.restore();
-  return y0 + 500 * s;
+  ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = `500 ${22 * s}px Inter, Arial, sans-serif`; const subT = sub.toUpperCase().split("").join(" "); ctx.fillText(subT, W / 2, y0 + 398 * s);
+  const sw = ctx.measureText(subT).width; ctx.fillStyle = "rgba(244,174,43,0.8)"; ctx.fillRect(W / 2 - sw / 2 - 110 * s, y0 + 410 * s, 90 * s, 2); ctx.fillRect(W / 2 + sw / 2 + 20 * s, y0 + 410 * s, 90 * s, 2);
+  if (pill) { ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.fillStyle = "rgba(3,19,31,0.75)"; ctx.beginPath(); ctx.roundRect(W / 2 - 110 * s, y0 + 438 * s, 220 * s, 46 * s, 8 * s); ctx.fill(); ctx.stroke(); ctx.fillStyle = GOLD; ctx.font = `800 ${20 * s}px Inter, Arial, sans-serif`; ctx.textBaseline = "middle"; ctx.fillText(pill.toUpperCase().split("").join(" "), W / 2, y0 + 461 * s); ctx.textBaseline = "top"; }
+  ctx.save(); ctx.translate(W - 110 * s, y0 + 140 * s); ctx.rotate(-0.18); ctx.fillStyle = GOLD; ctx.font = `700 ${44 * s}px Caveat, cursive`; ctx.textAlign = "center"; ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 10; hand.forEach((l, i) => ctx.fillText(l, 0, i * 44 * s)); ctx.restore();
+  return y0 + (pill ? 500 : 440) * s;
 }
+
+export async function drawPosterFooter(ctx, W, H, sponsor, note = "") {
+  const footH = 120, fy = H - footH - 10;
+  ctx.fillStyle = "rgba(3,19,31,0.85)"; ctx.beginPath(); ctx.roundRect(40, fy, W - 80, 78, 14); ctx.fill(); ctx.strokeStyle = "rgba(244,174,43,0.6)"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.textBaseline = "middle"; ctx.textAlign = "left"; ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(80, fy + 39, 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = INK; ctx.font = '800 16px "Barlow Condensed", sans-serif'; ctx.textAlign = "center"; ctx.fillText("FSL", 80, fy + 40); ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.font = "600 20px Inter, Arial, sans-serif";
+  if (sponsor) {
+    ctx.fillText("P R E S E N T E D   B Y", 110, fy + 39); const pw = ctx.measureText("P R E S E N T E D   B Y").width; ctx.fillStyle = GOLD; ctx.font = '800 30px "Barlow Condensed", sans-serif'; ctx.fillText(sponsor.name.toUpperCase(), 110 + pw + 16, fy + 39);
+    const logoSrc = sponsor.logo || sponsor.logo_url; if (logoSrc) { const li = await loadImg(logoSrc); if (li) { const lh = 54, lw = lh * (li.width / li.height); ctx.fillStyle = "rgba(255,255,255,0.95)"; ctx.beginPath(); ctx.roundRect(W - 60 - lw - 16, fy + 39 - lh / 2 - 6, lw + 16, lh + 12, 8); ctx.fill(); ctx.drawImage(li, W - 60 - lw - 8, fy + 39 - lh / 2, lw, lh); } }
+  } else {
+    const a = "S C O P R I   T O R N E I ,   C L A S S I F I C H E   E   H I G H L I G H T S   S U"; ctx.fillText(a, 110, fy + 39); const aw = ctx.measureText(a).width; ctx.fillStyle = GOLD; ctx.font = '800 28px "Barlow Condensed", sans-serif'; ctx.fillText("FUTURE STARS LEAGUE", 110 + aw + 14, fy + 39);
+    ctx.strokeStyle = GOLD; ctx.beginPath(); ctx.arc(W - 78, fy + 39, 16, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = GOLD; ctx.font = "700 20px Inter, Arial, sans-serif"; ctx.textAlign = "center"; ctx.fillText("›", W - 78, fy + 38);
+  }
+  if (note) { ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "600 16px Inter, Arial, sans-serif"; ctx.fillText(note, W - 44, fy + 98); }
+  ctx.textBaseline = "top"; ctx.textAlign = "left";
+  return fy;
+}
+
+export const drawTop11Header = (ctx, W, doc, competition, y0 = 50, scale = 1) => drawPosterHeader(ctx, W, { gold: "TOP 11", white: "SETTIMANALE", sub: competition?.name || "I migliori della settimana", pill: `Giornata ${doc.match_day}`, y0, scale });
 
 export async function renderTop11(ctx, W, H, doc, competition, opts = {}) {
   await loadFonts();
@@ -99,19 +128,7 @@ export async function renderTop11(ctx, W, H, doc, competition, opts = {}) {
       await drawStadiumCard(ctx, { x: x0 + i * gap, y, w: cardW }, s.player, { offRole: s.off_role, img, label: GROUP_LABEL[s.slot_group] });
     }
   }
-  const fy = H - footH - 10; ctx.fillStyle = "rgba(3,19,31,0.85)"; ctx.beginPath(); ctx.roundRect(40, fy, W - 80, 78, 14); ctx.fill(); ctx.strokeStyle = "rgba(244,174,43,0.6)"; ctx.lineWidth = 2; ctx.stroke();
-  ctx.textBaseline = "middle"; ctx.textAlign = "left"; ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(80, fy + 39, 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = INK; ctx.font = '800 18px "Barlow Condensed", sans-serif'; ctx.textAlign = "center"; ctx.fillText("11", 80, fy + 40); ctx.textAlign = "left";
-  const sponsor = opts.sponsor || (doc.sponsor ? { name: doc.sponsor } : null);
-  ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.font = "600 20px Inter, Arial, sans-serif";
-  if (sponsor) {
-    ctx.fillText("P R E S E N T E D   B Y", 110, fy + 39); const pw = ctx.measureText("P R E S E N T E D   B Y").width; ctx.fillStyle = GOLD; ctx.font = '800 30px "Barlow Condensed", sans-serif'; ctx.fillText(sponsor.name.toUpperCase(), 110 + pw + 16, fy + 39);
-    if (sponsor.logo) { const li = await loadImg(sponsor.logo); if (li) { const lh = 54, lw = lh * (li.width / li.height); ctx.fillStyle = "rgba(255,255,255,0.95)"; ctx.beginPath(); ctx.roundRect(W - 60 - lw - 16, fy + 39 - lh / 2 - 6, lw + 16, lh + 12, 8); ctx.fill(); ctx.drawImage(li, W - 60 - lw - 8, fy + 39 - lh / 2, lw, lh); } }
-  } else {
-    const a = "S C O P R I   T O R N E I ,   C L A S S I F I C H E   E   H I G H L I G H T S   S U"; ctx.fillText(a, 110, fy + 39); const aw = ctx.measureText(a).width; ctx.fillStyle = GOLD; ctx.font = '800 28px "Barlow Condensed", sans-serif'; ctx.fillText("FUTURE STARS LEAGUE", 110 + aw + 14, fy + 39);
-    ctx.strokeStyle = GOLD; ctx.beginPath(); ctx.arc(W - 78, fy + 39, 16, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = GOLD; ctx.font = "700 20px Inter, Arial, sans-serif"; ctx.textAlign = "center"; ctx.fillText("›", W - 78, fy + 38);
-  }
-  ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "600 16px Inter, Arial, sans-serif"; ctx.fillText(`${doc.formation} · FANTAVOTO UFFICIALE FSL`, W - 44, fy + 98);
-  ctx.textBaseline = "top";
+  await drawPosterFooter(ctx, W, H, opts.sponsor || (doc.sponsor ? { name: doc.sponsor } : null), `${doc.formation} · FANTAVOTO UFFICIALE FSL`);
 }
 
 export async function downloadTop11(doc, competition, ratio = "4:5") {

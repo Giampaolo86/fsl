@@ -1,5 +1,5 @@
 import "@/App.css";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { TournamentProvider } from "@/context/TournamentContext";
@@ -17,6 +17,7 @@ import Studio from "@/pages/admin/Studio";
 import { WeeklyDetail, WeeklyList } from "@/pages/public/WeeklyPublic";
 import { ClubHistory, HallOfFame, SeasonArchive } from "@/pages/public/HallOfFame";
 import Legacy from "@/pages/admin/Legacy";
+import { TabbedSection } from "@/components/fsl/SectionTabs";
 import Hub from "@/pages/admin/Hub";
 import NewTournament from "@/pages/admin/NewTournament";
 import Overview from "@/pages/admin/Overview";
@@ -58,6 +59,21 @@ function Logout() {
   const { logout } = useAuth();
   logout();
   return <Navigate to="/login" replace />;
+}
+
+function AdminWeeklyHub({ children }) {
+  const { tournamentId } = useParams();
+  return <TabbedSection testId="weekly-hub-tabs" tabs={[{ to: `/admin/t/${tournamentId}/weekly`, label: "Giornale" }, { to: `/admin/t/${tournamentId}/top11`, label: "Top 11" }]}>{children}</TabbedSection>;
+}
+
+function AdminMoneyHub({ children }) {
+  const { tournamentId } = useParams();
+  return <TabbedSection testId="money-hub-tabs" tabs={[{ to: `/admin/t/${tournamentId}/pagamenti`, label: "Pagamenti" }, { to: `/admin/t/${tournamentId}/vendite`, label: "Vendite" }]}>{children}</TabbedSection>;
+}
+
+function PublicWeeklyHub({ children }) {
+  const { slug } = useParams();
+  return <><div className="mx-auto max-w-[1488px] px-6 pt-8 -mb-8"><TabbedSection testId="public-weekly-tabs" tabs={[{ to: `/tornei/${slug}/weekly`, label: "FSL Weekly" }, { to: `/tornei/${slug}/top11`, label: "Top 11" }]} /></div>{children}</>;
 }
 
 function App() {
@@ -112,14 +128,14 @@ function AppRoutes() {
                 <Route path="rose" element={<Rosters />} />
                 <Route path="ticket" element={<Tickets />} />
                 <Route path="premi" element={<Awards />} />
-                <Route path="top11" element={<Top11Admin />} />
-                <Route path="weekly" element={<WeeklyAdmin />} />
+                <Route path="top11" element={<AdminWeeklyHub tab="top11"><Top11Admin /></AdminWeeklyHub>} />
+                <Route path="weekly" element={<AdminWeeklyHub tab="weekly"><WeeklyAdmin /></AdminWeeklyHub>} />
                 <Route path="studio" element={<Studio />} />
                 <Route path="legacy" element={<Legacy />} />
-                <Route path="pagamenti" element={<Payments />} />
+                <Route path="pagamenti" element={<AdminMoneyHub><Payments /></AdminMoneyHub>} />
                 <Route path="media" element={<BlogManager />} />
                 <Route path="documenti" element={<Documents />} />
-                <Route path="vendite" element={<Sales />} />
+                <Route path="vendite" element={<AdminMoneyHub><Sales /></AdminMoneyHub>} />
                 <Route path="comunicazioni" element={<ModulePlaceholder module="comunicazioni" />} />
               </Route>
 
@@ -163,8 +179,8 @@ function AppRoutes() {
                 <Route path="partite" element={<PublicMatches />} />
                 <Route path="partite/:matchId" element={<PublicMatchCenter />} />
                 <Route path="statistiche" element={<PublicStats />} />
-                <Route path="top11" element={<Top11Public />} />
-                <Route path="weekly" element={<WeeklyList />} />
+                <Route path="top11" element={<PublicWeeklyHub><Top11Public /></PublicWeeklyHub>} />
+                <Route path="weekly" element={<PublicWeeklyHub><WeeklyList /></PublicWeeklyHub>} />
                 <Route path="weekly/:issueId" element={<WeeklyDetail />} />
                 <Route path="news" element={<PublicNews />} />
                 <Route path="news/:postSlug" element={<PublicPost />} />

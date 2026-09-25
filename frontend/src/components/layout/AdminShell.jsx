@@ -25,20 +25,20 @@ const TOURNAMENT_NAV = (id) => [
   { to: `/admin/t/${id}/classifiche`, label: "Classifiche", icon: BarChart3 },
   { to: `/admin/t/${id}/rose`, label: "Rose", icon: Users },
   { to: `/admin/t/${id}/premi`, label: "Premi", icon: Award },
-  { to: `/admin/t/${id}/top11`, label: "Top 11", icon: Sparkles },
-  { to: `/admin/t/${id}/weekly`, label: "FSL Weekly", icon: Newspaper },
+  { to: `/admin/t/${id}/weekly`, label: "FSL Weekly · Top 11", icon: Newspaper, match: ["weekly", "top11"] },
   { to: `/admin/t/${id}/studio`, label: "Social Studio", icon: Palette },
   { to: `/admin/t/${id}/legacy`, label: "Albo d'oro", icon: Archive },
-  { to: `/admin/t/${id}/pagamenti`, label: "Pagamenti", icon: CreditCard },
+  { to: `/admin/t/${id}/pagamenti`, label: "Pagamenti e vendite", icon: CreditCard, match: ["pagamenti", "vendite"] },
   { to: `/admin/t/${id}/comunicazioni`, label: "Contatti", icon: Phone },
   { to: `/admin/t/${id}/ticket`, label: "Ticket", icon: Ticket },
   { to: `/admin/t/${id}/media`, label: "Blog e interviste", icon: Image },
   { to: `/admin/t/${id}/documenti`, label: "Documenti", icon: FileText },
-  { to: `/admin/t/${id}/vendite`, label: "Vendite", icon: ShoppingBag },
   { to: `/admin/t/${id}/audit`, label: "Audit", icon: Archive },
 ];
 
-function NavItem({ to, label, icon: Icon, end, onClick }) {
+function NavItem({ to, label, icon: Icon, end, onClick, match }) {
+  const { pathname } = useLocation();
+  const forced = match?.some((m) => pathname.split("/").includes(m));
   return (
     <NavLink
       to={to}
@@ -47,7 +47,7 @@ function NavItem({ to, label, icon: Icon, end, onClick }) {
       data-testid={`sidebar-nav-${label.toLowerCase()}`}
       className={({ isActive }) =>
         `flex items-center gap-3 min-h-[44px] py-2 pl-4 pr-3 text-[12.5px] leading-tight font-semibold uppercase tracking-wide border-l-[3px] transition-colors ${
-          isActive ? "border-fsl-gold text-fsl-gold bg-white/[0.06]" : "border-transparent text-fsl-slate hover:text-fsl-white hover:bg-white/[0.04]"
+          isActive || forced ? "border-fsl-gold text-fsl-gold bg-white/[0.06]" : "border-transparent text-fsl-slate hover:text-fsl-white hover:bg-white/[0.04]"
         }`
       }
     >

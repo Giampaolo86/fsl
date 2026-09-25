@@ -126,7 +126,7 @@ async def compute_standings(t_id: str, c) -> list[dict]:
     teams = await scoped("teams", t_id).list({"competition_id": c.id})
     clubs = {cl.id: cl for cl in await scoped("clubs", t_id).list()}
     matches = await scoped("matches", t_id).list({"competition_id": c.id, "stage": "qualification", "status": {"$in": ["official", "rectified"]}}, sort=[("kickoff_at", 1)])
-    rows = {tm.id: {"team_id": tm.id, "name": tm.name, "club": {"name": clubs[tm.club_id].name, "short_name": clubs[tm.club_id].short_name, "colors": clubs[tm.club_id].colors, "slug": clubs[tm.club_id].slug} if tm.club_id in clubs else None, "PG": 0, "V": 0, "N": 0, "P": 0, "GF": 0, "GS": 0, "DR": 0, "PT": 0, "fair_play": 0, "form": []} for tm in teams}
+    rows = {tm.id: {"team_id": tm.id, "name": tm.name, "club": {"name": clubs[tm.club_id].name, "short_name": clubs[tm.club_id].short_name, "colors": clubs[tm.club_id].colors, "slug": clubs[tm.club_id].slug, "crest_url": None if clubs[tm.club_id].crest_is_placeholder else clubs[tm.club_id].crest_url} if tm.club_id in clubs else None, "PG": 0, "V": 0, "N": 0, "P": 0, "GF": 0, "GS": 0, "DR": 0, "PT": 0, "fair_play": 0, "form": []} for tm in teams}
     h2h = defaultdict(lambda: defaultdict(int))
     for m in matches:
         h, a = m.score.get("home"), m.score.get("away")

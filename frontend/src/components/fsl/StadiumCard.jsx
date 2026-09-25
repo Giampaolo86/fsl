@@ -2,7 +2,8 @@ import { GOLD, ROLE_ABBR, fmt1, loadImg, splitName } from "@/components/fsl/Fifa
 import { mediaUrl } from "@/lib/upload";
 
 const CLIP = "polygon(7% 0,93% 0,100% 5%,100% 95%,93% 100%,7% 100%,0 95%,0 5%)";
-const SIZES = { sm: { w: 112, role: 7, rating: 22, first: 7, last: 11, club: 6.5, crest: 14 }, md: { w: 150, role: 9, rating: 30, first: 9, last: 15, club: 8, crest: 18 }, lg: { w: 220, role: 12, rating: 44, first: 12, last: 22, club: 11, crest: 26 } };
+const SIZE_W = { xs: 84, sm: 112, md: 150, lg: 220 };
+const sizeFor = (w) => { const u = w / 150; return { w, role: Math.max(6, 9 * u), rating: 30 * u, first: Math.max(6, 9 * u), last: Math.max(9, 15 * u), club: Math.max(6, 8 * u), crest: Math.max(12, 18 * u) }; };
 const GOLD_EDGE = "linear-gradient(160deg,#FFE9A8 0%,#F4AE2B 40%,#B8741A 70%,#FFD97A 100%)";
 const SILVER_EDGE = "linear-gradient(160deg,#F1F4F8 0%,#B9C4D1 40%,#7E8C9C 70%,#E5EBF2 100%)";
 
@@ -11,8 +12,8 @@ function Crest({ p, size }) {
   return <span className="inline-flex items-center justify-center rounded-full overflow-hidden shrink-0 bg-white/95" style={{ width: size, height: size }}>{p.crest_url ? <img src={mediaUrl(p.crest_url)} alt="" className="h-full w-full object-contain p-[1px]" draggable={false} /> : <span className="font-display font-extrabold" style={{ fontSize: size * 0.42, color: p.colors?.primary || "#0B57D9" }}>{initials}</span>}</span>;
 }
 
-export function StadiumCard({ player: p, size = "md", offRole = false, label, onClick, disabled, testId, className = "" }) {
-  const s = SIZES[size], W = s.w, H = Math.round(W * 1.17);
+export function StadiumCard({ player: p, size = "md", width, offRole = false, label, onClick, disabled, testId, className = "" }) {
+  const s = sizeFor(width || SIZE_W[size]), W = s.w, H = Math.round(W * 1.17);
   const [first, last] = splitName(p?.name || "");
   const Tag = onClick ? "button" : "div";
   return (

@@ -21,7 +21,7 @@ export function HubHero({ main }) {
           <div className="mt-9 flex flex-wrap gap-3">
             <Link to="/login" className="btn-gold h-12 px-7 uppercase tracking-wide font-display text-base shadow-[0_10px_30px_-10px_rgba(244,174,43,0.8)]" data-testid="hero-login"><UserRound className="h-4 w-4" /> Accedi</Link>
             <a href="#missione" className="btn-ghost h-12 px-6 uppercase tracking-wide font-display text-base border-fsl-gold/50 hover:border-fsl-gold" data-testid="hero-discover">Scopri FSL <ArrowRight className="h-4 w-4" /></a>
-            <a href="#tornei" className="btn-ghost h-12 px-6 uppercase tracking-wide font-display text-base border-fsl-gold/50 hover:border-fsl-gold" data-testid="hero-tournaments"><Trophy className="h-4 w-4" /> Tornei attivi</a>
+            <Link to="/tornei" className="btn-ghost h-12 px-6 uppercase tracking-wide font-display text-base border-fsl-gold/50 hover:border-fsl-gold" data-testid="hero-tournaments"><Trophy className="h-4 w-4" /> Tornei attivi</Link>
           </div>
         </div>
         <div className="relative hidden lg:block min-h-[420px]">

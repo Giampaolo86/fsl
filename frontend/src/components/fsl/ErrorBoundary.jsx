@@ -8,16 +8,26 @@ export class ErrorBoundary extends React.Component {
     return { error };
   }
 
-  componentDidCatch(error) {
-    const stale = /ChunkLoadError|Loading chunk|dynamically imported module|Unexpected token '<'/.test(String(error?.message || error));
-    if (stale && !sessionStorage.getItem("fsl-reloaded")) {
+  static isStale(error) {
+    return /ChunkLoadError|Loading chunk|Loading CSS chunk|dynamically imported module|Unexpected token '<'|Importing a module script failed/.test(String(error?.message || error));
+  }
+
+  async componentDidCatch(error) {
+    if (ErrorBoundary.isStale(error) && !sessionStorage.getItem("fsl-reloaded")) {
       sessionStorage.setItem("fsl-reloaded", "1");
+      try { const keys = await caches.keys(); await Promise.all(keys.map((k) => caches.delete(k))); } catch { /* no cache API */ }
+      try { const regs = await navigator.serviceWorker?.getRegistrations?.(); await Promise.all((regs || []).map((r) => r.update())); } catch { /* no sw */ }
       window.location.reload();
+    } else if (!ErrorBoundary.isStale(error)) {
+      sessionStorage.removeItem("fsl-reloaded");
     }
   }
 
   render() {
     if (!this.state.error) return this.props.children;
+    if (ErrorBoundary.isStale(this.state.error) && !sessionStorage.getItem("fsl-reloaded")) {
+      return <div className="min-h-screen bg-navy-900 text-fsl-white flex items-center justify-center p-6" data-testid="app-updating"><div className="text-center"><RefreshCw className="h-8 w-8 mx-auto text-fsl-gold animate-spin" /><div className="mt-4 font-display font-extrabold uppercase text-xl">Aggiornamento in corso…</div><p className="mt-1 text-sm text-fsl-slate">Stiamo caricando la nuova versione dell'app.</p></div></div>;
+    }
     return (
       <div className="min-h-screen bg-navy-900 text-fsl-white flex items-center justify-center p-6" data-testid="app-error-boundary">
         <div className="fsl-card p-8 max-w-md text-center">

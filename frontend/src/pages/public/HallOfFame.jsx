@@ -56,7 +56,8 @@ export function HallOfFame() {
 }
 
 export function SeasonArchive() {
-  const { archiveSlug: slug } = useParams();
+  const params = useParams();
+  const slug = params.archiveSlug;
   const [a, setA] = useState(null);
   const [err, setErr] = useState(null);
   useEffect(() => { api.get(`/public/legacy/${slug}`).then((r) => setA(r.data)).catch(setErr); }, [slug]);

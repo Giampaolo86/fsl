@@ -24,10 +24,10 @@ export function StandingsTable({ competition, rows, clubBase, testId }) {
           <tbody>
             {rows.length === 0 && <tr><td colSpan={11} className="text-center text-sm text-fsl-slate py-8">Nessuna squadra iscritta.</td></tr>}
             {rows.map((r) => (
-              <tr key={r.team_id} className="h-12" data-testid={`standings-row-${r.pos}`}>
+              <tr key={r.team_id} className={`h-12 ${r.pos === 1 ? "bg-fsl-gold/[0.08]" : r.pos <= 3 ? "bg-white/[0.03]" : ""}`} data-testid={`standings-row-${r.pos}`}>
                 <td className="num font-display font-bold text-lg relative">
                   {r.zone && <span className={`absolute left-0 top-2 bottom-2 w-1 rounded-r ${ZONE[r.zone]?.[1] || "bg-fsl-slate"}`} aria-hidden="true" />}
-                  {r.pos}
+                  {r.pos <= 3 ? <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm text-ink-950 ${r.pos === 1 ? "bg-fsl-gold shadow-[0_0_14px_rgba(244,174,43,0.6)]" : r.pos === 2 ? "bg-[#C9D3DE]" : "bg-[#C8811A]"}`}>{r.pos}</span> : r.pos}
                 </td>
                 <td>
                   <span className="flex items-center gap-2 font-semibold">
@@ -37,7 +37,7 @@ export function StandingsTable({ competition, rows, clubBase, testId }) {
                 </td>
                 <td className="num text-right">{r.PG}</td><td className="num text-right hidden md:table-cell">{r.V}</td><td className="num text-right hidden md:table-cell">{r.N}</td><td className="num text-right hidden md:table-cell">{r.P}</td>
                 <td className="num text-right hidden lg:table-cell">{r.GF}</td><td className="num text-right hidden lg:table-cell">{r.GS}</td><td className="num text-right hidden sm:table-cell">{r.DR > 0 ? `+${r.DR}` : r.DR}</td>
-                <td className="num text-right font-display font-extrabold text-xl text-fsl-gold">{r.PT}</td>
+                <td className="text-right"><span className="num inline-flex min-w-[40px] h-8 items-center justify-center rounded-md border border-fsl-gold/50 bg-fsl-gold/10 px-2 font-display font-extrabold text-xl text-fsl-gold">{r.PT}</span></td>
                 <td className="hidden sm:table-cell"><span className="flex gap-0.5">{r.form.map((f, i) => <span key={i} className={`h-5 w-5 rounded text-[10px] font-bold inline-flex items-center justify-center ${f === "V" ? "bg-fsl-success text-ink-950" : f === "N" ? "bg-fsl-slate text-ink-950" : "bg-fsl-danger"}`}>{f}</span>)}</span></td>
               </tr>
             ))}
