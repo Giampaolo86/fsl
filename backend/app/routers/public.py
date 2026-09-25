@@ -293,7 +293,7 @@ async def club_page(slug: str, club_slug: str):
         ps = [p for p in players if p.team_id == tm.id]
         rows = [{"id": p.id, "name": _pname(p), "role": p.role, "shirt_number": p.shirt_number, "photo_url": p.photo_url, "badges": bmap.get(p.id, [])[:6]} if (p.profile_visibility == "public" and p.media_consent) else {"id": None, "name": "Giocatore", "role": p.role, "shirt_number": p.shirt_number, "photo_url": None, "badges": []} for p in ps]
         rosters.append({"team": tm.public(), "competition": comps[tm.competition_id].name if tm.competition_id in comps else "", "players": rows, "count": len(ps)})
-    recent = await scoped("matches", t.id).list({"$or": [{"home_team_id": {"$in": ids}}, {"away_team_id": {"$in": ids}}], "status": {"$in": FINAL}}, sort=[("kickoff_at", -1)], limit=5)
+    recent = await scoped("matches", t.id).list({"$or": [{"home_team_id": {"$in": ids}}, {"away_team_id": {"$in": ids}}], "status": {"$in": FINAL}}, sort=[("kickoff_at", -1)], limit=10)
     from .posts import public_posts
 
     posts = await public_posts(t.id, "news,interview,gallery,video,match_story", club.id, limit=8)
@@ -303,7 +303,17 @@ async def club_page(slug: str, club_slug: str):
     match_ids = [m.id for m in await scoped("matches", t.id).list({"$or": [{"home_team_id": {"$in": ids}}, {"away_team_id": {"$in": ids}}]}, limit=2000)]
     shop = await scoped("paid_media", t.id).list({"match_id": {"$in": match_ids}, "active": True}, sort=[("created_at", -1)], limit=8)
     others = [{"slug": o.slug, "name": o.name, "season": o.season_label} for o in await __import__("app.repositories.registry", fromlist=["tournaments"]).tournaments.list({"published": True}) if o.id != t.id and await scoped("clubs", o.id).find_one({"slug": club.slug})]
-    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": venue.public() if venue else None, "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others, "history": history}
+    standings = []
+    for tm in teams:
+        c = comps.get(tm.competition_id)
+        if not c:
+            continue
+        rows = await engine.compute_standings(t.id, c)
+        pos = next((i + 1 for i, r in enumerate(rows) if r["team_id"] == tm.id), None)
+        row = next((r for r in rows if r["team_id"] == tm.id), None)
+        if row:
+            standings.append({"team_id": tm.id, "team": tm.name, "competition": c.name, "category": c.category, "pos": pos, "total": len(rows), "PT": row.get("PT", 0), "PG": row.get("PG", 0), "V": row.get("V", 0), "N": row.get("N", 0), "P": row.get("P", 0), "GF": row.get("GF", 0), "GS": row.get("GS", 0)})
+    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": venue.public() if venue else None, "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "standings": standings, "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others, "history": history}
 
 
 @router.get("/tournaments/{slug}/top11")

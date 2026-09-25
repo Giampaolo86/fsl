@@ -10,7 +10,7 @@ function Field({ label, children }) { return <label className="block"><span clas
 
 export function PlayerProfileEditor({ open, onClose, tournamentId, card, onSaved }) {
   const p = card.profile || {};
-  const [f, setF] = useState({ height_cm: p.height_cm ?? "", weight_kg: p.weight_kg ?? "", foot: p.foot || "", quote: p.quote || "", nickname: p.nickname || "", idol: p.idol || "", favorite_team: p.favorite_team || "", testimonials: p.testimonials?.length ? p.testimonials : [{ author: "", text: "" }], guardian_emails: (card.guardian_emails || []).join(", ") });
+  const [f, setF] = useState({ height_cm: p.height_cm ?? "", weight_kg: p.weight_kg ?? "", foot: p.foot || "", quote: p.quote || "", nickname: p.nickname || "", idol: p.idol || "", favorite_team: p.favorite_team || "", bio: p.bio || "", tagline: p.tagline || "", strengths: (p.strengths || []).join(", "), testimonials: p.testimonials?.length ? p.testimonials : [{ author: "", text: "" }], guardian_emails: (card.guardian_emails || []).join(", ") });
   const [busy, setBusy] = useState(false);
   const set = (k, v) => setF({ ...f, [k]: v });
   const setT = (i, k, v) => set("testimonials", f.testimonials.map((t, j) => (j === i ? { ...t, [k]: v } : t)));
@@ -18,7 +18,7 @@ export function PlayerProfileEditor({ open, onClose, tournamentId, card, onSaved
   const save = async () => {
     setBusy(true);
     try {
-      const body = { ...f, testimonials: f.testimonials.filter((t) => t.text.trim()) };
+      const body = { ...f, testimonials: f.testimonials.filter((t) => t.text.trim()), strengths: f.strengths.split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean).slice(0, 6) };
       if (staff) body.guardian_emails = f.guardian_emails.split(/[,;\s]+/).filter(Boolean); else delete body.guardian_emails;
       await api.put(`/tournaments/${tournamentId}/players/${card.player_id}/profile`, body);
       toast.success("Scheda aggiornata");
@@ -37,6 +37,11 @@ export function PlayerProfileEditor({ open, onClose, tournamentId, card, onSaved
           <Field label="Soprannome"><input className="fsl-input" value={f.nickname} onChange={(e) => set("nickname", e.target.value)} data-testid="pp-nickname" /></Field>
           <Field label="Il mio idolo"><input className="fsl-input" value={f.idol} onChange={(e) => set("idol", e.target.value)} data-testid="pp-idol" /></Field>
           <Field label="Squadra del cuore"><input className="fsl-input" value={f.favorite_team} onChange={(e) => set("favorite_team", e.target.value)} data-testid="pp-favorite-team" /></Field>
+        </div>
+        <Field label="Profilo del giocatore (bio)"><textarea className="fsl-input h-28 py-2" placeholder="Es. Riccardo è un portiere classe 2014: reattività tra i pali, ottima lettura del gioco e sicurezza nelle uscite alte…" value={f.bio} onChange={(e) => set("bio", e.target.value)} maxLength={1200} data-testid="pp-bio" /></Field>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Punti di forza (max 6, separati da virgola)"><input className="fsl-input" placeholder="Reattività, Uscite alte, Personalità, Gioco con i piedi" value={f.strengths} onChange={(e) => set("strengths", e.target.value)} data-testid="pp-strengths" /></Field>
+          <Field label="Tagline (riga sotto il nome)"><input className="fsl-input" placeholder="Portiere · Leader difensivo · Top performer" value={f.tagline} onChange={(e) => set("tagline", e.target.value)} maxLength={120} data-testid="pp-tagline" /></Field>
         </div>
         <Field label="La mia citazione"><textarea className="fsl-input h-20 py-2" placeholder="Es. «Il pallone è il mio migliore amico»" value={f.quote} onChange={(e) => set("quote", e.target.value)} data-testid="pp-quote" /></Field>
         <div>

@@ -116,6 +116,8 @@ def sheet_summary(rows):
 
 async def player_card(tournament_id: str, p, public: bool = False):
     teams = {tm.id: tm for tm in await scoped("teams", tournament_id).list()}
+    clubs_all = {c.id: c for c in await scoped("clubs", tournament_id).list(limit=500)}
+    comps_all = {c.id: c for c in await scoped("competitions", tournament_id).list(limit=200)}
     matches = await scoped("matches", tournament_id).list({"status": {"$in": FINAL}, "$or": [{"callups.home": p.id}, {"callups.away": p.id}]}, sort=[("kickoff_at", 1)], limit=500)
     tot = defaultdict(int)
     votes, fantas, history = [], [], []
@@ -134,7 +136,9 @@ async def player_card(tournament_id: str, p, public: bool = False):
         votes.append(r["vote"])
         fantas.append(r["fanta"])
         opp = m.away_team_id if r["side"] == "home" else m.home_team_id
-        history.append({"match_id": m.id, "round_name": m.round_name, "kickoff_at": m.kickoff_at, "opponent": teams[opp].name if opp in teams else "", "score": f"{m.score.get('home')}-{m.score.get('away')}", "vote": r["vote"], "fanta": r["fanta"], "events": r["events"], "badges": r["badges"]})
+        opp_club = clubs_all.get(teams[opp].club_id) if opp in teams else None
+        gf, ga = (m.score.get("home"), m.score.get("away")) if r["side"] == "home" else (m.score.get("away"), m.score.get("home"))
+        history.append({"match_id": m.id, "round_name": m.round_name, "kickoff_at": m.kickoff_at, "opponent": teams[opp].name if opp in teams else "", "opponent_crest_url": opp_club.crest_url if opp_club and not opp_club.crest_is_placeholder else None, "opponent_colors": opp_club.colors if opp_club else None, "result": "W" if (gf or 0) > (ga or 0) else "L" if (gf or 0) < (ga or 0) else "D", "score": f"{gf}-{ga}", "vote": r["vote"], "fanta": r["fanta"], "events": r["events"], "badges": r["badges"]})
     ok = p.profile_visibility == "public" and p.media_consent
     name = (p.public_name or f"{p.first_name} {p.last_name[:1]}.") if public else f"{p.first_name} {p.last_name}"
     if public and not ok:
@@ -149,10 +153,10 @@ async def player_card(tournament_id: str, p, public: bool = False):
     club = await scoped("clubs", tournament_id).get(p.club_id)
     club_d = {"id": club.id, "name": club.name, "slug": club.slug, "colors": club.colors, "crest_url": club.crest_url if not club.crest_is_placeholder else None} if club else None
     tdoc = await tournaments.get(tournament_id)
-    return {"club": club_d, "tournament": {"slug": tdoc.slug, "name": tdoc.name} if tdoc else None, "player_id": p.id, "name": name, "role": p.role, "role_code": ROLE_CODE.get(p.role, ""), "shirt_number": p.shirt_number, "birth_year": None if public else p.birth_year, "team": teams[p.team_id].name if p.team_id in teams else "", "team_id": p.team_id, "club_id": p.club_id, "photo_url": p.photo_url if show else None, "public_ok": ok, "profile": prof, "guardian_emails": [] if public else p.guardian_emails, "media": {"posts": posts, "shop": shop}, "totals": dict(tot), "top11_count": await scoped("badges", tournament_id).count({"player_id": p.id, "code": "top11"}), "season_label": tdoc.season_label if tdoc else "", "avg_vote": round(sum(votes) / len(votes), 2) if votes else None, "avg_fanta": round(sum(fantas) / len(fantas), 2) if fantas else None, "history": list(reversed(history)), "badges": (await badges.for_players(tournament_id, [p.id])).get(p.id, [])}
+    return {"club": club_d, "tournament": {"slug": tdoc.slug, "name": tdoc.name} if tdoc else None, "player_id": p.id, "name": name, "role": p.role, "role_code": ROLE_CODE.get(p.role, ""), "shirt_number": p.shirt_number, "birth_year": None if public else p.birth_year, "team": teams[p.team_id].name if p.team_id in teams else "", "category": (comps_all[teams[p.team_id].competition_id].category if p.team_id in teams and teams[p.team_id].competition_id in comps_all else None), "team_id": p.team_id, "club_id": p.club_id, "photo_url": p.photo_url if show else None, "public_ok": ok, "profile": prof, "guardian_emails": [] if public else p.guardian_emails, "media": {"posts": posts, "shop": shop}, "totals": dict(tot), "top11_count": await scoped("badges", tournament_id).count({"player_id": p.id, "code": "top11"}), "season_label": tdoc.season_label if tdoc else "", "avg_vote": round(sum(votes) / len(votes), 2) if votes else None, "avg_fanta": round(sum(fantas) / len(fantas), 2) if fantas else None, "history": list(reversed(history)), "badges": (await badges.for_players(tournament_id, [p.id])).get(p.id, [])}
 
 
-PROFILE_FIELDS = {"height_cm", "weight_kg", "foot", "quote", "testimonials", "nickname", "idol", "favorite_team"}
+PROFILE_FIELDS = {"height_cm", "weight_kg", "foot", "quote", "testimonials", "nickname", "idol", "favorite_team", "bio", "strengths", "tagline"}
 
 
 async def can_edit_player(user: CurrentUser, tournament_id: str, p) -> Optional[str]:
@@ -203,6 +207,10 @@ async def put_player_profile(tournament_id: str, player_id: str, body: dict, use
                 v = int(v) if v not in (None, "") else None
             elif k == "testimonials":
                 v = [{"author": str(x.get("author", "")).strip()[:60], "text": str(x.get("text", "")).strip()[:300]} for x in (v or []) if isinstance(x, dict) and str(x.get("text", "")).strip()][:8]
+            elif k == "strengths":
+                v = [str(x).strip()[:40] for x in (v or []) if str(x).strip()][:6]
+            elif k == "bio":
+                v = str(v).strip()[:1200] if v is not None else ""
             elif k == "foot":
                 v = v if v in ("destro", "sinistro", "ambidestro", None, "") else None
             else:

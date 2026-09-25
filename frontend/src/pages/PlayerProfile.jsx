@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, Camera, Check, Heart, ImagePlus, Loader2, Newspaper, Pencil, Quote, Ruler, Weight, X } from "lucide-react";
-import { PostCard } from "@/components/fsl/Article";
-import { BadgeChips } from "@/components/fsl/BadgeChips";
+import { Link, useParams } from "react-router-dom";
+import { Activity, ArrowLeft, Award, BarChart3, BookOpen, CalendarDays, Camera, Check, Footprints, Hand, Heart, ImagePlus, Loader2, Newspaper, Pencil, Quote, Ruler, Star, Target, Trophy, User, Users, Weight, X, Zap } from "lucide-react";
 import { FavButton } from "@/components/fsl/FavButton";
 import { PlayerProfileEditor, FOOT_LABEL } from "@/components/fsl/PlayerProfileEditor";
 import { PlayerPostcard } from "@/components/fsl/PlayerPostcard";
 import { PlayerIdOffer } from "@/components/fsl/PlayerIdCard";
+import { BadgePills, GoldPill, HandClaim, HeroStage, HonourCard, MediaCard, MediaStrip, OvrBox, Panel, ResultDot, SectionHead, Signature, StatTile, TagPill, badgeIcon } from "@/components/fsl/ProfileKit";
+import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { buyProduct } from "@/pages/DigitalProduct";
-import { Badges, EventIcons } from "@/components/fsl/Ratings";
-import { ShopItemCard } from "@/components/fsl/Shop";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
 import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
-import { ROLE_TONE, fmtVote } from "@/lib/fanta";
+import { fmtVote } from "@/lib/fanta";
 import { fmtDate } from "@/lib/format";
 import { mediaUrl } from "@/lib/upload";
 import { toast } from "sonner";
@@ -26,14 +24,13 @@ export const profileLink = (pathname, pid) => {
   return t ? `/tornei/${t[1]}/giocatori/${pid}` : null;
 };
 
-function Stat({ label, value, testId }) {
-  return <div className="fsl-card p-4" data-testid={testId}><div className="font-display font-extrabold text-3xl num leading-none">{value}</div><div className="text-[10px] uppercase tracking-wider text-fsl-slate mt-1">{label}</div></div>;
-}
+const ROLE_TAG = { Portiere: "Leader difensivo", Difensore: "Muro della difesa", Centrocampista: "Motore della squadra", Esterno: "Velocità sulla fascia", Attaccante: "Istinto del gol" };
+const autoTags = (card) => { const t = card.totals || {}; const out = [card.role, ROLE_TAG[card.role]].filter(Boolean); if ((card.avg_fanta || 0) >= 7) out.push("Top performer"); else if ((t.goal || 0) >= 3) out.push("Bomber"); else if (card.top11_count) out.push("Top 11"); else out.push("Talento FSL"); return out; };
+const RESULT_LABEL = { W: "Vittoria", D: "Pareggio", L: "Sconfitta" };
 
 export default function PlayerProfile({ mode = "public" }) {
   const { slug, tournamentId, playerId } = useParams();
   const { user } = useAuth();
-  const location = useLocation();
   const [card, setCard] = useState(null);
   const [error, setError] = useState(null);
   const [tid, setTid] = useState(mode === "admin" ? tournamentId : mode === "club" ? user?.memberships?.find((m) => m.role === "club_manager")?.tournament_id : null);
@@ -70,34 +67,57 @@ export default function PlayerProfile({ mode = "public" }) {
   if (error) return <div className="p-10"><ErrorState message={apiError(error)} /></div>;
   if (!card) return <LoadingState full />;
   const p = card.profile || {}, t = card.totals || {};
+  const tSlug = slug || card?.tournament?.slug;
   const backTo = mode === "admin" ? `/admin/t/${tid}/rose` : mode === "club" ? "/societa/rose" : `/tornei/${slug}`;
   const matchTo = (mid) => (mode === "admin" ? `/admin/t/${tid}/partite/${mid}` : mode === "club" ? `/societa/partite/${mid}` : `/tornei/${slug}/partite/${mid}`);
+  const newsTo = (po) => (mode === "public" ? `/tornei/${slug}/news/${po.slug}` : undefined);
   const buy = async (it) => { try { const r = await api.post("/payments/checkout", { item_id: it.id, origin_url: window.location.origin }); window.location.href = r.data.checkout_url; } catch (e) { toast.error(apiError(e)); } };
-  const facts = [[Ruler, "Altezza", p.height_cm ? `${p.height_cm} cm` : null], [Weight, "Peso", p.weight_kg ? `${p.weight_kg} kg` : null], [null, "Piede", FOOT_LABEL[p.foot]], [null, "Soprannome", p.nickname], [null, "Idolo", p.idol], [Heart, "Squadra del cuore", p.favorite_team]].filter((x) => x[2]);
+  const [first, ...rest] = card.name.split(" "); const last = rest.join(" ");
+  const tags = p.tagline ? p.tagline.split(/\s*[·,|]\s*/).filter(Boolean) : autoTags(card);
+  const strengths = p.strengths?.length ? p.strengths : [];
+  const facts = [[Ruler, "Altezza", p.height_cm ? `${p.height_cm} cm` : null], [Weight, "Peso", p.weight_kg ? `${p.weight_kg} kg` : null], [Footprints, "Piede", FOOT_LABEL[p.foot]], [Star, "Soprannome", p.nickname], [Heart, "Idolo", p.idol], [Heart, "Squadra del cuore", p.favorite_team]].filter((x) => x[2]);
+  const recentBadges = [...(card.badges || [])].reverse().slice(0, 3);
+  const showRich = card.public_ok || card.can_edit;
+  const mediaItems = (card.media?.shop || []).filter((it) => it.kind === "photo" || it.kind === "video");
+  const stats = [[Users, t.presences || 0, "Presenze"], [Target, t.goal || 0, "Goal"], [Footprints, t.assist || 0, "Assist"], [Star, fmtVote(card.avg_vote), "Media voto"], [BarChart3, fmtVote(card.avg_fanta), "Media fanta"], [Hand, t.clean_sheets || 0, "Clean sheet"], [Trophy, t.mvp || 0, "MVP"], [Users, card.top11_count || 0, "Top 11"]];
   return (
-    <div className={mode === "public" ? "" : "space-y-2"} data-testid="player-profile">
-      <section className="relative overflow-hidden rounded-none md:rounded-2xl bg-navy-800 border-b md:border border-white/10">
-        <div className="absolute inset-0 grain opacity-30 pointer-events-none" />
-        <div className="relative mx-auto max-w-[1200px] px-6 py-10 flex flex-col md:flex-row md:items-end gap-6">
-          <Link to={backTo} className="absolute top-4 left-6 text-xs text-fsl-slate hover:text-fsl-white inline-flex items-center gap-1" data-testid="player-profile-back"><ArrowLeft className="h-3.5 w-3.5" /> Indietro</Link>
-          <div className="relative shrink-0">
-            {card.photo_url ? <img src={mediaUrl(card.photo_url)} alt="" className="h-36 w-36 rounded-2xl object-cover border-2 border-fsl-gold/60 shadow-elev" data-testid="player-profile-photo" /> : <span className={`h-36 w-36 rounded-2xl inline-flex items-center justify-center font-display font-extrabold text-3xl uppercase ${ROLE_TONE[card.role_code] || "bg-navy-700"}`}>{card.role_code || "—"}</span>}
-            {card.can_edit && <label className="absolute -bottom-2 -right-2 h-10 w-10 rounded-full bg-fsl-gold text-ink-950 inline-flex items-center justify-center cursor-pointer shadow-elev hover:scale-105 transition-transform" title="Carica foto (ritaglio quadrato automatico)"><input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(e.target.files[0])} disabled={uploading} data-testid="player-photo-input" />{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}</label>}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="fsl-kicker">{card.team}{card.role ? ` · ${card.role}` : ""}</div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[0.9] uppercase mt-1" data-testid="player-profile-name"><span className="num text-fsl-gold mr-3">{card.shirt_number ?? ""}</span>{card.name}{p.nickname && <span className="block text-2xl text-fsl-gold normal-case font-display">«{p.nickname}»</span>}</h1>
-            {p.quote && <p className="mt-4 text-lg md:text-xl font-display font-bold uppercase text-fsl-white/90 flex gap-2 max-w-2xl" data-testid="player-profile-quote"><Quote className="h-5 w-5 text-fsl-gold shrink-0" />{p.quote}</p>}
-            <div className="mt-4 flex flex-wrap gap-2 items-center">
-              {card.public_ok && <FavButton kind="players" id={card.player_id} label="Segui giocatore" small />}
-              {card.can_edit && <button className="btn-gold h-9" onClick={() => setEdit(true)} data-testid="player-profile-edit"><Pencil className="h-4 w-4" /> Modifica «Mi presento»</button>}
-              {card.can_edit === "guardian" && <span className="text-xs text-fsl-gold">Sei abbinato come genitore/tutore</span>}
+    <div className="bg-ink-950 text-fsl-white" data-testid="player-profile">
+      <HeroStage className={mode === "public" ? "" : "rounded-2xl border border-white/10"} testId="player-hero">
+        <div className="mx-auto max-w-[1488px] px-6 pt-6 pb-10 lg:pb-14 relative">
+          <Link to={backTo} className="text-xs text-fsl-white/70 hover:text-fsl-white inline-flex items-center gap-1" data-testid="player-profile-back"><ArrowLeft className="h-3.5 w-3.5" /> Indietro</Link>
+          <div className="mt-4 grid lg:grid-cols-[1.1fr_minmax(280px,0.9fr)_auto] gap-6 lg:gap-8 items-center">
+            <div className="relative z-10 min-w-0">
+              <GoldPill testId="player-role-pill">{card.role || "Giocatore"}</GoldPill>
+              <h1 className="mt-4 font-display font-extrabold uppercase leading-[0.85] text-5xl sm:text-6xl lg:text-7xl" data-testid="player-profile-name" style={{ textShadow: "0 8px 24px rgba(0,0,0,0.6)" }}><span className="block text-white">{first}</span>{last && <span className="block" style={{ background: "linear-gradient(180deg,#FFF0B8 0%,#F4AE2B 55%,#C8811A 100%)", WebkitBackgroundClip: "text", color: "transparent" }}>{last}</span>}</h1>
+              <div className="mt-5 flex flex-wrap items-center gap-3 text-sm sm:text-base">
+                {card.club && <span className="inline-flex items-center gap-2 font-display font-bold uppercase tracking-wide"><ClubCrest club={card.club} size={30} />{card.club.name}</span>}
+                {card.category && <><span className="h-6 w-px bg-white/30" /><span className="leading-none"><span className="block text-[9px] uppercase tracking-[0.2em] text-white/70">Categoria</span><span className="font-display font-extrabold text-lg">{card.category}</span></span></>}
+              </div>
+              <p className="mt-4 text-sm sm:text-base text-white/85 font-medium" data-testid="player-tagline">{tags.join(" · ")}</p>
+              {p.quote && <p className="mt-3 text-sm italic text-fsl-gold/90 flex gap-2 max-w-xl" data-testid="player-profile-quote"><Quote className="h-4 w-4 shrink-0" />{p.quote}</p>}
+              <div className="mt-5 flex flex-wrap gap-2 items-center">
+                {card.public_ok && <FavButton kind="players" id={card.player_id} label="Segui giocatore" small />}
+                {card.can_edit && <button className="btn-gold h-9" onClick={() => setEdit(true)} data-testid="player-profile-edit"><Pencil className="h-4 w-4" /> Modifica profilo</button>}
+                {card.can_edit === "guardian" && <span className="text-xs text-fsl-gold">Sei abbinato come genitore/tutore</span>}
+              </div>
+            </div>
+            <div className="relative flex justify-center lg:justify-end min-h-[300px]">
+              <span className="absolute -top-6 left-1/2 -translate-x-1/2 lg:left-auto lg:-right-6 num font-display font-extrabold text-[240px] sm:text-[300px] leading-none text-white/10 select-none pointer-events-none" style={{ textShadow: "0 0 40px rgba(255,255,255,0.1)" }} aria-hidden>{card.shirt_number ?? ""}</span>
+              <div className="relative">
+                {card.photo_url ? <img src={mediaUrl(card.photo_url)} alt="" className="relative h-72 w-72 sm:h-80 sm:w-80 object-cover rounded-[28px]" style={{ maskImage: "linear-gradient(180deg,#000 70%,transparent 100%)", WebkitMaskImage: "linear-gradient(180deg,#000 70%,transparent 100%)", filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.6))" }} data-testid="player-profile-photo" /> : <div className="relative h-72 w-72 sm:h-80 sm:w-80 rounded-[28px] border border-fsl-gold/40 bg-ink-950/60 flex items-center justify-center"><User className="h-24 w-24 text-white/20" /></div>}
+                {card.can_edit && <label className="absolute bottom-3 right-3 h-11 w-11 rounded-full bg-fsl-gold text-ink-950 inline-flex items-center justify-center cursor-pointer shadow-elev hover:scale-105 transition-transform" title="Carica foto (ritaglio quadrato automatico)"><input type="file" accept="image/*" className="hidden" onChange={(e) => uploadPhoto(e.target.files[0])} disabled={uploading} data-testid="player-photo-input" />{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}</label>}
+                <Signature className="absolute -right-6 bottom-8 hidden sm:block">{card.name}</Signature>
+              </div>
+            </div>
+            <div className="flex lg:flex-col items-center lg:items-end justify-between gap-6">
+              <HandClaim />
+              <OvrBox value={card.avg_fanta == null ? "–" : Number(card.avg_fanta).toFixed(1)} testId="player-ovr" />
             </div>
           </div>
         </div>
-      </section>
+      </HeroStage>
 
-      <div className="mx-auto max-w-[1200px] px-6 py-8 space-y-10">
+      <div className="mx-auto max-w-[1488px] px-6 py-8 space-y-10">
         {card.photo_pending_url && (
           <div className="fsl-card-gold p-4 flex flex-wrap items-center gap-4" data-testid="player-photo-pending">
             <img src={mediaUrl(card.photo_pending_url)} alt="" className="h-20 w-20 rounded-xl object-cover border border-fsl-gold/60" />
@@ -105,49 +125,79 @@ export default function PlayerProfile({ mode = "public" }) {
             {(card.can_edit === "staff" || card.can_edit === "club") && <div className="flex gap-2"><button className="btn-gold h-9" onClick={() => reviewPhoto(true)} data-testid="player-photo-approve"><Check className="h-4 w-4" /> Approva</button><button className="btn-ghost h-9" onClick={() => reviewPhoto(false)} data-testid="player-photo-reject"><X className="h-4 w-4" /> Rifiuta</button></div>}
           </div>
         )}
-        {idPreview && <PlayerIdOffer preview={idPreview} onBuy={buyCard} busy={buyingCard} />}
-        {(card.public_ok || card.can_edit) && (slug || card?.tournament?.slug) && <Link to={`/tornei/${slug || card.tournament.slug}/giocatori/${playerId}/capsule`} className="fsl-card p-4 flex items-center gap-4 hover:border-fsl-gold/50 transition-colors" data-testid="player-capsule-link"><span className="h-12 w-12 rounded-2xl bg-fsl-gold/15 border border-fsl-gold/40 inline-flex items-center justify-center font-display font-extrabold text-fsl-gold">TC</span><div className="flex-1"><div className="font-display font-extrabold uppercase text-lg leading-none">FSL Time Capsule</div><div className="text-xs text-fsl-slate mt-1">L'album digitale della stagione: numeri, partite, momenti Top 11, badge e foto · anteprima</div></div><span className="text-fsl-gold text-sm font-bold">Apri →</span></Link>}
-        {(card.public_ok || card.can_edit) && <section><h2 className="fsl-section-title mb-3">La mia cartolina</h2><PlayerPostcard card={card} colors={card.club?.colors} /></section>}
-        {(card.public_ok || card.can_edit) && (
-          <section className="relative overflow-hidden rounded-2xl border border-fsl-gold/30 bg-navy-800 p-6 md:p-8 grid md:grid-cols-[1fr_auto] items-center gap-6" data-testid="album-offer">
-            <div className="absolute inset-0 grain opacity-40 pointer-events-none" />
-            <div className="relative"><div className="fsl-kicker flex items-center gap-2"><BookOpen className="h-4 w-4 text-fsl-gold" /> Album stagione</div><h2 className="mt-1 text-3xl sm:text-4xl font-extrabold uppercase leading-[0.95]">Tutta la stagione di {card.name.split(" ")[0]} in un album</h2><p className="mt-2 text-sm text-fsl-slate max-w-xl">Cartolina, badge conquistati, interviste, le foto più belle e ogni partita giocata: un ricordo digitale che si aggiorna fino all'ultima giornata, stampabile in PDF.</p></div>
-            <div className="relative flex flex-col items-stretch gap-2 min-w-[200px]"><div className="font-display font-extrabold text-4xl text-fsl-gold num text-center">2,49 €</div><button className="btn-gold" disabled={buyingAlbum} onClick={buyAlbum} data-testid="album-buy">{buyingAlbum ? "Reindirizzamento…" : "Acquista l'album"}</button><span className="text-[10px] text-fsl-slate text-center">Pagamento sicuro Stripe · link personale</span></div>
-          </section>
-        )}
-        {(facts.length > 0 || p.testimonials?.length > 0) && (
-          <section className="grid lg:grid-cols-[1fr_1.2fr] gap-6" data-testid="player-profile-presentation">
-            <div>
-              <h2 className="fsl-section-title mb-3">Mi presento</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{facts.map(([Icon, l, v]) => <div key={l} className="fsl-card p-4"><div className="text-[10px] uppercase tracking-wider text-fsl-slate flex items-center gap-1">{Icon && <Icon className="h-3 w-3 text-fsl-gold" />}{l}</div><div className="font-display font-bold text-xl mt-1 truncate">{v}</div></div>)}</div>
-              {facts.length === 0 && <p className="text-sm text-fsl-slate">Nessun dato inserito.</p>}
-            </div>
-            {p.testimonials?.length > 0 && <div><h2 className="fsl-section-title mb-3">Dicono di me</h2><div className="space-y-3">{p.testimonials.map((x, i) => <blockquote key={i} className="bg-ink-950 rounded-xl border border-white/10 border-l-4 border-l-fsl-gold p-4"><p className="text-base font-display font-bold uppercase leading-tight">«{x.text}»</p>{x.author && <footer className="text-xs text-fsl-slate mt-2">— {x.author}</footer>}</blockquote>)}</div></div>}
-          </section>
-        )}
-        {facts.length === 0 && !p.testimonials?.length && card.can_edit && <div className="fsl-card-gold p-5 text-sm flex flex-wrap items-center gap-3" data-testid="player-profile-empty-presentation"><span>La sezione «Mi presento» è ancora vuota: altezza, piede preferito, citazione, dicono di me…</span><button className="btn-gold h-9" onClick={() => setEdit(true)}>Compila ora</button></div>}
 
-        <section>
-          <h2 className="fsl-section-title mb-3">Statistiche · gare ufficiali</h2>
-          <div className="grid grid-cols-3 md:grid-cols-7 gap-3">{[["Presenze", t.presences || 0], ["Gol", t.goal || 0], ["Assist", t.assist || 0], ["Media voto", fmtVote(card.avg_vote)], ["Media fanta", fmtVote(card.avg_fanta)], ["MVP", t.mvp || 0], ["Top 11", card.top11_count || 0]].map(([l, v]) => <Stat key={l} label={l} value={v} />)}</div>
-          <div className="mt-4"><div className="fsl-label mb-1.5">Badge ({card.badges?.length || 0})</div><BadgeChips list={card.badges || []} max={20} small={false} /></div>
+        <section data-testid="player-stats">
+          <SectionHead icon={BarChart3} title="Statistiche · Gare ufficiali" />
+          <div className="grid grid-cols-4 lg:grid-cols-8 gap-3">{stats.map(([Icon, v, l]) => <StatTile key={l} icon={Icon} value={v} label={l} testId={`player-stat-${l.toLowerCase().replace(/\s+/g, "-")}`} />)}</div>
         </section>
 
-        <section className="grid lg:grid-cols-[1.4fr_1fr] gap-6">
-          <div data-testid="player-profile-media">
-            <h2 className="fsl-section-title mb-3 flex items-center gap-2"><Newspaper className="h-5 w-5 text-fsl-gold" /> News, interviste e gallery</h2>
-            {card.media?.posts?.length ? <div className="grid sm:grid-cols-2 gap-3">{card.media.posts.map((po) => <PostCard key={po.id} p={po} to={mode === "public" ? `/tornei/${slug}/news/${po.slug}` : undefined} />)}</div> : <p className="text-sm text-fsl-slate">Nessun contenuto taggato: la redazione può collegare articoli, interviste e gallery a questo giocatore.</p>}
-            <h2 className="fsl-section-title mb-3 mt-8 flex items-center gap-2"><Camera className="h-5 w-5 text-fsl-gold" /> Foto e video</h2>
-            {card.media?.shop?.length ? <div className="grid sm:grid-cols-2 gap-3">{card.media.shop.map((it) => <ShopItemCard key={it.id} it={it} onBuy={buy} />)}</div> : <p className="text-sm text-fsl-slate">Nessuna foto o video taggato.</p>}
-          </div>
-          <div>
-            <h2 className="fsl-section-title mb-3">Le sue partite</h2>
-            <div className="fsl-card divide-y divide-white/[0.06]" data-testid="player-profile-history">
-              {card.history.length === 0 && <p className="p-4 text-xs text-fsl-slate">Nessuna presenza in gare ufficiali.</p>}
-              {card.history.map((h) => <Link key={h.match_id} to={matchTo(h.match_id)} className="h-12 px-3 flex items-center gap-2 text-xs hover:bg-white/[0.04]"><span className="text-fsl-slate num w-16 shrink-0">{fmtDate(h.kickoff_at)}</span><span className="flex-1 min-w-0 truncate">vs {h.opponent} <span className="text-fsl-slate num">{h.score}</span></span><div className="w-[100px] overflow-x-auto no-scrollbar flex gap-1"><EventIcons ev={h.events} compact /><Badges list={h.badges} /></div><span className="num font-display font-extrabold text-base text-fsl-blue-light w-8 text-right">{fmtVote(h.fanta)}</span></Link>)}
-            </div>
-          </div>
+        <section data-testid="player-badges">
+          <SectionHead icon={Award} title="Badge e riconoscimenti" count={card.badges?.length || 0} />
+          <BadgePills list={card.badges || []} max={14} />
         </section>
+
+        <div className="grid xl:grid-cols-[1.45fr_1fr] gap-8 items-start">
+          <section data-testid="player-profile-media">
+            <SectionHead icon={Newspaper} title="News, interviste e gallery" to={mode === "public" ? `/tornei/${slug}/news` : undefined} />
+            {card.media?.posts?.length ? <div className="grid sm:grid-cols-3 gap-4">{card.media.posts.slice(0, 3).map((po) => <MediaCard key={po.id} p={po} to={newsTo(po)} />)}</div> : <p className="text-sm text-fsl-slate">Nessun contenuto taggato: la redazione può collegare articoli, interviste e gallery a questo giocatore.</p>}
+          </section>
+          <Panel icon={CalendarDays} title="Le sue partite" to={mode === "public" ? `/tornei/${slug}/partite` : undefined} testId="player-profile-history">
+            <div className="overflow-x-auto -mx-2">
+              <table className="w-full text-xs min-w-[420px]">
+                <thead><tr className="text-[9px] uppercase tracking-[0.18em] text-fsl-slate"><th className="text-left font-bold px-2 py-2">Data</th><th className="text-left font-bold px-2 py-2">Avversario</th><th className="text-center font-bold px-2 py-2">Risultato</th><th className="text-center font-bold px-2 py-2">Voto</th><th className="text-right font-bold px-2 py-2">Riconoscimenti</th></tr></thead>
+                <tbody>
+                  {card.history.length === 0 && <tr><td colSpan={5} className="px-2 py-4 text-fsl-slate">Nessuna presenza in gare ufficiali.</td></tr>}
+                  {[...card.history].map((h) => (
+                    <tr key={h.match_id} className="border-t border-white/[0.06] hover:bg-white/[0.04]">
+                      <td className="px-2 py-2.5 num text-fsl-slate whitespace-nowrap"><Link to={matchTo(h.match_id)}>{fmtDate(h.kickoff_at)}</Link></td>
+                      <td className="px-2 py-2.5"><Link to={matchTo(h.match_id)} className="inline-flex items-center gap-2 min-w-0"><ClubCrest club={{ name: h.opponent, crest_url: h.opponent_crest_url, colors: h.opponent_colors }} size={22} /><span className="truncate font-semibold">{h.opponent}</span></Link></td>
+                      <td className="px-2 py-2.5 text-center whitespace-nowrap"><span className="inline-flex items-center gap-1.5" title={RESULT_LABEL[h.result]}><ResultDot r={h.result} /><span className="num font-bold">{h.score}</span></span></td>
+                      <td className="px-2 py-2.5 text-center num font-display font-extrabold text-base text-white">{fmtVote(h.fanta)}</td>
+                      <td className="px-2 py-2.5 text-right"><span className="inline-flex flex-wrap justify-end gap-1">{h.badges.slice(0, 2).map((b) => <span key={b} className="inline-flex h-6 items-center gap-1 rounded-md border border-fsl-gold/70 bg-fsl-gold/10 px-1.5 text-[9px] font-extrabold uppercase text-fsl-gold">{b === "mvp" ? <Trophy className="h-3 w-3" /> : <Star className="h-3 w-3" />}{b === "muro" ? "Clean sheet" : b}</span>)}{h.badges.length === 0 && <span className="text-fsl-slate">-</span>}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        </div>
+
+        {showRich && (
+          <section data-testid="player-media-strip">
+            <SectionHead icon={Camera} title="Foto e video" to={mode === "public" && mediaItems.length ? `/tornei/${slug}` : undefined} linkLabel="Vedi tutti" />
+            {mediaItems.length ? <MediaStrip items={mediaItems} onBuy={buy} /> : <p className="text-sm text-fsl-slate">Le foto e i video taggati compariranno qui.</p>}
+          </section>
+        )}
+
+        <div className="grid lg:grid-cols-[1.2fr_0.8fr_1fr] gap-6 items-start">
+          <Panel icon={User} title="Profilo del giocatore" testId="player-bio">
+            {p.bio ? <p className="text-sm leading-relaxed text-white/90 whitespace-pre-line">{p.bio}</p> : <p className="text-sm text-fsl-slate">{card.can_edit ? "Racconta chi è: caratteristiche, qualità, cosa lo rende speciale in campo." : "Profilo in aggiornamento."}</p>}
+            {facts.length > 0 && <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">{facts.map(([Icon, l, v]) => <div key={l} className="rounded-lg border border-white/10 bg-ink-950/60 px-3 py-2"><div className="text-[9px] uppercase tracking-wider text-fsl-slate flex items-center gap-1"><Icon className="h-3 w-3 text-fsl-gold" />{l}</div><div className="font-display font-bold text-base truncate">{v}</div></div>)}</div>}
+            {p.testimonials?.length > 0 && <div className="mt-4 space-y-2">{p.testimonials.map((x, i) => <blockquote key={i} className="rounded-lg border border-white/10 border-l-4 border-l-fsl-gold bg-ink-950/60 p-3"><p className="text-sm font-display font-bold uppercase leading-tight">«{x.text}»</p>{x.author && <footer className="text-[11px] text-fsl-slate mt-1">— {x.author}</footer>}</blockquote>)}</div>}
+            {card.can_edit && <button className="mt-4 text-xs text-fsl-gold hover:underline" onClick={() => setEdit(true)} data-testid="player-profile-edit-2">Modifica profilo, punti di forza e «dicono di me» →</button>}
+          </Panel>
+          <Panel icon={Zap} title="Punti di forza" testId="player-strengths">
+            {strengths.length ? <div className="flex flex-wrap gap-2">{strengths.map((s) => <TagPill key={s} icon={[Activity, Zap, Users, Target, Hand, Star][Math.abs([...s].reduce((a, c) => a + c.charCodeAt(0), 0)) % 6]}>{s}</TagPill>)}</div> : <div className="flex flex-wrap gap-2">{tags.slice(1).map((s) => <TagPill key={s}>{s}</TagPill>)}</div>}
+          </Panel>
+          <Panel icon={Trophy} title="Ultimi riconoscimenti" testId="player-honours">
+            {recentBadges.length ? <div className="grid grid-cols-3 gap-2">{recentBadges.map((b, i) => <HonourCard key={i} icon={badgeIcon(b)} title={b.label.split(" — ")[0].split(" della ")[0]} subtitle={b.label.includes(" — ") ? b.label.split(" — ")[1] : b.label.includes(" della ") ? `della ${b.label.split(" della ")[1]}` : b.scope === "career" ? "Carriera" : "Stagione"} date={b.earned_at ? fmtDate(b.earned_at) : null} />)}</div> : <p className="text-sm text-fsl-slate">I riconoscimenti compaiono dopo le prime gare ufficiali.</p>}
+          </Panel>
+        </div>
+
+        {showRich && (
+          <section className="space-y-6" data-testid="player-products">
+            <SectionHead icon={BookOpen} title="Ricordi e prodotti FSL" />
+            {idPreview && <PlayerIdOffer preview={idPreview} onBuy={buyCard} busy={buyingCard} />}
+            <div className="grid lg:grid-cols-2 gap-6">
+              {tSlug && <Link to={`/tornei/${tSlug}/giocatori/${playerId}/capsule`} className="rounded-2xl border border-fsl-gold/40 bg-navy-800/80 p-5 flex items-center gap-4 hover:border-fsl-gold transition-colors" data-testid="player-capsule-link"><span className="h-14 w-14 rounded-2xl bg-fsl-gold/15 border border-fsl-gold/50 inline-flex items-center justify-center font-display font-extrabold text-fsl-gold text-lg">TC</span><div className="flex-1"><div className="font-display font-extrabold uppercase text-xl leading-none">FSL Time Capsule</div><div className="text-xs text-fsl-slate mt-1">L'album digitale della stagione: numeri, partite, momenti Top 11, badge e foto</div></div><span className="text-fsl-gold text-sm font-bold">Apri →</span></Link>}
+              <div className="relative overflow-hidden rounded-2xl border border-fsl-gold/40 bg-navy-800/80 p-5 flex items-center gap-4" data-testid="album-offer">
+                <div className="flex-1"><div className="fsl-kicker flex items-center gap-2"><BookOpen className="h-4 w-4 text-fsl-gold" /> Album stagione</div><div className="mt-1 font-display font-extrabold uppercase text-xl leading-none">Tutta la stagione di {first} in un album</div><p className="mt-1 text-xs text-fsl-slate">Cartolina, badge, interviste, foto e ogni partita: si aggiorna fino all'ultima giornata, stampabile in PDF.</p></div>
+                <div className="flex flex-col items-stretch gap-1 min-w-[150px]"><div className="font-display font-extrabold text-3xl text-fsl-gold num text-center">2,49 €</div><button className="btn-gold h-9" disabled={buyingAlbum} onClick={buyAlbum} data-testid="album-buy">{buyingAlbum ? "Reindirizzamento…" : "Acquista"}</button></div>
+              </div>
+            </div>
+            <div><h3 className="fsl-label mb-3">La cartolina</h3><PlayerPostcard card={card} colors={card.club?.colors} /></div>
+          </section>
+        )}
       </div>
       {edit && <PlayerProfileEditor open onClose={() => setEdit(false)} tournamentId={tid} card={card} onSaved={load} />}
     </div>

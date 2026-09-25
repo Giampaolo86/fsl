@@ -1,0 +1,22 @@
+const G = "#F4AE2B", G2 = "#C8811A", NAVY = "#03131F", RED = "#E5484D";
+const svg = (w, h, body) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${body}</svg>`)}`;
+const F = 'font-family="Impact, Arial Black, Arial Narrow, sans-serif" font-weight="900"';
+const goldGrad = `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE9A8"/><stop offset=".45" stop-color="${G}"/><stop offset=".75" stop-color="${G2}"/><stop offset="1" stop-color="#FFD97A"/></linearGradient></defs>`;
+const pill = (text, bg, fg, w = 360, stroke = "") => svg(w, 120, `${goldGrad}<rect x="4" y="4" width="${w - 8}" height="112" rx="56" fill="${bg}" ${stroke}/><text x="${w / 2}" y="84" text-anchor="middle" font-size="72" fill="${fg}" ${F} letter-spacing="4">${text}</text>`);
+const crownPath = "M20 70 L40 30 L60 55 L80 20 L100 55 L120 30 L140 70 Z M20 78 H140 V92 H20 Z";
+const confetti = () => { let b = ""; const cols = [G, "#FFFFFF", "#0B57D9", RED, "#2ECC71", "#FFD97A"]; let seed = 7; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }; for (let i = 0; i < 70; i++) { const x = rnd() * 600, y = rnd() * 400, r = rnd() * 360, c = cols[i % cols.length]; b += i % 3 ? `<rect x="${x}" y="${y}" width="${10 + rnd() * 14}" height="${5 + rnd() * 6}" rx="2" fill="${c}" transform="rotate(${r} ${x} ${y})"/>` : `<circle cx="${x}" cy="${y}" r="${4 + rnd() * 5}" fill="${c}"/>`; } return svg(600, 400, b); };
+
+export const STICKERS = [
+  { key: "nuovo", label: "NUOVO", src: pill("NUOVO", "url(#g)", NAVY), ratio: 3, w: 0.26 },
+  { key: "live", label: "LIVE", src: svg(360, 120, `<rect x="4" y="4" width="352" height="112" rx="56" fill="${RED}"/><circle cx="70" cy="60" r="20" fill="#fff"/><text x="215" y="84" text-anchor="middle" font-size="72" fill="#fff" ${F} letter-spacing="6">LIVE</text>`), ratio: 3, w: 0.24 },
+  { key: "mvp", label: "MVP", src: svg(320, 200, `${goldGrad}<path d="${crownPath}" transform="translate(80 0) scale(1)" fill="url(#g)"/><rect x="10" y="100" width="300" height="90" rx="14" fill="url(#g)"/><text x="160" y="170" text-anchor="middle" font-size="70" fill="${NAVY}" ${F} letter-spacing="6">MVP</text>`), ratio: 1.6, w: 0.22 },
+  { key: "top", label: "TOP", src: pill("TOP", NAVY, G, 300, `stroke="${G}" stroke-width="6"`), ratio: 2.5, w: 0.2 },
+  { key: "soldout", label: "SOLD OUT", src: svg(520, 200, `<g transform="rotate(-10 260 100)"><rect x="20" y="40" width="480" height="120" rx="10" fill="none" stroke="${RED}" stroke-width="10"/><text x="260" y="140" text-anchor="middle" font-size="88" fill="${RED}" ${F} letter-spacing="8">SOLD OUT</text></g>`), ratio: 2.6, w: 0.42 },
+  { key: "confetti", label: "Coriandoli", src: confetti(), ratio: 1.5, w: 0.6 },
+  { key: "arrow", label: "Freccia", src: svg(300, 140, `${goldGrad}<path d="M10 70 H200 V30 L290 70 L200 110 V70" fill="url(#g)" stroke="${NAVY}" stroke-width="4" stroke-linejoin="round"/>`), ratio: 2.14, w: 0.2 },
+  { key: "arrowcurve", label: "Freccia curva", src: svg(300, 220, `<path d="M20 200 C 60 60, 180 40, 260 60" fill="none" stroke="${G}" stroke-width="14" stroke-linecap="round"/><path d="M270 62 L215 40 L250 95 Z" fill="${G}"/>`), ratio: 1.36, w: 0.2 },
+  { key: "star", label: "Stella", src: svg(200, 200, `${goldGrad}<path d="M100 10 L127 72 L194 78 L143 122 L159 190 L100 154 L41 190 L57 122 L6 78 L73 72 Z" fill="url(#g)" stroke="#FFF0B8" stroke-width="3"/>`), ratio: 1, w: 0.14 },
+  { key: "flame", label: "Fiamma", src: svg(160, 220, `<path d="M80 10 C 95 60, 140 80, 140 140 C 140 185, 112 210, 80 210 C 48 210, 20 185, 20 140 C 20 110, 40 95, 50 70 C 58 95, 70 100, 80 90 C 70 60, 70 35, 80 10 Z" fill="${G}"/><path d="M80 110 C 95 135, 108 150, 108 168 C 108 190, 96 200, 80 200 C 64 200, 52 190, 52 168 C 52 150, 66 135, 80 110 Z" fill="#FFF0B8"/>`), ratio: 0.73, w: 0.12 },
+  { key: "circle", label: "Cerchio evidenziatore", src: svg(400, 240, `<path d="M60 120 C 40 40, 330 20, 370 100 C 400 190, 120 240, 50 170 C 20 140, 90 60, 200 50" fill="none" stroke="${G}" stroke-width="12" stroke-linecap="round"/>`), ratio: 1.67, w: 0.36 },
+  { key: "crown", label: "Corona", src: svg(160, 100, `${goldGrad}<path d="${crownPath}" fill="url(#g)" stroke="#FFF0B8" stroke-width="2"/><circle cx="40" cy="28" r="7" fill="#FFF0B8"/><circle cx="80" cy="18" r="7" fill="#FFF0B8"/><circle cx="120" cy="28" r="7" fill="#FFF0B8"/>`), ratio: 1.6, w: 0.16 },
+];

@@ -1,22 +1,46 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Award, Bus, Image as ImageIcon, CalendarDays, Camera, Clock, Globe, Instagram, Mail, MapPin, MessageCircle, Phone, ShieldCheck, Trophy, Users } from "lucide-react";
-import { PostCard } from "@/components/fsl/Article";
+import { Award, BarChart3, Bus, CalendarDays, Camera, Clock, Globe, Image as ImageIcon, Instagram, Mail, MapPin, Medal, MessageCircle, Newspaper, Phone, Shield, ShieldCheck, Sparkles, Star, Target, Trophy, Users, Zap } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
-import { MatchCard } from "@/components/fsl/MatchCard";
 import { PlayerCardDialog } from "@/components/fsl/PlayerCard";
-import { ShopItemCard } from "@/components/fsl/Shop";
+import { BadgePills, GoldPill, HandClaim, HeroStage, HonourCard, MediaCard, MediaStrip, OvrBox, Panel, ResultDot, SectionHead, Signature, StatTile, TagPill } from "@/components/fsl/ProfileKit";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
-import { HonoursStrip } from "@/pages/public/HallOfFame";
 import { ROLE_CODE, ROLE_TONE } from "@/lib/fanta";
 import { api, apiError } from "@/lib/api";
+import { fmtDate } from "@/lib/format";
 import { mediaUrl } from "@/lib/upload";
 import { toast } from "sonner";
 import { TeamCardDialog } from "@/components/fsl/TeamCardDialog";
 
-function Block({ title, icon: Icon, children, className = "", testId }) {
-  return <section className={`fsl-card p-5 ${className}`} data-testid={testId}><h2 className="fsl-kicker mb-3 flex items-center gap-2">{Icon && <Icon className="h-4 w-4 text-fsl-gold" />}{title}</h2>{children}</section>;
+const ord = (n) => (n ? `${n}°` : "—");
+const timeOf = (iso) => { try { return new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
+
+function MatchesTable({ recent, upcoming, teamIds, slug }) {
+  const rows = [...upcoming.slice(0, 3).map((m) => ({ ...m, _up: true })), ...recent];
+  return (
+    <div className="overflow-x-auto -mx-2">
+      <table className="w-full text-xs min-w-[440px]">
+        <thead><tr className="text-[9px] uppercase tracking-[0.18em] text-fsl-slate"><th className="text-left font-bold px-2 py-2">Data</th><th className="text-left font-bold px-2 py-2">Avversario</th><th className="text-center font-bold px-2 py-2">Risultato</th><th className="text-right font-bold px-2 py-2">Competizione</th></tr></thead>
+        <tbody>
+          {rows.length === 0 && <tr><td colSpan={4} className="px-2 py-4 text-fsl-slate">Nessuna gara disputata.</td></tr>}
+          {rows.map((m) => {
+            const mine = teamIds.has(m.home.id) ? "home" : "away", opp = mine === "home" ? m.away : m.home;
+            const gf = m.score?.[mine], ga = m.score?.[mine === "home" ? "away" : "home"];
+            const r = m._up ? null : gf > ga ? "W" : gf < ga ? "L" : "D";
+            return (
+              <tr key={m.id} className="border-t border-white/[0.06] hover:bg-white/[0.04]">
+                <td className="px-2 py-2.5 num text-fsl-slate whitespace-nowrap"><Link to={`/tornei/${slug}/partite/${m.id}`}>{fmtDate(m.kickoff_at)}</Link></td>
+                <td className="px-2 py-2.5"><Link to={`/tornei/${slug}/squadre/${opp.club?.slug || ""}`} className="inline-flex items-center gap-2 min-w-0"><ClubCrest club={opp.club} size={22} /><span className="truncate font-semibold">{opp.club?.name || opp.name}</span><span className="text-[9px] text-fsl-slate uppercase">{mine === "home" ? "casa" : "trasf."}</span></Link></td>
+                <td className="px-2 py-2.5 text-center whitespace-nowrap">{m._up ? <span className="inline-flex h-6 items-center rounded-md border border-fsl-gold/60 px-2 text-[10px] font-bold uppercase text-fsl-gold num">{timeOf(m.kickoff_at)}</span> : <span className="inline-flex items-center gap-1.5"><ResultDot r={r} /><span className="num font-bold">{gf} - {ga}</span></span>}</td>
+                <td className="px-2 py-2.5 text-right text-fsl-slate truncate max-w-[140px]">{m.competition_name || m.round_name}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export default function PublicClubHome() {
@@ -25,58 +49,100 @@ export default function PublicClubHome() {
   const [error, setError] = useState(null);
   const [openPlayer, setOpenPlayer] = useState(null);
   const [teamCard, setTeamCard] = useState(null);
-  const [busy, setBusy] = useState(null);
   const fetchCard = useCallback((pid) => api.get(`/public/tournaments/${slug}/players/${pid}`), [slug]);
   useEffect(() => { setD(null); api.get(`/public/tournaments/${slug}/clubs/${clubSlug}`).then((r) => setD(r.data)).catch(setError); }, [slug, clubSlug]);
   if (error) return <div className="p-10"><ErrorState message={apiError(error)} /></div>;
   if (!d) return <LoadingState full />;
-  const c = d.club, p = c.profile || {}, primary = c.colors?.primary || "#7A1E2C", secondary = c.colors?.secondary || "#F4AE2B";
+  const c = d.club, p = c.profile || {}, secondary = c.colors?.secondary || "#F4AE2B";
   const contacts = [["phone", Phone, p.phone, `tel:${p.phone}`], ["whatsapp", MessageCircle, p.whatsapp, `https://wa.me/${(p.whatsapp || "").replace(/\D/g, "")}`], ["email", Mail, p.email, `mailto:${p.email}`], ["website", Globe, p.website, p.website], ["instagram", Instagram, p.instagram, `https://instagram.com/${(p.instagram || "").replace("@", "")}`]].filter((x) => x[2]);
-  const buy = async (it) => { setBusy(it.id); try { const r = await api.post("/payments/checkout", { item_id: it.id, origin_url: window.location.origin }); window.location.href = r.data.checkout_url; } catch (e) { toast.error(apiError(e)); setBusy(null); } };
-  const kpis = [[c.founded_year || d.kpis.founded_year || "—", "Anno di fondazione"], [d.kpis.players, "Tesserati"], [d.kpis.teams, "Squadre"], [d.kpis.tournaments, "Tornei FSL"]];
+  const buy = async (it) => { try { const r = await api.post("/payments/checkout", { item_id: it.id, origin_url: window.location.origin }); window.location.href = r.data.checkout_url; } catch (e) { toast.error(apiError(e)); } };
+  const teamIds = new Set(d.teams.map((t) => t.id));
+  const st = d.standings || [], main = st[0];
+  const sum = (k) => st.reduce((a, x) => a + (x[k] || 0), 0);
+  const h = d.history || {}, honours = h.honours || {}, seasons = h.seasons || [];
+  const [first, ...rest] = c.name.split(" "); const last = rest.join(" ");
+  const stats = [[Shield, c.founded_year || d.kpis.founded_year || "—", "Fondazione"], [Users, d.kpis.players, "Tesserati"], [Users, d.kpis.teams, "Squadre"], [Trophy, d.kpis.tournaments, "Tornei FSL"], [BarChart3, sum("PT"), "Punti"], [Star, sum("V"), "Vittorie"], [Target, sum("GF"), "Gol fatti"], [Medal, honours.titles || 0, "Titoli"]];
+  const palmares = [...seasons.filter((s) => s.champion).map((s) => ({ code: "campione", label: `Campione ${s.competition}`, scope: "career" })), ...seasons.filter((s) => s.promoted).map((s) => ({ code: "promosso", label: `Promossa · ${s.season_label}`, scope: "season" })), ...seasons.filter((s) => !s.champion && s.pos && s.pos <= 3).map((s) => ({ code: "podio", label: `${s.pos}° posto · ${s.competition}`, scope: "season" })), ...st.filter((x) => x.pos === 1).map((x) => ({ code: "top11", label: `In testa · ${x.competition}`, scope: "match" }))];
+  const services = p.services || [];
+  const tagline = [c.city, `${d.kpis.teams} squadr${d.kpis.teams === 1 ? "a" : "e"} FSL`, main ? `${ord(main.pos)} in ${main.competition.split("·").pop().trim()}` : null].filter(Boolean);
   return (
-    <div data-testid="club-home">
-      <section className="relative min-h-[420px] flex items-end overflow-hidden" style={{ background: `linear-gradient(120deg, ${primary} 0%, #041E32 70%)` }}>
-        <img src={mediaUrl(c.cover_url)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45 mix-blend-luminosity" data-testid={c.cover_is_default ? "club-cover-default" : "club-cover-own"} />
-        <div className="absolute inset-0 bg-gradient-to-t from-navy-900 via-navy-900/40 to-transparent" />
-        <div className="relative mx-auto max-w-[1488px] w-full px-6 pb-10 pt-24 flex flex-col md:flex-row md:items-end gap-6">
-          <div className="shrink-0 drop-shadow-2xl"><ClubCrest club={c} size={140} /></div>
-          <div className="flex-1 min-w-0">
-            <div className="fsl-kicker mb-2">{d.tournament.name}</div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[0.9] uppercase" data-testid="club-home-name">{c.name}</h1>
-            {c.motto && <p className="mt-3 text-base md:text-lg font-display font-bold uppercase tracking-wide" style={{ color: secondary }} data-testid="club-home-motto">{c.motto}</p>}
-            <div className="mt-5 flex flex-wrap gap-6">{kpis.map(([v, l]) => <div key={l}><div className="font-display font-extrabold text-3xl num leading-none">{v}</div><div className="text-[10px] uppercase tracking-wider text-fsl-slate mt-1">{l}</div></div>)}</div>
+    <div className="bg-ink-950" data-testid="club-home">
+      <HeroStage testId="club-hero">
+        <div className="mx-auto max-w-[1488px] px-6 pt-8 pb-10 lg:pb-14">
+          <div className="grid lg:grid-cols-[1.1fr_minmax(260px,0.9fr)_auto] gap-6 lg:gap-8 items-center">
+            <div className="relative z-10 min-w-0">
+              <GoldPill testId="club-home-kicker">{d.tournament.name}</GoldPill>
+              <h1 className="mt-4 font-display font-extrabold uppercase leading-[0.85] text-5xl sm:text-6xl lg:text-7xl" data-testid="club-home-name" style={{ textShadow: "0 8px 24px rgba(0,0,0,0.6)" }}><span className="block text-white">{first}</span>{last && <span className="block" style={{ background: "linear-gradient(180deg,#FFF0B8 0%,#F4AE2B 55%,#C8811A 100%)", WebkitBackgroundClip: "text", color: "transparent" }}>{last}</span>}</h1>
+              {c.motto && <Signature className="mt-4 !rotate-0 !text-2xl sm:!text-3xl" testId="club-home-motto"><span style={{ color: secondary }}>«{c.motto}»</span></Signature>}
+              <p className="mt-4 text-sm sm:text-base text-white/85 font-medium" data-testid="club-tagline">{tagline.join(" · ")}</p>
+              <div className="mt-5 flex flex-wrap gap-2">{d.teams.map((tm) => <FavButton key={tm.id} kind="teams" id={tm.id} label={`Segui ${tm.name}`} small />)}</div>
+            </div>
+            <div className="relative flex justify-center min-h-[280px] items-center">
+              <span className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 num font-display font-extrabold text-[200px] sm:text-[260px] leading-none text-white/[0.07] select-none pointer-events-none" aria-hidden>{c.founded_year || (c.short_name || c.name).slice(0, 3).toUpperCase()}</span>
+              <div className="relative drop-shadow-[0_24px_40px_rgba(0,0,0,0.7)]" data-testid={c.cover_is_default ? "club-cover-default" : "club-cover-own"}><ClubCrest club={c} size={220} /></div>
+            </div>
+            <div className="flex lg:flex-col items-center lg:items-end justify-between gap-6">
+              <HandClaim />
+              <OvrBox kicker="Classifica" value={main ? ord(main.pos) : "—"} label={main ? `${main.PT} punti · ${main.competition.split("·").pop().trim()}` : "Classifica"} testId="club-standing-box" />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2 md:self-end">{d.teams.map((tm) => <FavButton key={tm.id} kind="teams" id={tm.id} label={`Segui ${tm.name}`} />)}</div>
         </div>
-      </section>
+      </HeroStage>
 
-      <div className="mx-auto max-w-[1488px] px-6 py-10 space-y-8">
-        {c.description && <p className="text-base md:text-lg text-fsl-slate max-w-3xl">{c.description}</p>}
-
-        <section data-testid="club-home-gallery">
-          <div className="flex items-end justify-between mb-3"><h2 className="fsl-section-title flex items-center gap-2"><Camera className="h-5 w-5 text-fsl-gold" /> La società in immagini</h2>{c.gallery_is_default && <span className="text-[10px] uppercase tracking-wider text-fsl-slate" data-testid="club-gallery-default-note">Immagini FSL · in attesa delle foto della società</span>}</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {c.gallery.slice(0, 4).map((u, i) => (
-              <div key={u + i} className={`group relative overflow-hidden rounded-xl border border-white/10 ${i === 0 ? "col-span-2 row-span-2 aspect-square md:aspect-auto" : "aspect-square"}`} data-testid={`club-gallery-${i}`}>
-                <img src={mediaUrl(u)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-gradient-to-t from-navy-900/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            ))}
-          </div>
+      <div className="mx-auto max-w-[1488px] px-6 py-8 space-y-10">
+        <section data-testid="club-stats">
+          <SectionHead icon={BarChart3} title="La società in numeri" />
+          <div className="grid grid-cols-4 lg:grid-cols-8 gap-3">{stats.map(([Icon, v, l]) => <StatTile key={l} icon={Icon} value={v} label={l} testId={`club-stat-${l.toLowerCase().replace(/\s+/g, "-")}`} />)}</div>
         </section>
 
+        <section data-testid="club-palmares">
+          <SectionHead icon={Award} title="Palmarès e riconoscimenti" count={palmares.length} to={h.org_club_id ? `/albo-doro/societa/${h.org_club_id}` : undefined} linkLabel="Albo d'oro" />
+          {palmares.length ? <BadgePills list={palmares} max={12} /> : <p className="text-sm text-fsl-slate">La storia della società si scrive stagione dopo stagione: i riconoscimenti compariranno qui.</p>}
+        </section>
+
+        <div className="grid xl:grid-cols-[1.45fr_1fr] gap-8 items-start">
+          <section data-testid="club-home-posts">
+            <SectionHead icon={Newspaper} title="News, interviste e gallery" to={`/tornei/${slug}/news`} />
+            {d.posts.length ? <div className="grid sm:grid-cols-3 gap-4">{d.posts.slice(0, 3).map((po) => <MediaCard key={po.id} p={po} to={`/tornei/${slug}/news/${po.slug}`} />)}</div> : <p className="text-sm text-fsl-slate">Nessun contenuto pubblicato dalla società.</p>}
+          </section>
+          <Panel icon={CalendarDays} title="Le nostre partite" to={`/tornei/${slug}/partite`} testId="club-home-matches">
+            <MatchesTable recent={d.recent_matches} upcoming={d.upcoming_matches} teamIds={teamIds} slug={slug} />
+          </Panel>
+        </div>
+
+        <section data-testid="club-home-shop">
+          <SectionHead icon={Camera} title="Foto e video" to={d.shop.length ? `/tornei/${slug}` : undefined} linkLabel="Vedi tutti" />
+          {d.shop.length ? <MediaStrip items={d.shop} onBuy={buy} /> : <p className="text-sm text-fsl-slate">Le foto professionali e i video delle gare compariranno qui.</p>}
+        </section>
+
+        <div className="grid lg:grid-cols-[1.2fr_0.8fr_1fr] gap-6 items-start">
+          <Panel icon={ShieldCheck} title="Chi siamo" testId="club-home-about">
+            {c.description ? <p className="text-sm leading-relaxed text-white/90 whitespace-pre-line">{c.description}</p> : <p className="text-sm text-fsl-slate">Presentazione in aggiornamento.</p>}
+            <div className="mt-4 grid sm:grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg border border-white/10 bg-ink-950/60 p-3" data-testid="club-home-venue"><div className="text-[9px] uppercase tracking-wider text-fsl-slate flex items-center gap-1"><MapPin className="h-3 w-3 text-fsl-gold" /> Sede</div><div className="font-semibold mt-1">{d.venue?.name || p.address || "In aggiornamento"}</div>{(p.address || d.venue?.address) && <div className="text-xs text-fsl-slate">{p.address || d.venue.address}</div>}{(p.hours_office || p.hours_field) && <div className="mt-2 text-[11px] text-fsl-slate flex items-start gap-1"><Clock className="h-3 w-3 mt-0.5 text-fsl-gold" /><span className="whitespace-pre-line">{[p.hours_office && `Segreteria: ${p.hours_office}`, p.hours_field && `Campo: ${p.hours_field}`].filter(Boolean).join("\n")}</span></div>}{p.directions && <div className="mt-2 text-[11px] text-fsl-slate flex gap-1"><Bus className="h-3 w-3 mt-0.5 text-fsl-gold shrink-0" /><span className="whitespace-pre-line">{p.directions}</span></div>}</div>
+              <div className="rounded-lg border border-white/10 bg-ink-950/60 p-3" data-testid="club-home-contacts"><div className="text-[9px] uppercase tracking-wider text-fsl-slate flex items-center gap-1"><Phone className="h-3 w-3 text-fsl-gold" /> Contatti</div>{contacts.length === 0 && <div className="text-xs text-fsl-slate mt-1">In aggiornamento.</div>}<ul className="mt-1 space-y-1 text-xs">{contacts.map(([k, Icon, v, href]) => <li key={k}><a href={href} target={k === "phone" || k === "email" ? undefined : "_blank"} rel="noreferrer" className="flex items-center gap-2 hover:text-fsl-gold"><Icon className="h-3.5 w-3.5 text-fsl-gold" /><span className="truncate">{v}</span></a></li>)}</ul>{p.email && <a href={`mailto:${p.email}`} className="btn-gold h-8 w-full mt-3 text-xs" data-testid="club-home-write"><Mail className="h-3.5 w-3.5" /> Scrivici</a>}</div>
+            </div>
+            {p.manager?.name && <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-ink-950/60 p-3" data-testid="club-home-manager">{p.manager.photo_url ? <img src={mediaUrl(p.manager.photo_url)} alt="" className="h-12 w-12 rounded-full object-cover border-2" style={{ borderColor: secondary }} /> : <span className="h-12 w-12 rounded-full bg-navy-700 inline-flex items-center justify-center font-display font-bold text-lg">{p.manager.name[0]}</span>}<div className="min-w-0"><div className="text-[9px] uppercase tracking-wider text-fsl-slate">Responsabile</div><div className="font-display font-bold" style={{ color: secondary }}>{p.manager.name}</div><div className="text-[11px] text-fsl-slate">{p.manager.role}{p.manager.phone ? ` · ${p.manager.phone}` : ""}</div></div></div>}
+          </Panel>
+          <Panel icon={Zap} title="Punti di forza" testId="club-home-strengths">
+            {services.length ? <div className="flex flex-wrap gap-2">{services.map((s) => <TagPill key={s} icon={[Sparkles, Zap, Users, Star, Shield, Target][Math.abs([...s].reduce((a, ch) => a + ch.charCodeAt(0), 0)) % 6]}>{s}</TagPill>)}</div> : <div className="flex flex-wrap gap-2"><TagPill icon={Users}>Settore giovanile</TagPill><TagPill icon={Star}>Spirito FSL</TagPill>{main?.pos === 1 && <TagPill icon={Trophy}>Capolista</TagPill>}</div>}
+          </Panel>
+          <Panel icon={Trophy} title="Ultimi riconoscimenti" to={h.org_club_id ? `/albo-doro/societa/${h.org_club_id}` : undefined} testId="club-home-history">
+            {seasons.length ? <div className="grid grid-cols-3 gap-2">{seasons.slice(0, 3).map((s, i) => <HonourCard key={i} icon={s.champion ? Trophy : s.promoted ? Star : Medal} title={s.champion ? "Campione" : s.promoted ? "Promossa" : `${s.pos}° posto`} subtitle={s.competition} date={s.season_label} />)}</div> : <p className="text-sm text-fsl-slate">I riconoscimenti compaiono alla chiusura di ogni stagione FSL.</p>}
+          </Panel>
+        </div>
+
         <section data-testid="club-home-rosters">
-          <h2 className="fsl-section-title mb-1 flex items-center gap-2"><Users className="h-5 w-5 text-fsl-gold" /> Le nostre squadre</h2>
-          <p className="text-xs text-fsl-slate mb-4">Una rosa per ogni torneo a cui la società è iscritta. Nomi e foto compaiono solo con il consenso della famiglia.</p>
+          <SectionHead icon={Users} title="Le nostre squadre" />
+          <p className="text-xs text-fsl-slate -mt-2 mb-4">Una rosa per ogni torneo a cui la società è iscritta. Nomi e foto compaiono solo con il consenso della famiglia.</p>
           <div className="grid lg:grid-cols-2 gap-4">
             {d.rosters.map((r) => (
-              <div key={r.team.id} className="fsl-card overflow-hidden" data-testid={`club-roster-${r.team.id}`}>
-                <div className="h-12 px-4 flex items-center gap-3 border-b border-white/10" style={{ background: `linear-gradient(90deg, ${primary}66, transparent)` }}><Trophy className="h-4 w-4 text-fsl-gold" /><span className="font-display font-bold uppercase">{r.team.name}</span><span className="text-xs text-fsl-slate truncate">{r.competition}</span><span className="ml-auto num text-xs text-fsl-slate">{r.count} tesserati</span><button className="btn-gold h-8 px-3 text-xs shrink-0" onClick={() => setTeamCard(r.team)} data-testid={`team-card-open-${r.team.id}`}><ImageIcon className="h-3.5 w-3.5" /> Cartolina · 2,49 €</button></div>
+              <div key={r.team.id} className="rounded-2xl border border-white/10 bg-navy-800/80 overflow-hidden" data-testid={`club-roster-${r.team.id}`}>
+                <div className="h-12 px-4 flex items-center gap-3 border-b border-fsl-gold/30 bg-ink-950/60"><Trophy className="h-4 w-4 text-fsl-gold" /><span className="font-display font-bold uppercase">{r.team.name}</span><span className="text-xs text-fsl-slate truncate">{r.competition}</span><span className="ml-auto num text-xs text-fsl-slate">{r.count} tesserati</span><button className="btn-gold h-8 px-3 text-xs shrink-0" onClick={() => setTeamCard(r.team)} data-testid={`team-card-open-${r.team.id}`}><ImageIcon className="h-3.5 w-3.5" /> Cartolina · 2,49 €</button></div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-white/[0.06]">
                   {r.players.map((pl, i) => (
                     <button key={i} type="button" disabled={!pl.id} onClick={() => pl.id && setOpenPlayer(pl.id)} className="h-16 px-3 flex items-center gap-2 text-left enabled:hover:bg-white/[0.04] disabled:cursor-default" data-testid={pl.id ? `club-player-${pl.id}` : undefined}>
-                      {pl.photo_url ? <img src={mediaUrl(pl.photo_url)} alt="" className="h-10 w-10 rounded-full object-cover border border-white/20 shrink-0" /> : <span className={`h-10 w-10 rounded-full inline-flex items-center justify-center text-[10px] font-bold uppercase shrink-0 ${ROLE_TONE[ROLE_CODE[pl.role]] || "bg-navy-700"}`}>{ROLE_CODE[pl.role] || "—"}</span>}
+                      {pl.photo_url ? <img src={mediaUrl(pl.photo_url)} alt="" className="h-10 w-10 rounded-full object-cover border border-fsl-gold/50 shrink-0" /> : <span className={`h-10 w-10 rounded-full inline-flex items-center justify-center text-[10px] font-bold uppercase shrink-0 ${ROLE_TONE[ROLE_CODE[pl.role]] || "bg-navy-700"}`}>{ROLE_CODE[pl.role] || "—"}</span>}
                       <span className="min-w-0 flex-1 flex items-center gap-2"><span className="block text-sm font-semibold truncate"><span className="num text-fsl-gold mr-1">{pl.shirt_number ?? ""}</span>{pl.name}</span>{pl.badges.length > 0 && <span className="ml-auto shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-full border border-fsl-gold/50 text-fsl-gold text-[10px] font-bold num" title={`${pl.badges.length} badge`} data-testid={pl.id ? `club-player-badges-${pl.id}` : undefined}><Award className="h-3 w-3" />{pl.badges.length}</span>}</span>
                     </button>
                   ))}
@@ -88,40 +154,13 @@ export default function PublicClubHome() {
           {d.other_tournaments.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-xs">{d.other_tournaments.map((o) => <Link key={o.slug} to={`/tornei/${o.slug}/squadre/${clubSlug}`} className="h-8 px-3 rounded-full border border-fsl-gold/40 text-fsl-gold inline-flex items-center gap-1 hover:bg-fsl-gold/10"><Trophy className="h-3.5 w-3.5" /> Rosa {o.name} · {o.season}</Link>)}</div>}
         </section>
 
-        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
-          <Block title="Sede della società" icon={MapPin} testId="club-home-venue">
-            <div className="font-semibold">{d.venue?.name || p.address || "Sede in aggiornamento"}</div>
-            {(p.address || d.venue?.address) && <div className="text-sm text-fsl-slate">{p.address || d.venue.address}</div>}
-            {(p.hours_office || p.hours_field) && <div className="mt-3 grid grid-cols-2 gap-2 text-xs">{p.hours_office && <div><div className="fsl-label flex items-center gap-1"><Clock className="h-3 w-3" /> Segreteria</div><div className="text-fsl-slate whitespace-pre-line">{p.hours_office}</div></div>}{p.hours_field && <div><div className="fsl-label flex items-center gap-1"><Clock className="h-3 w-3" /> Campo</div><div className="text-fsl-slate whitespace-pre-line">{p.hours_field}</div></div>}</div>}
-            {p.directions && <div className="mt-3 text-xs text-fsl-slate flex gap-2"><Bus className="h-4 w-4 shrink-0 text-fsl-gold" /><span className="whitespace-pre-line">{p.directions}</span></div>}
-            {(p.services || []).length > 0 && <div className="mt-3 flex flex-wrap gap-1">{p.services.map((s) => <span key={s} className="h-6 px-2 rounded-full bg-navy-700 text-[10px] uppercase font-semibold inline-flex items-center">{s}</span>)}</div>}
-          </Block>
-          <Block title="Contatti" icon={Phone} testId="club-home-contacts">
-            {contacts.length === 0 && <p className="text-sm text-fsl-slate">Contatti in aggiornamento.</p>}
-            <ul className="space-y-2 text-sm">{contacts.map(([k, Icon, v, href]) => <li key={k}><a href={href} target={k === "phone" || k === "email" ? undefined : "_blank"} rel="noreferrer" className="flex items-center gap-2 hover:text-fsl-gold"><Icon className="h-4 w-4 text-fsl-gold" /><span className="truncate">{v}</span></a></li>)}</ul>
-            {p.email && <a href={`mailto:${p.email}`} className="btn-gold w-full mt-4" data-testid="club-home-write"><Mail className="h-4 w-4" /> Scrivici</a>}
-          </Block>
-          <Block title="Responsabile della società" icon={ShieldCheck} testId="club-home-manager">
-            {p.manager?.name ? <div className="flex items-center gap-3">{p.manager.photo_url ? <img src={mediaUrl(p.manager.photo_url)} alt="" className="h-16 w-16 rounded-full object-cover border-2" style={{ borderColor: secondary }} /> : <span className="h-16 w-16 rounded-full bg-navy-700 inline-flex items-center justify-center font-display font-bold text-xl">{p.manager.name[0]}</span>}<div><div className="font-display font-bold text-lg" style={{ color: secondary }}>{p.manager.name}</div><div className="text-xs text-fsl-slate">{p.manager.role}</div>{p.manager.phone && <a href={`tel:${p.manager.phone}`} className="block text-xs mt-1 hover:text-fsl-gold">{p.manager.phone}</a>}{p.manager.email && <a href={`mailto:${p.manager.email}`} className="block text-xs hover:text-fsl-gold">{p.manager.email}</a>}</div></div> : <p className="text-sm text-fsl-slate">Referente in aggiornamento.</p>}
-          </Block>
-          {d.history?.seasons?.length > 0 && <Block title="Storia della società" icon={Trophy} testId="club-home-history">
-            <HonoursStrip h={d.history.honours} compact />
-            <ul className="mt-3 space-y-1 text-sm">{d.history.seasons.slice(0, 3).map((s, i) => <li key={i} className="flex items-center justify-between gap-2"><span className="truncate text-fsl-slate">{s.season_label} · {s.competition}</span><span className="num font-bold whitespace-nowrap">{s.champion ? "Campione" : `${s.pos}°`}</span></li>)}</ul>
-            <Link to={`/albo-doro/societa/${d.history.org_club_id}`} className="text-xs text-fsl-gold hover:underline mt-3 inline-block" data-testid="club-home-history-link">Tutta la storia nell'Albo d'oro →</Link>
-          </Block>}
-          <Block title="Prossime partite" icon={CalendarDays} testId="club-home-upcoming">
-            <div className="space-y-2">{d.upcoming_matches.slice(0, 3).map((m) => <MatchCard key={m.id} m={m} to={`/tornei/${slug}/partite/${m.id}`} compact />)}{d.upcoming_matches.length === 0 && <p className="text-sm text-fsl-slate">Nessuna gara in programma.</p>}</div>
-            {d.recent_matches.length > 0 && <><div className="fsl-label mt-4 mb-2">Ultimi risultati</div><div className="space-y-2">{d.recent_matches.slice(0, 2).map((m) => <MatchCard key={m.id} m={m} to={`/tornei/${slug}/partite/${m.id}`} compact />)}</div></>}
-            <Link to={`/tornei/${slug}/partite`} className="text-xs text-fsl-gold hover:underline mt-3 inline-block">Vedi calendario →</Link>
-          </Block>
-        </div>
-
-        {(d.posts.length > 0 || d.shop.length > 0) && (
-          <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6">
-            <section data-testid="club-home-posts"><div className="flex items-end justify-between mb-3"><h2 className="fsl-section-title">Blog, interviste e gallery</h2><Link to={`/tornei/${slug}/news`} className="text-xs text-fsl-gold hover:underline">Tutte le news</Link></div>{d.posts.length === 0 ? <p className="text-sm text-fsl-slate">Nessun contenuto pubblicato dalla società.</p> : <div className="grid sm:grid-cols-2 gap-3">{d.posts.slice(0, 4).map((po) => <PostCard key={po.id} p={po} to={`/tornei/${slug}/news/${po.slug}`} />)}</div>}</section>
-            <section data-testid="club-home-shop"><div className="flex items-end justify-between mb-3"><h2 className="fsl-section-title">Foto e video</h2><span className="text-xs text-fsl-slate">Foto 0,49 € · Video 0,99 €</span></div>{d.shop.length === 0 ? <p className="text-sm text-fsl-slate">Le foto professionali e i video delle gare compariranno qui.</p> : <div className="grid sm:grid-cols-2 gap-3">{d.shop.slice(0, 4).map((it) => <ShopItemCard key={it.id} it={it} onBuy={buy} busy={busy === it.id} />)}</div>}</section>
+        <section data-testid="club-home-gallery">
+          <SectionHead icon={Camera} title="La società in immagini" />
+          {c.gallery_is_default && <span className="block -mt-2 mb-3 text-[10px] uppercase tracking-wider text-fsl-slate" data-testid="club-gallery-default-note">Immagini FSL · in attesa delle foto della società</span>}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {c.gallery.slice(0, 4).map((u, i) => <div key={u + i} className={`group relative overflow-hidden rounded-xl border border-white/10 ${i === 0 ? "col-span-2 row-span-2 aspect-square md:aspect-auto" : "aspect-square"}`} data-testid={`club-gallery-${i}`}><img src={mediaUrl(u)} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /></div>)}
           </div>
-        )}
+        </section>
       </div>
       <PlayerCardDialog playerId={openPlayer} onClose={() => setOpenPlayer(null)} fetcher={fetchCard} />
       {teamCard && <TeamCardDialog slug={slug} team={teamCard} onClose={() => setTeamCard(null)} />}

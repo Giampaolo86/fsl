@@ -1,5 +1,8 @@
-import { useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, ImagePlus, Layers, RotateCcw, Save, Trash2, Type, Wand2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, ImagePlus, Layers, Loader2, RotateCcw, Save, Sticker, Trash2, Type, Wand2 } from "lucide-react";
+import { api, apiError } from "@/lib/api";
+import { uploadMedia } from "@/lib/upload";
+import { STICKERS } from "@/components/studio/stickers";
 import { toast } from "sonner";
 import { loadImg } from "@/components/fsl/FifaCard";
 import { BGS, FONTS, QUICK_TEXTS, SWATCHES, loadPresets, newImage, newText, readImageFile, savePresets } from "@/components/studio/layers";
@@ -38,20 +41,25 @@ function ImageProps({ l, up }) {
   );
 }
 
-export function LayerPanel({ tid, layers, setLayers, selectedId, setSelectedId, options, setOptions, sponsors = [], onReset }) {
+export function LayerPanel({ tid, template, layers, setLayers, selectedId, setSelectedId, options, setOptions, sponsors = [], onReset }) {
   const fileRef = useRef(null);
-  const [presets, setPresets] = useState(() => loadPresets(tid));
+  const [presets, setPresets] = useState([]);
+  const [localPresets, setLocalPresets] = useState(() => loadPresets(tid));
+  const [uploading, setUploading] = useState(false);
+  useEffect(() => { api.get(`/tournaments/${tid}/studio/presets`).then((r) => setPresets(r.data)).catch(() => setPresets([])); }, [tid]);
   const sel = layers.find((l) => l.id === selectedId);
   const add = (l) => { setLayers([...layers, l]); setSelectedId(l.id); };
   const up = (patch) => setLayers(layers.map((l) => (l.id === selectedId ? { ...l, ...patch } : l)));
   const move = (i, d) => { const j = i + d; if (j < 0 || j >= layers.length) return; const a = [...layers]; [a[i], a[j]] = [a[j], a[i]]; setLayers(a); };
   const remove = (id) => { setLayers(layers.filter((l) => l.id !== id)); if (selectedId === id) setSelectedId(null); };
   const dup = (l) => add({ ...l, id: Math.random().toString(36).slice(2, 9), x: Math.min(0.95, l.x + 0.04), y: Math.min(0.95, l.y + 0.04), name: `${l.name} (copia)` });
-  const onFile = async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; if (f.size > 4 * 1024 * 1024) return toast.error("Immagine troppo grande (max 4 MB)"); try { const { src, ratio } = await readImageFile(f); add(newImage(src, ratio, { name: f.name.replace(/\.[^.]+$/, "").slice(0, 24) })); } catch { toast.error("Immagine non leggibile"); } };
+  const onFile = async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; if (f.size > 8 * 1024 * 1024) return toast.error("Immagine troppo grande (max 8 MB)"); setUploading(true); try { const { ratio } = await readImageFile(f); const m = await uploadMedia(tid, f); add(newImage(m.url, ratio, { name: f.name.replace(/\.[^.]+$/, "").slice(0, 24) })); } catch (err) { toast.error(apiError(err) || "Immagine non caricabile"); } finally { setUploading(false); } };
+  const addSticker = (st) => add(newImage(st.src, st.ratio, { name: st.label, w: st.w, sticker: st.key, y: 0.2 + Math.random() * 0.5, x: 0.3 + Math.random() * 0.4 }));
   const addUrlImage = async (url, name, w = 0.18) => { const im = await loadImg(url); if (!im) return toast.error("Logo non caricabile"); add(newImage(url, im.width / im.height, { name, w, y: 0.88 })); };
-  const savePreset = () => { const name = window.prompt("Nome del modello (livelli e opzioni correnti)"); if (!name) return; const list = [...presets.filter((p) => p.name !== name), { name, layers, options }]; if (savePresets(tid, list)) { setPresets(list); toast.success(`Modello «${name}» salvato`); } else toast.error("Spazio locale insufficiente: riduci le immagini caricate"); };
+  const savePreset = async (name0, layers0 = layers, options0 = options) => { const name = name0 || window.prompt("Nome del modello condiviso (livelli e opzioni correnti)"); if (!name) return false; try { const { data } = await api.post(`/tournaments/${tid}/studio/presets`, { name, layers: layers0.filter((l) => l.type !== "image" || !String(l.src).startsWith("data:image/png") && !String(l.src).startsWith("data:image/jpeg")), options: options0, template }); setPresets((ps) => [...ps.filter((x) => x.id !== data.id), data].sort((a, b) => a.name.localeCompare(b.name))); toast.success(`Modello «${name}» salvato per tutto lo staff`); return true; } catch (e) { toast.error(apiError(e)); return false; } };
   const applyPreset = (p) => { setLayers(p.layers.map((l) => ({ ...l, id: Math.random().toString(36).slice(2, 9) }))); setOptions(p.options || {}); setSelectedId(null); toast.success(`Modello «${p.name}» applicato`); };
-  const delPreset = (p) => { const list = presets.filter((x) => x.name !== p.name); savePresets(tid, list); setPresets(list); };
+  const delPreset = async (p) => { if (!window.confirm(`Eliminare il modello «${p.name}» per tutto lo staff?`)) return; try { await api.delete(`/tournaments/${tid}/studio/presets/${p.id}`); setPresets((ps) => ps.filter((x) => x.id !== p.id)); } catch (e) { toast.error(apiError(e)); } };
+  const importLocal = async (p) => { if (await savePreset(p.name, p.layers, p.options)) { const rest = localPresets.filter((x) => x.name !== p.name); savePresets(tid, rest); setLocalPresets(rest); } };
   return (
     <div className="space-y-4" data-testid="studio-layers">
       <div className="fsl-card p-4 space-y-3" data-testid="studio-base-options">
@@ -64,11 +72,15 @@ export function LayerPanel({ tid, layers, setLayers, selectedId, setSelectedId, 
         <div className="fsl-label flex items-center gap-1"><Type className="h-3.5 w-3.5 text-fsl-gold" /> Aggiungi</div>
         <div className="flex flex-wrap gap-1.5" data-testid="studio-quick-add">{QUICK_TEXTS.map((q) => <button key={q.label} type="button" onClick={() => add(q.make())} className="h-8 rounded-full border border-white/15 px-3 text-[11px] font-semibold hover:border-fsl-gold hover:text-fsl-gold transition-colors" data-testid={`studio-add-${q.label.toLowerCase().replace(/[^a-z]+/g, "-")}`}>{q.label}</button>)}<button type="button" onClick={() => add(newText())} className="h-8 rounded-full border border-white/15 px-3 text-[11px] font-semibold hover:border-fsl-gold hover:text-fsl-gold" data-testid="studio-add-text">Testo libero</button></div>
         <div className="flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => fileRef.current?.click()} className="h-8 inline-flex items-center gap-1 rounded-full border border-fsl-gold/50 px-3 text-[11px] font-semibold text-fsl-gold hover:bg-fsl-gold/10" data-testid="studio-add-image"><ImagePlus className="h-3.5 w-3.5" /> Carica immagine / logo</button>
+          <button type="button" disabled={uploading} onClick={() => fileRef.current?.click()} className="h-8 inline-flex items-center gap-1 rounded-full border border-fsl-gold/50 px-3 text-[11px] font-semibold text-fsl-gold hover:bg-fsl-gold/10 disabled:opacity-50" data-testid="studio-add-image">{uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />} {uploading ? "Caricamento…" : "Carica immagine / logo"}</button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} data-testid="studio-image-input" />
           <button type="button" onClick={() => addUrlImage("/brand/logo.png", "Logo FSL", 0.14)} className="h-8 rounded-full border border-white/15 px-3 text-[11px] font-semibold hover:border-fsl-gold" data-testid="studio-add-fsl-logo">Logo FSL</button>
           {sponsors.filter((s) => s.logo_url).map((s, i) => <button key={i} type="button" onClick={() => addUrlImage(s.logo_url, s.name)} className="h-8 rounded-full border border-white/15 px-3 text-[11px] font-semibold hover:border-fsl-gold truncate max-w-[140px]">Logo {s.name}</button>)}
         </div>
+      </div>
+      <div className="fsl-card p-4 space-y-3" data-testid="studio-stickers">
+        <div className="fsl-label flex items-center gap-1"><Sticker className="h-3.5 w-3.5 text-fsl-gold" /> Sticker FSL</div>
+        <div className="grid grid-cols-4 gap-2">{STICKERS.map((st) => <button key={st.key} type="button" onClick={() => addSticker(st)} title={st.label} className="group rounded-lg border border-white/10 bg-ink-950/60 p-1.5 hover:border-fsl-gold transition-colors flex flex-col items-center gap-1" data-testid={`studio-sticker-${st.key}`}><span className="h-9 w-full flex items-center justify-center"><img src={st.src} alt={st.label} className="max-h-9 max-w-full object-contain" draggable={false} /></span><span className="text-[9px] text-fsl-slate truncate w-full text-center">{st.label}</span></button>)}</div>
       </div>
       <div className="fsl-card p-4 space-y-3">
         <div className="flex items-center justify-between"><div className="fsl-label flex items-center gap-1"><Layers className="h-3.5 w-3.5 text-fsl-gold" /> Livelli ({layers.length})</div>{(layers.length > 0 || Object.keys(options).length > 0) && <button type="button" onClick={onReset} className="inline-flex items-center gap-1 text-[11px] text-fsl-slate hover:text-fsl-white" data-testid="studio-reset"><RotateCcw className="h-3 w-3" /> Ripristina post base</button>}</div>
@@ -87,8 +99,9 @@ export function LayerPanel({ tid, layers, setLayers, selectedId, setSelectedId, 
         {sel && <div className="pt-3 border-t border-white/10 space-y-3" data-testid="studio-layer-props">{sel.type === "text" ? <TextProps l={sel} up={up} /> : <ImageProps l={sel} up={up} />}<p className="text-[11px] text-fsl-slate">Trascina il livello sull'anteprima per posizionarlo · frecce per spostarlo · Canc per eliminarlo.</p></div>}
       </div>
       <div className="fsl-card p-4 space-y-2" data-testid="studio-presets">
-        <div className="flex items-center justify-between"><div className="fsl-label flex items-center gap-1"><Save className="h-3.5 w-3.5 text-fsl-gold" /> Modelli salvati</div><button type="button" onClick={savePreset} disabled={layers.length === 0 && Object.keys(options).length === 0} className="text-[11px] text-fsl-gold hover:underline disabled:opacity-40" data-testid="studio-save-preset">Salva corrente</button></div>
-        {presets.length === 0 ? <p className="text-xs text-fsl-slate">Salva i tuoi livelli come modello per riutilizzarli su altre grafiche (memorizzati su questo dispositivo).</p> : <ul className="space-y-1">{presets.map((p) => <li key={p.name} className="flex items-center gap-2 text-xs"><button type="button" onClick={() => applyPreset(p)} className="flex-1 text-left h-8 px-2 rounded-md border border-white/10 hover:border-fsl-gold truncate" data-testid={`studio-preset-${p.name}`}>{p.name} <span className="text-fsl-slate">· {p.layers.length} livelli</span></button><button type="button" onClick={() => delPreset(p)} className="p-1 text-fsl-slate hover:text-fsl-danger"><Trash2 className="h-3.5 w-3.5" /></button></li>)}</ul>}
+        <div className="flex items-center justify-between"><div className="fsl-label flex items-center gap-1"><Save className="h-3.5 w-3.5 text-fsl-gold" /> Modelli condivisi</div><button type="button" onClick={() => savePreset()} disabled={layers.length === 0 && Object.keys(options).length === 0} className="text-[11px] text-fsl-gold hover:underline disabled:opacity-40" data-testid="studio-save-preset">Salva corrente</button></div>
+        {presets.length === 0 ? <p className="text-xs text-fsl-slate">Salva i tuoi livelli come modello: tutto lo staff del torneo lo ritrova da qualsiasi dispositivo.</p> : <ul className="space-y-1">{presets.map((p) => <li key={p.id} className="flex items-center gap-2 text-xs"><button type="button" onClick={() => applyPreset(p)} className="flex-1 text-left h-8 px-2 rounded-md border border-white/10 hover:border-fsl-gold truncate" data-testid={`studio-preset-${p.name}`}>{p.name} <span className="text-fsl-slate">· {p.layers.length} livelli{p.template ? ` · ${p.template}` : ""}</span></button><button type="button" onClick={() => delPreset(p)} className="p-1 text-fsl-slate hover:text-fsl-danger" data-testid={`studio-preset-delete-${p.name}`}><Trash2 className="h-3.5 w-3.5" /></button></li>)}</ul>}
+        {localPresets.length > 0 && <div className="pt-2 border-t border-white/10"><div className="text-[10px] uppercase tracking-wider text-fsl-slate mb-1">Modelli su questo dispositivo</div><ul className="space-y-1">{localPresets.map((p) => <li key={p.name} className="flex items-center gap-2 text-xs"><span className="flex-1 truncate">{p.name} <span className="text-fsl-slate">· {p.layers.length} livelli</span></span><button type="button" onClick={() => importLocal(p)} className="text-[11px] text-fsl-gold hover:underline" data-testid={`studio-import-local-${p.name}`}>Condividi</button></li>)}</ul></div>}
       </div>
     </div>
   );

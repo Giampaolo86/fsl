@@ -149,7 +149,7 @@ export default function Studio() {
           <div className="fsl-card p-4 flex justify-center bg-ink-950/60"><canvas ref={canvas} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} className={`rounded-xl border border-white/15 shadow-elev max-h-[78vh] max-w-full h-auto w-auto touch-none ${layers.length ? "cursor-move" : ""}`} aria-label="Anteprima grafica" data-testid="studio-canvas" /></div>
           <p className="text-xs text-fsl-slate flex items-center gap-1"><ImageIcon className="h-3.5 w-3.5" /> I nomi dei bambini compaiono per intero solo con il consenso delle famiglie; le grafiche usano solo dati ufficiali. I livelli aggiunti finiscono nel PNG scaricato, condiviso e pubblicato.</p>
         </section>
-        <LayerPanel tid={tid} layers={layers} setLayers={setLayers} selectedId={selectedId} setSelectedId={setSelectedId} options={options} setOptions={setOptions} sponsors={sponsors} onReset={reset} />
+        <LayerPanel tid={tid} template={tpl} layers={layers} setLayers={setLayers} selectedId={selectedId} setSelectedId={setSelectedId} options={options} setOptions={setOptions} sponsors={sponsors} onReset={reset} />
       </div>
     </div>
   );
