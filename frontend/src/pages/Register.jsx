@@ -56,15 +56,16 @@ export default function Register() {
         <form onSubmit={submit} className="w-full max-w-md space-y-4 animate-rise" data-testid="register-form">
           <div className="lg:hidden"><Logo /></div>
           <div className="fsl-kicker">Genitori e tifosi</div>
-          <h2 className="text-3xl font-extrabold">Crea il tuo account</h2>
-          <GoogleButton />
-          <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-fsl-slate"><span className="h-px flex-1 bg-white/10" />oppure con email<span className="h-px flex-1 bg-white/10" /></div>
+          <h2 className="text-3xl font-extrabold">Crea il tuo account genitore</h2>
+          <p className="text-sm text-fsl-slate -mt-2">Bastano nome, email e una password. Gratis, senza account Google.</p>
           <label className="block"><span className="fsl-label">Nome e cognome</span><input className="fsl-input mt-1" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} data-testid="register-name" /></label>
           <label className="block"><span className="fsl-label">Email</span><input type="email" className="fsl-input mt-1" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="register-email" /></label>
           <label className="block"><span className="fsl-label">Password (min. 8 caratteri)</span><input type="password" className="fsl-input mt-1" required minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="register-password" /></label>
           <label className="flex items-start gap-2 text-xs text-fsl-slate"><input type="checkbox" className="mt-0.5" checked={form.privacy_accepted} onChange={(e) => setForm({ ...form, privacy_accepted: e.target.checked })} data-testid="register-privacy" /> Ho letto l'informativa privacy: i dati dei minori sono pubblicati solo con il consenso della società e della famiglia.</label>
           <button type="submit" className="btn-gold w-full" disabled={busy || !form.privacy_accepted} data-testid="register-submit"><UserPlus className="h-4 w-4" /> {busy ? "Creazione…" : "Registrati"}</button>
-          <p className="text-xs text-fsl-slate">Hai già un account? <Link to="/login" className="text-fsl-gold hover:underline" data-testid="register-login-link">Accedi</Link></p>
+          <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-fsl-slate"><span className="h-px flex-1 bg-white/10" />oppure, se preferisci<span className="h-px flex-1 bg-white/10" /></div>
+          <GoogleButton />
+          <p className="text-xs text-fsl-slate">Hai già un account? <Link to="/login?area=genitori" className="text-fsl-gold hover:underline" data-testid="register-login-link">Accedi all'area genitori</Link> · Sei una società o staff? <Link to="/login" className="text-fsl-gold hover:underline">Altri accessi</Link></p>
         </form>
       </section>
     </div>

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, BarChart3, CalendarDays, Grid3X3, Play, PlayCircle, Settings, Flag, Shield, Shirt, Trophy, UserRound, Users } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, Grid3X3, Heart, Play, PlayCircle, Settings, Flag, Shield, Shirt, Trophy, UserRound, Users } from "lucide-react";
 import { fmtPeriod } from "@/lib/format";
 
 const IMG = (n) => `/brand/home/${n}.jpg`;
@@ -19,7 +19,7 @@ export function HubHero({ main }) {
           <h1 className="text-5xl sm:text-6xl lg:text-[84px] font-extrabold leading-[0.9] tracking-tight"><span className="text-fsl-white">La casa del</span><br /><span className="text-fsl-gold">calcio giovanile</span></h1>
           <p className="mt-7 text-fsl-white/85 max-w-lg text-base sm:text-lg leading-relaxed">Tornei giovanili con risultati ufficiali, classifiche in tempo reale, visibilità per i talenti, contenuti multimediali e una vera community di club, ragazzi e famiglie.</p>
           <div className="mt-9 flex flex-wrap gap-3">
-            <Link to="/login" className="btn-gold h-12 px-7 uppercase tracking-wide font-display text-base shadow-[0_10px_30px_-10px_rgba(244,174,43,0.8)]" data-testid="hero-login"><UserRound className="h-4 w-4" /> Accedi</Link>
+            <Link to="/login?area=genitori" className="btn-gold h-12 px-7 uppercase tracking-wide font-display text-base shadow-[0_10px_30px_-10px_rgba(244,174,43,0.8)]" data-testid="hero-login"><UserRound className="h-4 w-4" /> Area Genitori</Link>
             <a href="#missione" className="btn-ghost h-12 px-6 uppercase tracking-wide font-display text-base border-fsl-gold/50 hover:border-fsl-gold" data-testid="hero-discover">Scopri FSL <ArrowRight className="h-4 w-4" /></a>
             <Link to="/tornei" className="btn-ghost h-12 px-6 uppercase tracking-wide font-display text-base border-fsl-gold/50 hover:border-fsl-gold" data-testid="hero-tournaments"><Trophy className="h-4 w-4" /> Tornei attivi</Link>
           </div>
@@ -129,13 +129,19 @@ export function HubAccess() {
   return (
     <section id="contatti" className="relative overflow-hidden scroll-mt-20" data-testid="hub-access">
       <img src={IMG("media-ball")} alt="" className="absolute inset-y-0 right-0 h-full w-full lg:w-[55%] object-cover object-right" /><div className="absolute inset-0 bg-[linear-gradient(90deg,#041E32_0%,#041E32_45%,rgba(4,30,50,0.75)_62%,rgba(4,30,50,0.25)_100%)]" />
-      <div className="relative mx-auto max-w-[1488px] px-6 py-20 lg:py-28"><Kicker className="mb-3">Entra nella community FSL</Kicker><h2 className="!text-5xl sm:!text-6xl font-extrabold leading-[0.9]">Accedi alla tua area</h2><p className="mt-5 text-fsl-white/80 max-w-lg leading-relaxed">Sei una società, un arbitro o uno staff? Accedi ora alla tua area riservata per gestire tornei, calendari, risultati e molto altro.</p>
-        <div className="mt-8 flex flex-wrap gap-3">
+      <div className="relative mx-auto max-w-[1488px] px-6 py-20 lg:py-28"><Kicker className="mb-3">Entra nella community FSL</Kicker><h2 className="!text-5xl sm:!text-6xl font-extrabold leading-[0.9]">Accedi alla tua area</h2>
+        <div className="mt-8 rounded-2xl border border-fsl-gold/60 bg-fsl-gold/10 p-5 max-w-xl" data-testid="access-parents">
+          <div className="fsl-kicker flex items-center gap-2 !text-fsl-gold"><Heart className="h-4 w-4" /> Genitori e tifosi</div>
+          <h3 className="mt-1 font-display font-extrabold uppercase text-2xl leading-none">Segui tuo figlio, gratis</h3>
+          <p className="mt-2 text-sm text-fsl-white/80">Risultati in tempo reale, Top 11, foto e video, Card Player ID e avvisi delle convocazioni. Ti basta un'email: nessun account Google richiesto.</p>
+          <div className="mt-4 flex flex-wrap gap-2"><Link to="/registrati" className="btn-gold h-11 px-5 uppercase font-display tracking-wide" data-testid="access-fan-register">Registrati gratis</Link><Link to="/login?area=genitori" className="btn-ghost h-11 px-5 uppercase font-display tracking-wide border-fsl-gold/60" data-testid="access-fan-login">Ho già un account</Link></div>
+        </div>
+        <p className="mt-8 text-fsl-white/80 max-w-lg leading-relaxed">Sei una società, un arbitro o uno staff? Accedi alla tua area riservata per gestire rose, calendari, risultati e molto altro.</p>
+        <div className="mt-4 flex flex-wrap gap-3">
           <Link to="/login?area=societa" className="btn-gold h-12 px-6 uppercase font-display tracking-wide shadow-[0_10px_30px_-10px_rgba(244,174,43,0.8)]" data-testid="access-club"><Users className="h-4 w-4" /> Login società</Link>
           <Link to="/login?area=arbitri" className="btn-ghost h-12 px-6 uppercase font-display tracking-wide border-white/40 hover:border-fsl-gold" data-testid="access-referee"><Flag className="h-4 w-4" /> Login arbitri</Link>
           <Link to="/login?area=staff" className="btn-ghost h-12 px-6 uppercase font-display tracking-wide border-white/40 hover:border-fsl-gold" data-testid="access-staff"><Settings className="h-4 w-4" /> Login staff</Link>
         </div>
-        <p className="mt-6 text-sm text-fsl-slate">Genitori e tifosi: <Link to="/registrati" className="text-fsl-gold hover:underline" data-testid="access-fan-register">crea il tuo account gratuito</Link> per seguire squadre e giocatori.</p>
       </div>
     </section>
   );
