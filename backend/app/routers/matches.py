@@ -405,11 +405,12 @@ async def _after_official(t_id, m: Match, user):
     c = await scoped("competitions", t_id).get(m.competition_id)
     if c and m.stage == "qualification":
         await engine.snapshot_standings(t_id, c, m.id, user)
+    from ..services import badges, top11
     from .extras import charge_callups
-    from ..services import badges
 
     await charge_callups(t_id, m, user)
     await badges.recompute(t_id, user)
+    await top11.refresh_day(t_id, m.competition_id, m.match_day)
 
 
 @router.post("/matches/{match_id}/report")
@@ -597,9 +598,10 @@ async def reopen(tournament_id: str, match_id: str, body: dict, user: CurrentUse
     await _write_version(tournament_id, m, "reopen", m.score, user, role, reason=reason)
     m2 = await scoped("matches", tournament_id).update_versioned(m.id, m.version, {"status": "under_review"}, user.id)
     await audit.record(user, "report.reopened", "match", m.id, tournament_id, before={"status": m.status}, after={"status": "under_review"}, reason=reason)
-    from ..services import badges
+    from ..services import badges, top11
 
     await badges.recompute(tournament_id, user)
+    await top11.refresh_day(tournament_id, m.competition_id, m.match_day)
     return (await _enrich(tournament_id, [m2]))[0]
 
 

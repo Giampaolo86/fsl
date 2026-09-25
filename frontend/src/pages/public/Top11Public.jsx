@@ -23,7 +23,7 @@ export default function Top11Public() {
       {day && <Link to={`/tornei/${slug}/top11`} className="mt-3 inline-flex text-xs text-fsl-gold hover:underline" data-testid="public-top11-all">← Tutte le giornate</Link>}
       <p className="mt-3 text-fsl-slate max-w-xl">La formazione ideale di ogni giornata, calcolata solo dai tabellini ufficiali con il fantavoto FSL. I nomi dei bambini compaiono per intero solo con il consenso delle famiglie.</p>
       {shown.length === 0 ? <div className="mt-10"><EmptyState icon={Trophy} title="Nessuna Top 11 pubblicata" description="Le formazioni compaiono dopo l'approvazione del Direttore al termine di ogni giornata." /></div> : (
-        <div className="grid xl:grid-cols-2 gap-10 mt-10">{shown.map((d) => <div key={d.id} className="animate-rise w-full max-w-[780px] mx-auto" data-testid={`public-top11-${d.competition?.id}-${d.match_day}`}><Top11Board doc={d} competition={d.competition} /></div>)}</div>
+        <div className="grid xl:grid-cols-2 gap-10 mt-10">{shown.map((d) => <div key={d.id} className="animate-rise w-full max-w-[780px] mx-auto" data-testid={`public-top11-${d.competition?.id}-${d.match_day}`}><Top11Board doc={d} competition={d.competition} linkTo={(p) => `/tornei/${slug}/giocatori/${p.player_id}`} /></div>)}</div>
       )}
     </section>
   );

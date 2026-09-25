@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, Trophy } from "lucide-react";
+import { Download, Repeat, Trophy } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { GOLD, INK, loadFonts, loadImg, preload } from "@/components/fsl/FifaCard";
 import { StadiumCard, drawStadiumCard } from "@/components/fsl/StadiumCard";
@@ -39,20 +39,21 @@ function useWidth(ref) {
   return w;
 }
 
-export function Top11Board({ doc, competition, tournamentName, editable = false, onPick, compact = false }) {
+export function Top11Board({ doc, competition, tournamentName, editable = false, onPick, linkTo, compact = false }) {
   const rows = rowsOf(doc);
   const ref = useRef(null);
   const bw = useWidth(ref);
   const gap = bw < 480 ? 8 : compact ? 10 : 20;
   const cardW = bw ? Math.max(78, Math.min(compact ? 112 : 150, Math.floor((bw - 16 - gap * 3) / 4))) : compact ? 112 : 150;
   const isMobile = bw > 0 && bw < 480;
+  const replaceBtn = (s) => editable && onPick ? <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPick(s); }} className="absolute -bottom-2 left-1/2 -translate-x-1/2 inline-flex h-5 items-center gap-1 rounded-full bg-fsl-blue px-2 text-[8px] font-bold uppercase tracking-wider text-white shadow-md hover:bg-fsl-gold hover:text-ink-950 transition-colors" title="Sostituisci giocatore" data-testid={`top11-replace-${s.slot}`}><Repeat className="h-2.5 w-2.5" /> Sostituisci</button> : null;
   return (
     <Pitch className="rounded-3xl border border-white/10 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]" testId="top11-board">
       <Top11Header doc={doc} competition={competition} compact={compact || isMobile} />
       <div ref={ref} className={`relative px-2 sm:px-3 ${compact || isMobile ? "pt-6 pb-4 space-y-3" : "pt-10 sm:pt-12 pb-8 space-y-4 sm:space-y-6"}`} data-testid="top11-board-rows">
         {rows.map((row, i) => (
           <div key={i} className="flex justify-center" style={{ gap }}>
-            {row.map((s, j) => <div key={s.slot} className="animate-rise" style={{ animationDelay: `${(i * 4 + j) * 60}ms` }}><StadiumCard player={s.player} width={cardW} offRole={s.off_role} label={GROUP_LABEL[s.slot_group]} onClick={editable ? () => onPick?.(s) : undefined} testId={`top11-slot-${s.slot}`} /></div>)}
+            {row.map((s, j) => <div key={s.slot} className="animate-rise" style={{ animationDelay: `${(i * 4 + j) * 60}ms` }}><StadiumCard player={s.player} width={cardW} offRole={s.off_role} label={GROUP_LABEL[s.slot_group]} to={s.player && linkTo ? linkTo(s.player) : undefined} onClick={!s.player && editable ? () => onPick?.(s) : undefined} overlay={replaceBtn(s)} testId={`top11-slot-${s.slot}`} /></div>)}
           </div>
         ))}
       </div>
@@ -87,7 +88,7 @@ export async function drawPosterHeader(ctx, W, { gold, white, sub, pill, hand = 
   ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = `500 ${22 * s}px Inter, Arial, sans-serif`; const subT = sub.toUpperCase().split("").join(" "); ctx.fillText(subT, W / 2, y0 + 398 * s);
   const sw = ctx.measureText(subT).width; ctx.fillStyle = "rgba(244,174,43,0.8)"; ctx.fillRect(W / 2 - sw / 2 - 110 * s, y0 + 410 * s, 90 * s, 2); ctx.fillRect(W / 2 + sw / 2 + 20 * s, y0 + 410 * s, 90 * s, 2);
   if (pill) { ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.fillStyle = "rgba(3,19,31,0.75)"; ctx.beginPath(); ctx.roundRect(W / 2 - 110 * s, y0 + 438 * s, 220 * s, 46 * s, 8 * s); ctx.fill(); ctx.stroke(); ctx.fillStyle = GOLD; ctx.font = `800 ${20 * s}px Inter, Arial, sans-serif`; ctx.textBaseline = "middle"; ctx.fillText(pill.toUpperCase().split("").join(" "), W / 2, y0 + 461 * s); ctx.textBaseline = "top"; }
-  ctx.save(); ctx.translate(W - 110 * s, y0 + 140 * s); ctx.rotate(-0.18); ctx.fillStyle = GOLD; ctx.font = `700 ${44 * s}px Caveat, cursive`; ctx.textAlign = "center"; ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 10; hand.forEach((l, i) => ctx.fillText(l, 0, i * 44 * s)); ctx.restore();
+  ctx.save(); if (hand) { ctx.translate(W - 110 * s, y0 + 140 * s); ctx.rotate(-0.18); ctx.fillStyle = GOLD; ctx.font = `700 ${44 * s}px Caveat, cursive`; ctx.textAlign = "center"; ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 10; hand.forEach((l, i) => ctx.fillText(l, 0, i * 44 * s)); } ctx.restore();
   return y0 + (pill ? 500 : 440) * s;
 }
 
@@ -108,13 +109,13 @@ export async function drawPosterFooter(ctx, W, H, sponsor, note = "") {
   return fy;
 }
 
-export const drawTop11Header = (ctx, W, doc, competition, y0 = 50, scale = 1) => drawPosterHeader(ctx, W, { gold: "TOP 11", white: "SETTIMANALE", sub: competition?.name || "I migliori della settimana", pill: `Giornata ${doc.match_day}`, y0, scale });
+export const drawTop11Header = (ctx, W, doc, competition, y0 = 50, scale = 1, opts = {}) => drawPosterHeader(ctx, W, { gold: (opts.headline || "TOP 11").toUpperCase(), white: "SETTIMANALE", sub: opts.subtitle ?? (competition?.name || "I migliori della settimana"), pill: `Giornata ${doc.match_day}`, hand: opts.hideHand ? null : undefined, y0, scale });
 
 export async function renderTop11(ctx, W, H, doc, competition, opts = {}) {
   await loadFonts();
   await drawStadium(ctx, W, H);
   const scale = H < 1200 ? 0.5 : H > 1400 ? 1 : 0.7;
-  const top = (await drawTop11Header(ctx, W, doc, competition, H > 1400 ? 70 : 36, scale)) + (H > 1400 ? 40 : 12);
+  const top = (await drawTop11Header(ctx, W, doc, competition, H > 1400 ? 70 : 36, scale, opts)) + (H > 1400 ? 40 : 12);
   const rows = rowsOf(doc);
   await preload(doc.lineup.flatMap((s) => [s.player?.photo_url, s.player?.crest_url]));
   const footH = 120, bottom = H - footH - 30, gapY = 14;
@@ -128,7 +129,7 @@ export async function renderTop11(ctx, W, H, doc, competition, opts = {}) {
       await drawStadiumCard(ctx, { x: x0 + i * gap, y, w: cardW }, s.player, { offRole: s.off_role, img, label: GROUP_LABEL[s.slot_group] });
     }
   }
-  await drawPosterFooter(ctx, W, H, opts.sponsor || (doc.sponsor ? { name: doc.sponsor } : null), `${doc.formation} · FANTAVOTO UFFICIALE FSL`);
+  if (!opts.hideFooter) await drawPosterFooter(ctx, W, H, opts.sponsor || (doc.sponsor ? { name: doc.sponsor } : null), `${doc.formation} · FANTAVOTO UFFICIALE FSL`);
 }
 
 export async function downloadTop11(doc, competition, ratio = "4:5") {

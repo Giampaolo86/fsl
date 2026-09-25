@@ -1,4 +1,5 @@
 """Motore TOP 11 della giornata: usa solo tabellini ufficiali e il fantavoto già calcolato (nessuna nuova valutazione)."""
+from datetime import timezone
 from typing import Optional
 
 from bson import ObjectId
@@ -75,6 +76,42 @@ async def generate(t_id: str, competition_id: str, match_day: int, actor_id: Opt
         res = await db.top11.insert_one(doc)
         doc["_id"] = res.inserted_id
     return doc
+
+
+STAT_KEYS = ("vote", "fanta", "goals", "assists", "mvp", "photo_url", "public_ok", "public_name", "role", "shirt_number", "crest_url", "colors", "club", "club_short", "team")
+
+
+async def sync_stats(doc: dict, force: bool = False) -> dict:
+    """Riallinea i numeri della formazione ai tabellini ufficiali correnti (voto complessivo = voto + bonus)."""
+    if doc.get("status") == "archived":
+        return doc
+    synced = doc.get("synced_at")
+    if synced and synced.tzinfo is None:
+        synced = synced.replace(tzinfo=timezone.utc)
+    if not force and synced and (utcnow() - synced).total_seconds() < 120:
+        return doc
+    cands, match_ids = await candidates(doc["tournament_id"], doc["competition_id"], doc["match_day"])
+    if doc["status"] == "draft" and not doc.get("changes"):
+        lineup = select_formation(cands, doc.get("formation", "4-3-3"))
+    else:
+        by_key = {(c["player_id"], c["match_id"]): c for c in cands}
+        by_pid = {c["player_id"]: c for c in cands}
+        lineup = []
+        for s in doc["lineup"]:
+            p = s.get("player")
+            if p:
+                fresh = by_key.get((p["player_id"], p.get("match_id"))) or by_pid.get(p["player_id"])
+                if fresh:
+                    p = {**p, **{k: fresh[k] for k in STAT_KEYS if k in fresh}, "match_id": fresh["match_id"]}
+            lineup.append({**s, "player": p})
+    patch = {"lineup": lineup, "candidates": cands[:40], "match_ids": match_ids, "synced_at": utcnow()}
+    await db.top11.update_one({"_id": doc["_id"]}, {"$set": patch})
+    return {**doc, **patch}
+
+
+async def refresh_day(t_id: str, competition_id: str, match_day: int) -> None:
+    async for d in db.top11.find({"tournament_id": t_id, "competition_id": competition_id, "match_day": match_day, "status": {"$ne": "archived"}}):
+        await sync_stats(d, force=True)
 
 
 def out(doc: dict, public: bool = False) -> dict:

@@ -321,7 +321,7 @@ async def public_top11(slug: str, competition_id: Optional[str] = None, match_da
     comps = {c.id: c for c in await scoped("competitions", t.id).list(limit=200)}
     out = []
     for d in docs:
-        o = svc.out(d, public=True)
+        o = svc.out(await svc.sync_stats(d), public=True)
         c = comps.get(d["competition_id"])
         o["competition"] = {"id": c.id, "name": c.name, "category": c.category, "series": c.series} if c else None
         out.append(o)

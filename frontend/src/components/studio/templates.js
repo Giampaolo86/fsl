@@ -44,7 +44,7 @@ const crest = async (ctx, side, x, y, s) => {
 
 export async function renderMatchday(ctx, W, H, d, opts) {
   await loadFonts(); bg(ctx, W, H);
-  await header(ctx, W, `${d.tournament} · ${d.competition}`, opts.headline || "Matchday", `Giornata ${d.match_day} · in campo questo weekend`);
+  await header(ctx, W, `${d.tournament} · ${d.competition}`, opts.headline || "Matchday", opts.subtitle ?? `Giornata ${d.match_day} · in campo questo weekend`);
   const list = d.matches.slice(0, H > 1400 ? 12 : H < 1200 ? 6 : 9);
   await preload(list.flatMap((m) => [m.home.crest_url, m.away.crest_url]));
   const top = 300, rowH = Math.min(96, (H - top - 130) / Math.max(list.length, 1));
@@ -58,12 +58,12 @@ export async function renderMatchday(ctx, W, H, d, opts) {
     ctx.fillStyle = SLATE; ctx.font = "500 16px Inter, Arial, sans-serif"; ctx.fillText(fit(ctx, (m.field_name || m.venue_name || "").toUpperCase(), 220), W / 2, y + (rowH - 10) / 2 + 14);
     ctx.textBaseline = "top";
   }
-  await footer(ctx, W, H, opts.sponsor);
+  if (!opts.hideFooter) await footer(ctx, W, H, opts.sponsor);
 }
 
 export async function renderFullTime(ctx, W, H, s, opts) {
   await loadFonts(); bg(ctx, W, H, s.home.colors?.primary, s.away.colors?.primary);
-  await header(ctx, W, `${s.tournament} · ${s.competition}`, opts.headline || "Full Time", s.round_name || "");
+  await header(ctx, W, `${s.tournament} · ${s.competition}`, opts.headline || "Full Time", opts.subtitle ?? (s.round_name || ""));
   await preload([s.home.crest_url, s.away.crest_url, s.mvp?.photo_url]);
   const cy = H > 1400 ? 620 : H < 1200 ? 420 : 500, cs = H < 1200 ? 200 : 260;
   await crest(ctx, s.home, W * 0.25 - cs / 2, cy - cs / 2, cs); await crest(ctx, s.away, W * 0.75 - cs / 2, cy - cs / 2, cs);
@@ -75,25 +75,25 @@ export async function renderFullTime(ctx, W, H, s, opts) {
   (s.scorers?.home || []).slice(0, 5).forEach((x, i) => { ctx.textAlign = "center"; ctx.fillText(fit(ctx, `${x.name}${x.goals > 1 ? ` ×${x.goals}` : ""}`, 440), W * 0.25, y0 + i * 32); });
   (s.scorers?.away || []).slice(0, 5).forEach((x, i) => { ctx.fillText(fit(ctx, `${x.name}${x.goals > 1 ? ` ×${x.goals}` : ""}`, 440), W * 0.75, y0 + i * 32); });
   if (s.mvp && H >= 1200) { const my = H - 96 - 60 - 110; ctx.fillStyle = "rgba(244,174,43,0.12)"; ctx.beginPath(); ctx.roundRect(60, my, W - 120, 110, 20); ctx.fill(); ctx.strokeStyle = "rgba(244,174,43,0.5)"; ctx.lineWidth = 2; ctx.stroke(); const im = await loadImg(s.mvp.photo_url); ctx.save(); ctx.beginPath(); ctx.arc(130, my + 55, 38, 0, Math.PI * 2); ctx.clip(); ctx.fillStyle = INK; ctx.fillRect(92, my + 17, 76, 76); if (im) ctx.drawImage(im, 92, my + 17, 76, 76); ctx.restore(); ctx.textAlign = "left"; ctx.fillStyle = GOLD; ctx.font = "700 18px Inter, Arial, sans-serif"; ctx.fillText("MVP DELLA PARTITA", 190, my + 34); ctx.fillStyle = WHITE; ctx.font = F(800, 40); ctx.fillText(fit(ctx, s.mvp.name.toUpperCase(), 600), 190, my + 70); ctx.textAlign = "right"; ctx.fillStyle = GOLD; ctx.font = F(800, 56); ctx.fillText(fmt1(s.mvp.fanta), W - 90, my + 55); }
-  ctx.textBaseline = "top"; await footer(ctx, W, H, opts.sponsor);
+  ctx.textBaseline = "top"; if (!opts.hideFooter) await footer(ctx, W, H, opts.sponsor);
 }
 
 export async function renderMvp(ctx, W, H, s, opts) {
   await loadFonts(); const mine = s.mvp && (s.mvp.team_id === s.home.id ? s.home : s.away); bg(ctx, W, H, mine?.colors?.primary || GOLD, GOLD);
-  await header(ctx, W, `${s.tournament} · ${s.competition}`, opts.headline || "MVP", `${s.home.name} ${s.score?.home ?? ""}-${s.score?.away ?? ""} ${s.away.name}`);
-  if (!s.mvp) { ctx.fillStyle = SLATE; ctx.font = F(700, 40); ctx.textAlign = "center"; ctx.fillText("MVP NON ANCORA ASSEGNATO", W / 2, H / 2); await footer(ctx, W, H, opts.sponsor); return; }
+  await header(ctx, W, `${s.tournament} · ${s.competition}`, opts.headline || "MVP", opts.subtitle ?? `${s.home.name} ${s.score?.home ?? ""}-${s.score?.away ?? ""} ${s.away.name}`);
+  if (!s.mvp) { ctx.fillStyle = SLATE; ctx.font = F(700, 40); ctx.textAlign = "center"; ctx.fillText("MVP NON ANCORA ASSEGNATO", W / 2, H / 2); if (!opts.hideFooter) await footer(ctx, W, H, opts.sponsor); return; }
   const cw = H < 1200 ? 380 : 520, cx = W / 2 - cw / 2, cy = H > 1400 ? 420 : 300;
   const img = await loadImg(s.mvp.photo_url);
   const ch = drawFifaCard(ctx, { x: cx, y: cy, w: cw }, { name: s.mvp.name, photo_url: s.mvp.photo_url, role: s.mvp.role, fanta: s.mvp.fanta, vote: s.mvp.vote, team: mine?.name, shirt_number: s.mvp.shirt_number, goals: s.mvp.events?.goal || 0, assists: s.mvp.events?.assist || 0, mvp: true }, { variant: "special", img });
   const [first, last] = splitName(s.mvp.name);
   if (cy + ch + 150 < H - 100) { ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = "600 26px Inter, Arial, sans-serif"; ctx.fillText(first.toUpperCase(), W / 2, cy + ch + 40); ctx.fillStyle = WHITE; ctx.font = F(800, 84); ctx.fillText(fit(ctx, (last || first).toUpperCase(), W - 120), W / 2, cy + ch + 70); }
-  await footer(ctx, W, H, opts.sponsor);
+  if (!opts.hideFooter) await footer(ctx, W, H, opts.sponsor);
 }
 
 export async function renderStandings(ctx, W, H, d, opts) {
   await loadFonts(); await drawStadium(ctx, W, H);
   const scale = H < 1200 ? 0.5 : H > 1400 ? 0.9 : 0.66;
-  const top = (await drawPosterHeader(ctx, W, { gold: (opts.headline || "Classifica").toUpperCase(), white: "SETTIMANALE", sub: "I leader del campionato", pill: d.match_day ? `Giornata ${d.match_day}` : d.competition, y0: H > 1400 ? 60 : 30, scale })) + 20;
+  const top = (await drawPosterHeader(ctx, W, { gold: (opts.headline || "Classifica").toUpperCase(), white: "SETTIMANALE", sub: opts.subtitle ?? "I leader del campionato", pill: d.match_day ? `Giornata ${d.match_day}` : d.competition, hand: opts.hideHand ? null : undefined, y0: H > 1400 ? 60 : 30, scale })) + 20;
   const rows = d.rows.slice(0, H > 1400 ? 18 : H < 1200 ? 10 : 12);
   await preload(rows.map((r) => r.club?.crest_url));
   const fy = H - 130, avail = fy - top - 40, rowH = Math.min(78, Math.floor((avail - 44) / Math.max(rows.length, 1)));
@@ -120,15 +120,15 @@ export async function renderStandings(ctx, W, H, d, opts) {
     [[r.PG, 720], [r.V, 786], [r.N, 848], [r.P, 910], [r.GF, 972], [r.GS, 1034]].forEach(([v, x]) => { ctx.fillText(String(v), x, y + h / 2 + 1); ctx.fillStyle = "rgba(255,255,255,0.1)"; ctx.fillRect(x - 31, y + 10, 1, h - 20); ctx.fillStyle = "rgba(255,255,255,0.92)"; });
   }
   ctx.textBaseline = "top";
-  await drawPosterFooter(ctx, W, H, opts.sponsor, "SOLO RISULTATI UFFICIALI · FSL");
+  if (!opts.hideFooter) await drawPosterFooter(ctx, W, H, opts.sponsor, "SOLO RISULTATI UFFICIALI · FSL");
 }
 
 export async function renderScorers(ctx, W, H, d, opts) {
   await loadFonts(); await drawStadium(ctx, W, H);
   const scale = H < 1200 ? 0.5 : H > 1400 ? 0.9 : 0.66;
-  const top = (await drawPosterHeader(ctx, W, { gold: (opts.headline || "Marcatori").toUpperCase(), white: "DELLA SETTIMANA", sub: d.competition, pill: `Giornata ${d.match_day}`, hand: ["Chi ha fatto", "la differenza"], y0: H > 1400 ? 60 : 30, scale })) + 20;
+  const top = (await drawPosterHeader(ctx, W, { gold: (opts.headline || "Marcatori").toUpperCase(), white: "DELLA SETTIMANA", sub: opts.subtitle ?? d.competition, pill: `Giornata ${d.match_day}`, hand: opts.hideHand ? null : ["Chi ha fatto", "la differenza"], y0: H > 1400 ? 60 : 30, scale })) + 20;
   const rows = d.rows.slice(0, H > 1400 ? 10 : H < 1200 ? 5 : 8);
-  if (!rows.length) { ctx.fillStyle = SLATE; ctx.font = F(700, 40); ctx.textAlign = "center"; ctx.fillText("NESSUN GOL UFFICIALE NELLA GIORNATA", W / 2, H / 2); await drawPosterFooter(ctx, W, H, opts.sponsor); return; }
+  if (!rows.length) { ctx.fillStyle = SLATE; ctx.font = F(700, 40); ctx.textAlign = "center"; ctx.fillText("NESSUN GOL UFFICIALE NELLA GIORNATA", W / 2, H / 2); if (!opts.hideFooter) await drawPosterFooter(ctx, W, H, opts.sponsor); return; }
   await preload(rows.flatMap((r) => [r.photo_url, r.crest_url]));
   const fy = H - 130, rowH = Math.min(104, Math.floor((fy - top - 30) / rows.length));
   const medal = ["#F4AE2B", "#C9D3DE", "#C8811A"];
@@ -149,11 +149,11 @@ export async function renderScorers(ctx, W, H, d, opts) {
     ctx.textAlign = "center"; ctx.fillStyle = GOLD; ctx.font = F(800, Math.min(48, h * 0.58)); ctx.fillText(String(r.goals), W - 60 - 52, y + h / 2 - 4);
     ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "600 11px Inter, Arial, sans-serif"; ctx.fillText(r.goals === 1 ? "GOL" : "GOL", W - 60 - 52, y + h - 16);
   }
-  ctx.textBaseline = "top"; await drawPosterFooter(ctx, W, H, opts.sponsor, "SOLO TABELLINI UFFICIALI · FSL");
+  ctx.textBaseline = "top"; if (!opts.hideFooter) await drawPosterFooter(ctx, W, H, opts.sponsor, "SOLO TABELLINI UFFICIALI · FSL");
 }
 
 export async function renderTop11Template(ctx, W, H, d, opts) {
-  await renderTop11(ctx, W, H, d.doc, d.competition, { sponsor: opts.sponsor ? { name: opts.sponsor.name, logo: opts.sponsor.logo_url } : null });
+  await renderTop11(ctx, W, H, d.doc, d.competition, { ...opts, sponsor: opts.sponsor ? { name: opts.sponsor.name, logo: opts.sponsor.logo_url } : null });
 }
 
 export const TEMPLATES = [

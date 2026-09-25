@@ -58,7 +58,7 @@ export default function Top11Admin() {
           {items.length === 0 ? <p className="p-3 text-sm text-fsl-slate">Nessuna giornata elaborata: premi «Elabora giornate».</p> : items.map((it) => <button key={it.id} onClick={() => open(it.id)} className={`w-full text-left h-12 px-3 rounded-md flex items-center justify-between text-sm ${doc?.id === it.id ? "bg-fsl-blue/20 text-fsl-white" : "hover:bg-white/5 text-fsl-white/85"}`} data-testid={`top11-item-${it.match_day}`}><span className="font-display font-bold uppercase">Giornata {it.match_day}</span><span className={`text-xs ${STATUS[it.status][1]}`}>{STATUS[it.status][0]}</span></button>)}
         </aside>
         <section className="space-y-4">
-          {!doc ? <EmptyState icon={Trophy} title="Seleziona una giornata" description="La formazione compare qui: clicca un giocatore per sostituirlo prima della pubblicazione." /> : (
+          {!doc ? <EmptyState icon={Trophy} title="Seleziona una giornata" description="La formazione compare qui: clicca un giocatore per aprire la scheda, usa «Sostituisci» sotto la card prima della pubblicazione." /> : (
             <>
               <div className="flex flex-wrap items-center gap-2 text-sm"><span className={`font-bold ${STATUS[doc.status][1]}`} data-testid="top11-status">{STATUS[doc.status][0]}</span><span className="text-fsl-slate">· {doc.match_ids?.length || 0} gare ufficiali · {doc.lineup.filter((s) => s.off_role).length} fuori ruolo · {doc.changes?.length || 0} sostituzioni</span>
                 <div className="ml-auto flex flex-wrap gap-2">
@@ -68,7 +68,7 @@ export default function Top11Admin() {
                   {doc.status !== "archived" && canPublish && <button className="btn-ghost h-9 text-fsl-danger" onClick={() => window.confirm("Archiviare questa Top 11?") && setStatus("archived")} data-testid="top11-archive">Archivia</button>}
                 </div></div>
               {editable && <input className="fsl-input h-10 max-w-sm" placeholder="Sponsor (es. Presented by …)" value={sponsor} onChange={(e) => setSponsor(e.target.value)} data-testid="top11-sponsor" />}
-              <Top11Board doc={doc} competition={comp} editable={editable} onPick={setSlot} />
+              <Top11Board doc={doc} competition={comp} editable={editable} onPick={setSlot} linkTo={(p) => `/admin/t/${tid}/giocatori/${p.player_id}`} />
               <DownloadTop11 doc={doc} competition={comp} />
               {doc.changes?.length > 0 && <div className="fsl-card p-4 text-xs text-fsl-slate space-y-1" data-testid="top11-changes">{doc.changes.map((c, i) => <div key={i}>Slot {c.slot}: <span className="text-fsl-white">{c.out_name || "vuoto"} → {c.in_name}</span> · {c.reason}</div>)}</div>}
             </>

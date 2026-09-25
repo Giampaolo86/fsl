@@ -70,7 +70,7 @@ async def list_top11(tournament_id: str, competition_id: Optional[str] = None, u
     q = {"tournament_id": tournament_id}
     if competition_id:
         q["competition_id"] = competition_id
-    docs = [svc.out(d) for d in await db.top11.find(q).sort([("competition_id", 1), ("match_day", -1)]).to_list(500)]
+    docs = [svc.out(await svc.sync_stats(d)) for d in await db.top11.find(q).sort([("competition_id", 1), ("match_day", -1)]).to_list(500)]
     for d in docs:
         d.pop("candidates", None)
     return docs
@@ -79,7 +79,7 @@ async def list_top11(tournament_id: str, competition_id: Optional[str] = None, u
 @router.get("/{top11_id}")
 async def detail(tournament_id: str, top11_id: str, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user, roles=STAFF)
-    return svc.out(await _get(tournament_id, top11_id))
+    return svc.out(await svc.sync_stats(await _get(tournament_id, top11_id)))
 
 
 class ReplaceIn(BaseModel):

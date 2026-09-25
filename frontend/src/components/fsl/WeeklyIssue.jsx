@@ -55,7 +55,7 @@ export function WeeklyIssue({ issue, slug, matchTo }) {
         </div>
       </section>
 
-      {c.top11 && <section data-testid="weekly-top11"><SectionHead icon={Crown}>Top 11 della giornata</SectionHead><Top11Board doc={c.top11} competition={issue.competition} compact /></section>}
+      {c.top11 && <section data-testid="weekly-top11"><SectionHead icon={Crown}>Top 11 della giornata</SectionHead><Top11Board doc={c.top11} competition={issue.competition} compact linkTo={slug ? (p) => `/tornei/${slug}/giocatori/${p.player_id}` : undefined} /></section>}
 
       <section className="grid lg:grid-cols-[1.3fr_1fr] gap-8">
         <div data-testid="weekly-standings">
