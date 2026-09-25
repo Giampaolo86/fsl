@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
-import { Download, Image as ImageIcon, LayoutTemplate, Share2 } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, Download, Image as ImageIcon, LayoutTemplate, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { LoadingState } from "@/components/fsl/States";
 import { LayerPanel } from "@/components/studio/LayerPanel";
 import { drawLayers, drawSelection, hitLayer } from "@/components/studio/layers";
 import { PublishToBlog } from "@/components/studio/PublishToBlog";
+import { SavePreviewDialog, useSaveImage } from "@/components/studio/SaveImage";
+import { loadImg } from "@/components/fsl/FifaCard";
 import { FORMATS, TEMPLATES } from "@/components/studio/templates";
 import { api, apiError } from "@/lib/api";
 
@@ -50,7 +52,8 @@ export default function Studio() {
   const sponsors = t?.settings?.sponsors || [];
   const sponsor = sponsorIdx === "" ? null : sponsors[Number(sponsorIdx)];
   const template = TEMPLATES.find((x) => x.key === tpl);
-  const { subtitle, hideHand, hideFooter, dim } = options;
+  const { subtitle, hideHand, hideFooter, dim, baseImage } = options;
+  const saver = useSaveImage();
 
   useEffect(() => {
     if (!comp || !t) return;
@@ -64,6 +67,14 @@ export default function Studio() {
     const run = async () => {
       setRendering(true); setReady(false);
       try {
+        if (baseImage) {
+          const im = await loadImg(baseImage);
+          if (!im) throw new Error("Immagine base non caricabile");
+          const r = Math.max(W / im.width, H / im.height), dw = im.width * r, dh = im.height * r;
+          ctx.fillStyle = "#03131F"; ctx.fillRect(0, 0, W, H); ctx.drawImage(im, (W - dw) / 2, (H - dh) / 2, dw, dh);
+          if (commit()) setReady(true);
+          return;
+        }
         const opts = { sponsor, headline: headline.trim() || undefined, subtitle: subtitle?.trim() || undefined, hideHand, hideFooter };
         if (tpl === "matchday") await template.render(ctx, W, H, { tournament: t.name, competition: comp.name, match_day: day, matches: dayMatches.map((m) => ({ ...m, home: side(m.home), away: side(m.away) })) }, opts);
         else if (tpl === "scorers") { const { data } = await api.get(`/tournaments/${tid}/top11/scorers`, { params: { competition_id: compId, match_day: Number(day) } }); await template.render(ctx, W, H, { tournament: t.name, competition: comp.name, match_day: day, rows: data }, opts); }
@@ -74,7 +85,7 @@ export default function Studio() {
       } catch (e) { ctx.fillStyle = "#041E32"; ctx.fillRect(0, 0, W, H); ctx.fillStyle = "#A8BACB"; ctx.font = "600 34px Inter, sans-serif"; ctx.textAlign = "center"; ctx.fillText(e.message || apiError(e), W / 2, H / 2); commit(); } finally { if (token === renderToken.current) setRendering(false); }
     };
     run();
-  }, [tpl, format, day, matchId, top11Id, sponsor, headline, subtitle, hideHand, hideFooter, comp, t, tid, compId, dayMatches, matches, template]);
+  }, [tpl, format, day, matchId, top11Id, sponsor, headline, subtitle, hideHand, hideFooter, baseImage, comp, t, tid, compId, dayMatches, matches, template]);
 
   const compositeToken = useRef(0);
   useEffect(() => {
@@ -103,8 +114,8 @@ export default function Studio() {
   const reset = useCallback(() => { setLayers([]); setOptions({}); setSelectedId(null); toast.info("Post base ripristinato"); }, []);
 
   const fileName = () => `fsl-${tpl}-${(comp?.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${format.replace(":", "x")}.png`;
-  const download = () => { const a = document.createElement("a"); a.href = cleanRef.current.toDataURL("image/png"); a.download = fileName(); a.click(); };
-  const share = async () => { const b = await new Promise((res) => cleanRef.current.toBlob(res, "image/png")); const file = new File([b], fileName(), { type: "image/png" }); if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file], title: "Future Stars League" }); } catch (e) { if (e.name !== "AbortError") toast.error("Condivisione non riuscita"); } } else { download(); toast.info("Grafica scaricata"); } };
+  const download = () => saver.save(cleanRef.current, fileName());
+  const share = () => saver.save(cleanRef.current, fileName(), { forceShare: true });
   if (!comps || !t) return <LoadingState />;
   const [W, H] = FORMATS[format];
   const selMatch = matches.find((m) => m.id === matchId);
@@ -121,6 +132,8 @@ export default function Studio() {
   if (headline.trim()) blogDefaults.title = `${headline.trim()} · ${comp?.name}`;
   return (
     <div data-testid="studio">
+      <Link to={`/admin/t/${tid}`} className="inline-flex items-center gap-1 text-xs text-fsl-slate hover:text-fsl-white mb-3" data-testid="studio-back"><ArrowLeft className="h-3.5 w-3.5" /> Torna alla Control Room</Link>
+      <SavePreviewDialog preview={saver.preview} onClose={saver.close} />
       <PageHeader kicker="FSL Social Studio" title="Grafiche ufficiali" subtitle="Post base generato dai dati ufficiali + i tuoi livelli: testi, loghi, immagini e opzioni. Trascina gli elementi sull'anteprima, poi scarica, condividi o pubblica nel blog." />
       <div className="grid lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_340px] gap-6">
         <aside className="space-y-5">

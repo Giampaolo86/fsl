@@ -78,9 +78,7 @@ async def seed_showcase(slug: str = "la-serie-a-dei-bambini") -> None:
     now = utcnow().isoformat()
     for club in clubs.values():
         pids = [p.id for p in players if p.club_id == club.id]
-        if not pids:
-            continue
-        if not (club.profile or {}).get("showcase"):
+        if not (club.profile or {}).get("showcase") and (ASSETS / f"crest_{club.slug}.png").exists():
             crest = await _asset(t_id, f"crest_{club.slug}.png")
             cover = await _asset(t_id, "team_1.jpg")
             gallery = [await _asset(t_id, n) for n in ("team_1.jpg", "act_celebrate.jpg", "act_tunnel.jpg", "act_dribble.jpg")]
@@ -92,6 +90,8 @@ async def seed_showcase(slug: str = "la-serie-a-dei-bambini") -> None:
             if cover and not club.cover_url:
                 patch["cover_url"] = f"/api/media/{cover}"
             await scoped("clubs", t_id).update(club.id, patch)
+        if not pids:
+            continue
         cat = next((comps[teams[tm].competition_id].category for tm in teams if teams[tm].club_id == club.id and teams[tm].competition_id in comps), "")
         for i, (kind, title, excerpt, cover) in enumerate(POSTS):
             pslug = f"vetrina-{club.slug}-{kind}"

@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 29 QA — cutout pipeline (rembg u2netp) + club showcase demo seed. Backend pytest /app/backend/tests/test_iteration29.py: 5 passed / 1 skipped. (1) Single photo upload with synthetic gradient bg + dark silhouette to POST /api/tournaments/{tid}/players/{PID=6aaa5ce2cfb606f5c0fb753b}/photo → 200; GET photo_url → 200 image/png RGBA 674x900, alpha extrema [0,255] (transparency present), aspect 0.749 (perfect 3:4). (2) Restore gk_green.png demo portrait: upload → 200, photo_url /api/media/… (also processed as PNG). (3) Bulk upload one file named '1.jpg' → status ok, PNG output. (4) Public /api/public/tournaments/la-serie-a-dei-bambini/clubs/sporting-eur → crest_is_placeholder=false, crest_url /api/media/…, cover_is_default=false, gallery_is_default=false, profile.gallery_urls=4 (all /api/media/…), profile.services=6, club.description 363 chars. (5) Media docs with original_filename 'crest_sporting-eur.png' remained count=1 after `sudo supervisorctl restart backend` (idempotency ok). Showcase log line present in backend.err.log (`Showcase demo content ready for la-serie-a-dei-bambini`). Regression pytest test_iteration26 + test_iteration27 + test_top11 + test_iteration28 → 22 passed / 5 skipped. Frontend (1920×1080): /tornei/la-serie-a-dei-bambini/squadre/sporting-eur → hero crest img /api/media/6ab6be82ed330f20f5255a1b naturalWidth=357, club-home-gallery 4 images loaded (nw=1264 each), no club-gallery-default-note, club-home-about 424 chars, page renders clean. /squadre list and /classifiche standings show 5 real crests from /api/media/ (all loaded), other clubs use placeholder inline SVG (expected). Admin bulk upload copy 'Lo sfondo viene rimosso automaticamente' present in BulkPhotoUpload.jsx (l.27); PlayerProfile.jsx has data-testid=player-photo-input with title tooltip 'lo sfondo viene rimosso automaticamente'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/public/tournaments/la-serie-a-dei-bambini (clubs list)", "issue": "Only 5/18 demo clubs have crest_is_placeholder=false (sporting-eur, atletico-prenestino, roma-nord, virtus-aurelia, academy-tuscolana). Root cause in /app/backend/app/seed_showcase.py line 81-82: `pids = [p.id for p in players if p.club_id == club.id]; if not pids: continue` — clubs without seeded players are skipped entirely, including their crest+cover+gallery seeding. Task spec asks for 18 demo clubs to have real crests. Fix: hoist the crest/cover/gallery portion of the seed (lines 84-94) above the `if not pids: continue` guard, so club media is applied for every demo club regardless of whether it has players. Also note slug 'cinecittà-football' is stored as 'cinecitt-football' (accent stripped) — the demo asset file is `crest_cinecitta-football.png`, so once the guard is fixed the file lookup will still miss unless the club slug and filename are aligned."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration29.py",
+    "/app/test_reports/pytest/iteration29.xml"
+  ],
+  "action_items": [
+    "seed_showcase.py: apply crest/cover/gallery/description to demo clubs even when they have no seeded players (move the crest section above `if not pids: continue`).",
+    "seed_showcase.py: reconcile slug 'cinecitt-football' vs asset filename 'crest_cinecitta-football.png' (either fix the club slug or add an alias in the asset lookup)."
+  ],
+  "critical_code_review_comments": [
+    "cutout.py::_frame — uses `img.getchannel('A').point(...).getbbox()` to trim before pasting; if remove() ever returns fully-opaque output the bbox equals full image (harmless), but the alpha_max<40 check for 'no subject' should probably be `<10` — u2netp often yields a faint halo of ~15-30 that would falsely count as detection. Consider hysteresis.",
+    "cutout.py — session is a module-level singleton but not thread-safe; `asyncio.to_thread(cutout, data)` can invoke concurrent remove() calls sharing the same ORT session (rembg is not documented as thread-safe). Under load consider a per-request session or a semaphore.",
+    "club_extras.py::_player_photo — has a redundant local `import asyncio` inside the function (already imported at module top).",
+    "seed_showcase.py::seed_showcase — description-fallback logic (`club.description or CLUB_BIO.format(...)`) means once a real description exists it will never be overwritten by future BIO template updates. Consider a `showcase_v` marker to allow re-runs (also flagged in iter 28).",
+    "seed_showcase.py — the `if not pids: continue` on line 82 causes 13/18 demo clubs to skip their crest/cover/gallery seed. See action items."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration29.py"
+  ],
+  "success_rate": {"backend": "83% (5/6, 1 skipped documenting seed limitation) + regressions 22/22 pass", "frontend": "100% on public showcase; admin upload copy verified via source"},
+  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "seed_data_creation": "No persistent test data. Uploaded synthetic JPEG + gk_green.png then re-uploaded original portrait to restore. Bulk-uploaded 1 JPEG to Sporting Eur shirt #1 (overrides photo_url of Davide Rinaldi — main agent may want to reset to seed portrait if pixel-perfect demo is required, or a subsequent showcase reseed will not touch it because `showcase=true` is already set on the player).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The cutout pipeline is fully working: rembg u2netp local model at backend/app/ml/models/u2netp[.onnx] produces PNG 3:4 with real transparency in ~1-3s. To reproduce: `pytest /app/backend/tests/test_iteration29.py -v -o addopts=` (disable xdist so the restart test doesn't collide with upload tests). The main open item is the seed_showcase.py `if not pids: continue` guard that prevents 13 demo clubs from getting real crests — this is a real functional gap versus the spec ('crest_is_placeholder=false for 18 demo clubs'). Player Davide Rinaldi shirt #1 (Sporting Eur) photo was overwritten by the bulk-upload test — consider a reseed toggle.",
+  "rca of the issue": "Only 5/18 demo clubs receive real crest+cover+gallery because seed_showcase.py:82 (`if not pids: continue`) is placed BEFORE the club media block (lines 83-94). The intent (skip vetrina posts+shop items for empty clubs) is correct but the visual seed (crest/cover/gallery/description) got trapped inside the same guarded scope. Repro: `curl $API/api/public/tournaments/la-serie-a-dei-bambini | jq '.clubs[] | {slug,crest_is_placeholder}'` → 13 True. Mitigation: split the club loop into two passes — one for media (all clubs), one for posts+shop (clubs with players)."
+}

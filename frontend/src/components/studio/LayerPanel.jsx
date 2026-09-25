@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, ImagePlus, Layers, Loader2, RotateCcw, Save, Sticker, Trash2, Type, Wand2 } from "lucide-react";
 import { api, apiError } from "@/lib/api";
-import { uploadMedia } from "@/lib/upload";
+import { mediaUrl, uploadMedia } from "@/lib/upload";
 import { STICKERS } from "@/components/studio/stickers";
 import { toast } from "sonner";
 import { loadImg } from "@/components/fsl/FifaCard";
@@ -46,6 +46,9 @@ export function LayerPanel({ tid, template, layers, setLayers, selectedId, setSe
   const [presets, setPresets] = useState([]);
   const [localPresets, setLocalPresets] = useState(() => loadPresets(tid));
   const [uploading, setUploading] = useState(false);
+  const baseRef = useRef(null);
+  const [baseUploading, setBaseUploading] = useState(false);
+  const onBaseFile = async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; if (f.size > 12 * 1024 * 1024) return toast.error("Immagine troppo grande (max 12 MB)"); setBaseUploading(true); try { const m = await uploadMedia(tid, f); setOptions({ ...options, baseImage: m.url }); toast.success("Immagine base sostituita"); } catch (err) { toast.error(apiError(err) || "Immagine non caricabile"); } finally { setBaseUploading(false); } };
   useEffect(() => { api.get(`/tournaments/${tid}/studio/presets`).then((r) => setPresets(r.data)).catch(() => setPresets([])); }, [tid]);
   const sel = layers.find((l) => l.id === selectedId);
   const add = (l) => { setLayers([...layers, l]); setSelectedId(l.id); };
@@ -66,6 +69,15 @@ export function LayerPanel({ tid, template, layers, setLayers, selectedId, setSe
         <div className="fsl-label flex items-center gap-1"><Wand2 className="h-3.5 w-3.5 text-fsl-gold" /> Post base · opzioni</div>
         <Row label="Sottotitolo personalizzato"><input className="fsl-input h-9" placeholder="Lascia vuoto per quello automatico" value={options.subtitle || ""} onChange={(e) => setOptions({ ...options, subtitle: e.target.value || undefined })} data-testid="studio-subtitle" /></Row>
         <div className="flex flex-wrap gap-3 text-xs"><label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={!!options.hideHand} onChange={(e) => setOptions({ ...options, hideHand: e.target.checked })} data-testid="studio-hide-hand" /> Nascondi claim manoscritto</label><label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={!!options.hideFooter} onChange={(e) => setOptions({ ...options, hideFooter: e.target.checked })} data-testid="studio-hide-footer" /> Nascondi footer</label></div>
+        <Row label="Immagine base personalizzata">
+          <div className="flex items-center gap-2">
+            {options.baseImage && <img src={mediaUrl(options.baseImage)} alt="" className="h-10 w-10 rounded-md object-cover border border-fsl-gold/60" data-testid="studio-base-image-thumb" />}
+            <button type="button" disabled={baseUploading} onClick={() => baseRef.current?.click()} className="h-8 inline-flex items-center gap-1 rounded-full border border-fsl-gold/50 px-3 text-[11px] font-semibold text-fsl-gold hover:bg-fsl-gold/10 disabled:opacity-50" data-testid="studio-base-image">{baseUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />} {options.baseImage ? "Sostituisci" : "Carica immagine dall'esterno"}</button>
+            {options.baseImage && <button type="button" onClick={() => setOptions({ ...options, baseImage: undefined })} className="text-[11px] text-fsl-slate hover:text-fsl-danger" data-testid="studio-base-image-remove">Rimuovi</button>}
+            <input ref={baseRef} type="file" accept="image/*" className="hidden" onChange={onBaseFile} data-testid="studio-base-image-input" />
+          </div>
+          <p className="text-[10px] text-fsl-slate mt-1">Sostituisce la grafica generata: la tua foto diventa il post base e sopra aggiungi testi, loghi e sticker.</p>
+        </Row>
         <Row label={`Scurisci sfondo · ${options.dim || 0}%`}><Slider value={options.dim || 0} min={0} max={70} onChange={(dim) => setOptions({ ...options, dim: dim || undefined })} testId="studio-dim" /></Row>
       </div>
       <div className="fsl-card p-4 space-y-3">
