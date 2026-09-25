@@ -3,7 +3,7 @@ import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { fmtDate } from "@/lib/format";
 import { mediaUrl } from "@/lib/upload";
 
-export const KIND_LABEL = { news: "Notizia", interview: "Intervista", gallery: "Gallery", video: "Video", match_story: "Match story", badge: "Badge" };
+export const KIND_LABEL = { news: "Notizia", interview: "Intervista", gallery: "Gallery", video: "Video", match_story: "Match story", badge: "Badge", weekly: "FSL Weekly" };
 export const STATUS_LABEL = { draft: ["Bozza", "bg-navy-700 text-fsl-slate"], scheduled: ["Programmato", "bg-fsl-warning text-ink-950"], published: ["Pubblicato", "bg-fsl-success text-ink-950"], withdrawn: ["Ritirato", "bg-fsl-danger text-fsl-white"] };
 
 export function PostMeta({ p, className = "" }) {

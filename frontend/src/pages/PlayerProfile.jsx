@@ -6,6 +6,7 @@ import { BadgeChips } from "@/components/fsl/BadgeChips";
 import { FavButton } from "@/components/fsl/FavButton";
 import { PlayerProfileEditor, FOOT_LABEL } from "@/components/fsl/PlayerProfileEditor";
 import { PlayerPostcard } from "@/components/fsl/PlayerPostcard";
+import { PlayerIdOffer } from "@/components/fsl/PlayerIdCard";
 import { buyProduct } from "@/pages/DigitalProduct";
 import { Badges, EventIcons } from "@/components/fsl/Ratings";
 import { ShopItemCard } from "@/components/fsl/Shop";
@@ -39,6 +40,9 @@ export default function PlayerProfile({ mode = "public" }) {
   const [edit, setEdit] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [buyingAlbum, setBuyingAlbum] = useState(false);
+  const [idPreview, setIdPreview] = useState(null);
+  const [buyingCard, setBuyingCard] = useState(false);
+  const buyCard = async (kind) => { setBuyingCard(true); try { await buyProduct(slug || card?.tournament?.slug || "", kind, playerId); } catch (e) { toast.error(apiError(e)); setBuyingCard(false); } };
   const buyAlbum = async () => { setBuyingAlbum(true); try { await buyProduct(slug || card?.tournament?.slug || "", "album", playerId); } catch (e) { toast.error(apiError(e)); setBuyingAlbum(false); } };
   const uploadPhoto = async (file) => {
     if (!file) return; setUploading(true);
@@ -62,6 +66,7 @@ export default function PlayerProfile({ mode = "public" }) {
     } catch (e) { setError(e); }
   }, [mode, slug, playerId, tid, user]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { const sl = slug || card?.tournament?.slug; if (sl && card && (card.public_ok || card.can_edit)) api.get(`/public/tournaments/${sl}/players/${playerId}/card-preview`).then((r) => setIdPreview(r.data)).catch(() => setIdPreview(null)); }, [slug, card, playerId]);
   if (error) return <div className="p-10"><ErrorState message={apiError(error)} /></div>;
   if (!card) return <LoadingState full />;
   const p = card.profile || {}, t = card.totals || {};
@@ -100,6 +105,7 @@ export default function PlayerProfile({ mode = "public" }) {
             {(card.can_edit === "staff" || card.can_edit === "club") && <div className="flex gap-2"><button className="btn-gold h-9" onClick={() => reviewPhoto(true)} data-testid="player-photo-approve"><Check className="h-4 w-4" /> Approva</button><button className="btn-ghost h-9" onClick={() => reviewPhoto(false)} data-testid="player-photo-reject"><X className="h-4 w-4" /> Rifiuta</button></div>}
           </div>
         )}
+        {idPreview && <PlayerIdOffer preview={idPreview} onBuy={buyCard} busy={buyingCard} />}
         {(card.public_ok || card.can_edit) && <section><h2 className="fsl-section-title mb-3">La mia cartolina</h2><PlayerPostcard card={card} colors={card.club?.colors} /></section>}
         {(card.public_ok || card.can_edit) && (
           <section className="relative overflow-hidden rounded-2xl border border-fsl-gold/30 bg-navy-800 p-6 md:p-8 grid md:grid-cols-[1fr_auto] items-center gap-6" data-testid="album-offer">

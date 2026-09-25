@@ -118,5 +118,9 @@ async def set_status(tournament_id: str, top11_id: str, body: StatusIn, user: Cu
             if not await repo.find_one({"player_id": p["player_id"], "code": "top11", "competition_id": doc["competition_id"], "match_day": doc["match_day"]}):
                 await repo.insert(PlayerBadge(tournament_id=tournament_id, player_id=p["player_id"], team_id=p["team_id"], club_id=p["club_id"], code="top11", label=f"TOP 11 — Giornata {doc['match_day']}", scope="match", match_id=p["match_id"], competition_id=doc["competition_id"], match_day=doc["match_day"], value=p["fanta"], manual=True, note="Formazione ideale della giornata pubblicata"), user.id)
     await db.top11.update_one({"_id": doc["_id"]}, {"$set": patch})
+    if body.status == "published":
+        from .fans import notify_top11
+
+        await notify_top11(tournament_id, doc)
     await audit.record(user, f"top11.{body.status}", "top11", top11_id, tournament_id, before={"status": doc["status"]}, after={"status": body.status})
     return svc.out(await _get(tournament_id, top11_id))

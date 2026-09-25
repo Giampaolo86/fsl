@@ -13,7 +13,9 @@ from ..services import engine
 router = APIRouter(tags=["products"])
 PRICE_CENTS = 249
 LOOKUP = "fsl_digital_249"
+DYN_LOOKUP = "fsl_dyn_card"
 FINAL = ["official", "rectified"]
+CARD_KINDS = {"player_card": ("card_price", 3.99, "Card Player ID Premium"), "player_card_special": ("card_special_price", 4.99, "Card Player ID Speciale Top 11 / MVP")}
 
 
 class ProductIn(BaseModel):
@@ -23,6 +25,14 @@ class ProductIn(BaseModel):
 
 def _pname(p) -> str:
     return p.public_name or f"{p.first_name} {p.last_name[:1]}."
+
+
+async def card_prices(t_id: str) -> dict:
+    from ..repositories.registry import settings_repo
+
+    s = await settings_repo.find_one({"tournament_id": t_id})
+    fees = (s.fees if s else None) or {}
+    return {k: round(float(fees.get(key, default) or default), 2) for k, (key, default, _) in CARD_KINDS.items()}
 
 
 async def _tournament(slug: str):
@@ -38,8 +48,9 @@ async def get_or_create_product(slug: str, body: ProductIn, request: Request):
     from .fans import optional_user
 
     t = await _tournament(slug)
-    if body.kind not in ("team_card", "album"):
+    if body.kind not in ("team_card", "album", *CARD_KINDS):
         raise bad_request("Prodotto non disponibile")
+    price_cents, lookup = PRICE_CENTS, LOOKUP
     if body.kind == "team_card":
         tm = await scoped("teams", t.id).get(body.ref_id)
         if not tm:
@@ -53,14 +64,32 @@ async def get_or_create_product(slug: str, body: ProductIn, request: Request):
         user = await optional_user(request)
         editor = await can_edit_player(user, t.id, p) if user else None
         if not (p.profile_visibility == "public" and p.media_consent) and not editor:
-            raise forbidden("L'album è disponibile solo con il consenso della famiglia o per il genitore abbinato")
-        title = f"Album stagione · {_pname(p)}"
+            raise forbidden("Il prodotto è disponibile solo con il consenso della famiglia o per il genitore abbinato")
+        if body.kind == "album":
+            title = f"Album stagione · {_pname(p)}"
+        else:
+            title = f"{CARD_KINDS[body.kind][2]} · {_pname(p)}"
+            price_cents, lookup = int(round((await card_prices(t.id))[body.kind] * 100)), DYN_LOOKUP
         club_ids = [p.club_id]
     repo = scoped("paid_media", t.id)
     it = await repo.find_one({"kind": body.kind, "ref_id": body.ref_id})
     if not it:
-        it = await repo.insert(PaidMedia(tournament_id=t.id, kind=body.kind, title=title, ref_id=body.ref_id, lookup_key=LOOKUP, price_cents=PRICE_CENTS, club_ids=club_ids, player_ids=[body.ref_id] if body.kind == "album" else []))
+        it = await repo.insert(PaidMedia(tournament_id=t.id, kind=body.kind, title=title, ref_id=body.ref_id, lookup_key=lookup, price_cents=price_cents, club_ids=club_ids, player_ids=[body.ref_id] if body.kind != "team_card" else []))
+    elif body.kind in CARD_KINDS and it.price_cents != price_cents:
+        it = await repo.update(it.id, {"price_cents": price_cents})
     return {"id": it.id, "kind": it.kind, "title": it.title, "price": it.price_cents / 100}
+
+
+async def player_card_payload(t, p, special: bool, full: bool) -> dict:
+    from .extras import player_card
+
+    card = await player_card(t.id, p, public=not full)
+    top11 = await scoped("badges", t.id).list({"player_id": p.id, "code": "top11"}, sort=[("match_day", 1)], limit=100)
+    comps = {c.id: c.name for c in await scoped("competitions", t.id).list(limit=200)}
+    card["top11"] = [{"match_day": b.match_day, "competition": comps.get(b.competition_id, ""), "fanta": b.value} for b in top11]
+    card["special"] = special
+    card["card_kind"] = "player_card_special" if special else "player_card"
+    return card
 
 
 async def team_card_payload(t, tm) -> dict:
@@ -113,7 +142,7 @@ async def open_product(token: str, request: Request):
     if not pur:
         raise ApiError(404, "NOT_FOUND", "Acquisto non trovato")
     it = await Repository("paid_media", PaidMedia).get(pur.item_id)
-    if not it or it.kind not in ("team_card", "album"):
+    if not it or it.kind not in ("team_card", "album", *CARD_KINDS):
         raise not_found("Prodotto")
     t = await tournaments.get(it.tournament_id)
     if it.kind == "team_card":
@@ -126,7 +155,27 @@ async def open_product(token: str, request: Request):
         raise not_found("Giocatore")
     user = await optional_user(request)
     full = bool(user and await can_edit_player(user, t.id, p))
+    if it.kind in CARD_KINDS:
+        return {"kind": it.kind, "title": it.title, "data": await player_card_payload(t, p, it.kind == "player_card_special", full)}
     return {"kind": "album", "title": it.title, "data": await album_payload(t, p, full)}
+
+
+@router.get("/public/tournaments/{slug}/players/{player_id}/card-preview")
+async def player_card_preview(slug: str, player_id: str, request: Request):
+    from .extras import can_edit_player
+    from .fans import optional_user
+
+    t = await _tournament(slug)
+    p = await scoped("players", t.id).get(player_id)
+    if not p:
+        raise not_found("Giocatore")
+    user = await optional_user(request)
+    full = bool(user and await can_edit_player(user, t.id, p))
+    d = await player_card_payload(t, p, False, full)
+    d["preview"] = True
+    d["prices"] = await card_prices(t.id)
+    d["purchasable"] = full or (p.profile_visibility == "public" and p.media_consent)
+    return d
 
 
 @router.get("/public/tournaments/{slug}/teams/{team_id}/card-preview")

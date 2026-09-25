@@ -30,6 +30,7 @@ async def candidates(t_id: str, competition_id: str, match_day: int) -> tuple[li
     pids = {pid for m in ms for side in ("home", "away") for pid in m.callups.get(side, [])}
     players = {p.id: p for p in await scoped("players", t_id).list({"_id": {"$in": [ObjectId(x) for x in pids if len(x) == 24]}}, limit=5000)}
     teams = {tm.id: tm for tm in await scoped("teams", t_id).list({"competition_id": competition_id}, limit=500)}
+    clubs = {c.id: c for c in await scoped("clubs", t_id).list(limit=500)}
     out = []
     for m in ms:
         for r in fanta_rows(m, players):
@@ -37,7 +38,8 @@ async def candidates(t_id: str, competition_id: str, match_day: int) -> tuple[li
                 continue
             p = players[r["player_id"]]
             tm = teams.get(p.team_id)
-            out.append({"player_id": p.id, "name": f"{p.first_name} {p.last_name}", "public_name": r["public_name"], "public_ok": r["public_ok"], "photo_url": p.photo_url, "shirt_number": p.shirt_number, "role": p.role or "—", "group": ROLE_GROUP.get(p.role, "C"), "team_id": p.team_id, "club_id": p.club_id, "team": tm.name if tm else "", "match_id": m.id, "vote": r["vote"], "fanta": r["fanta"], "goals": r["events"].get("goal", 0), "assists": r["events"].get("assist", 0), "mvp": "mvp" in r["badges"]})
+            cl = clubs.get(p.club_id)
+            out.append({"player_id": p.id, "name": f"{p.first_name} {p.last_name}", "public_name": r["public_name"], "public_ok": r["public_ok"], "photo_url": p.photo_url, "shirt_number": p.shirt_number, "role": p.role or "—", "group": ROLE_GROUP.get(p.role, "C"), "team_id": p.team_id, "club_id": p.club_id, "team": tm.name if tm else "", "club": cl.name if cl else "", "club_short": cl.short_name if cl else "", "crest_url": cl.crest_url if cl and not cl.crest_is_placeholder else None, "colors": cl.colors if cl else None, "match_id": m.id, "vote": r["vote"], "fanta": r["fanta"], "goals": r["events"].get("goal", 0), "assists": r["events"].get("assist", 0), "mvp": "mvp" in r["badges"]})
     out.sort(key=_rank_key)
     return out, [m.id for m in ms]
 

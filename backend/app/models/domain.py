@@ -105,9 +105,10 @@ class TournamentSettings(BaseDocument):
     relegated_per_category: int = 0
     max_matches_per_team_per_weekend: int = 1
     skip_holidays: bool = False
-    fees: dict = {"registration": 0, "currency": "EUR"}
+    fees: dict = {"registration": 0, "currency": "EUR", "card_price": 3.99, "card_special_price": 4.99}
     required_documents: list[str] = []
     notification_channels: list[str] = ["email"]
+    sponsors: list[dict] = []
 
 
 class Competition(BaseDocument):
@@ -340,7 +341,7 @@ class Notification(BaseDocument):
 class PaidMedia(BaseDocument):
     tournament_id: str
     match_id: Optional[str] = None
-    kind: Literal["video", "photo", "team_card", "album"] = "photo"
+    kind: Literal["video", "photo", "team_card", "album", "player_card", "player_card_special"] = "photo"
     title: str
     media_id: Optional[str] = None
     ref_id: Optional[str] = None
@@ -390,7 +391,7 @@ class RosterImport(BaseDocument):
 
 class Post(BaseDocument):
     tournament_id: str
-    kind: Literal["news", "interview", "gallery", "video", "match_story", "badge"] = "news"
+    kind: Literal["news", "interview", "gallery", "video", "match_story", "badge", "weekly"] = "news"
     title: str
     slug: str = ""
     excerpt: str = ""

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Award, Bell, CalendarDays, Camera, FileText, Shirt } from "lucide-react";
+import { Award, Bell, CalendarDays, Camera, FileText, Shirt, Sparkles } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 
-const ICONS = { badge: [Award, "text-fsl-gold"], match: [CalendarDays, "text-fsl-gold"], media: [Camera, "text-fsl-blue-light"], callup: [Shirt, "text-fsl-success"] };
+const ICONS = { badge: [Award, "text-fsl-gold"], match: [CalendarDays, "text-fsl-gold"], media: [Camera, "text-fsl-blue-light"], callup: [Shirt, "text-fsl-success"], top11: [Sparkles, "text-fsl-gold"] };
 
 export function NotificationsBell({ fan = false }) {
   const { user } = useAuth();

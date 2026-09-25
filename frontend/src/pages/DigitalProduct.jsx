@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Award, BookOpen, Camera, Mic2, Printer } from "lucide-react";
 import { BadgeChips } from "@/components/fsl/BadgeChips";
 import { PlayerPostcard } from "@/components/fsl/PlayerPostcard";
+import { PlayerIdProduct } from "@/components/fsl/PlayerIdCard";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
 import { TeamCard } from "@/components/fsl/TeamCard";
 import { api, apiError } from "@/lib/api";
@@ -51,7 +52,7 @@ export default function DigitalProduct() {
         <Link to={`/tornei/${slug}`} className="text-xs text-fsl-slate hover:text-fsl-white inline-flex items-center gap-1" data-testid="product-back"><ArrowLeft className="h-3.5 w-3.5" /> {data.data.tournament?.name}</Link>
         <div className="flex items-center gap-2"><span className="h-7 px-3 rounded-full bg-fsl-success text-ink-950 text-[11px] font-bold uppercase inline-flex items-center" data-testid="product-paid">Acquistato</span>{data.kind === "album" && <button className="btn-ghost h-9" onClick={() => window.print()} data-testid="album-print"><Printer className="h-4 w-4" /> Stampa / PDF</button>}</div>
       </div>
-      {data.kind === "team_card" ? <><h1 className="text-4xl sm:text-5xl font-extrabold uppercase leading-[0.9] mb-6" data-testid="product-title">{data.title}</h1><TeamCard data={data.data} /></> : <Album d={data.data} slug={slug} />}
+      {data.kind === "team_card" ? <><h1 className="text-4xl sm:text-5xl font-extrabold uppercase leading-[0.9] mb-6" data-testid="product-title">{data.title}</h1><TeamCard data={data.data} /></> : data.kind.startsWith("player_card") ? <><h1 className="text-4xl sm:text-5xl font-extrabold uppercase leading-[0.9] mb-6" data-testid="product-title">{data.title}</h1><PlayerIdProduct card={data.data} special={data.kind === "player_card_special"} /></> : <Album d={data.data} slug={slug} />}
     </div>
   );
 }

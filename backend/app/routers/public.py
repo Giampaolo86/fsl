@@ -323,3 +323,31 @@ async def public_top11(slug: str, competition_id: Optional[str] = None, match_da
         o["competition"] = {"id": c.id, "name": c.name, "category": c.category, "series": c.series} if c else None
         out.append(o)
     return out
+
+
+@router.get("/tournaments/{slug}/weekly")
+async def public_weekly(slug: str, competition_id: Optional[str] = None):
+    from ..core.db import db
+    from ..services import weekly as svc
+
+    t = await _published(slug)
+    q = {"tournament_id": t.id, "status": "published"}
+    if competition_id:
+        q["competition_id"] = competition_id
+    comps = {c.id: c for c in await scoped("competitions", t.id).list(limit=200)}
+    docs = await db.weekly_issues.find(q, {"content.results": 0, "content.standings": 0, "content.top11": 0, "content.next_round": 0, "content.shop": 0, "content.scorers": 0}).sort([("published_at", -1)]).to_list(100)
+    return [svc.out(d, comps.get(d["competition_id"])) for d in docs]
+
+
+@router.get("/tournaments/{slug}/weekly/{issue_id}")
+async def public_weekly_detail(slug: str, issue_id: str):
+    from bson import ObjectId
+
+    from ..core.db import db
+    from ..services import weekly as svc
+
+    t = await _published(slug)
+    doc = await db.weekly_issues.find_one({"_id": ObjectId(issue_id), "tournament_id": t.id, "status": "published"}) if len(issue_id) == 24 else None
+    if not doc:
+        raise not_found("FSL Weekly")
+    return svc.out(doc, await scoped("competitions", t.id).get(doc["competition_id"]))

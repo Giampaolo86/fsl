@@ -8,7 +8,7 @@ import { usePublicTournament } from "@/hooks/usePublicTournament";
 import { api, apiError } from "@/lib/api";
 
 const Wrap = ({ children }) => <div className="mx-auto max-w-[1488px] px-6 py-10">{children}</div>;
-const KINDS = [["", "Tutto"], ["news", "Notizie"], ["interview", "Interviste"], ["gallery", "Gallery"], ["video", "Video"], ["match_story", "Match story"], ["badge", "Badge"]];
+const KINDS = [["", "Tutto"], ["news", "Notizie"], ["interview", "Interviste"], ["gallery", "Gallery"], ["video", "Video"], ["match_story", "Match story"], ["weekly", "FSL Weekly"], ["badge", "Badge"]];
 
 export function PublicNews() {
   const { slug } = useParams();

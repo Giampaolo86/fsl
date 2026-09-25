@@ -21,7 +21,7 @@ public_router = APIRouter(prefix="/public/tournaments/{slug}", tags=["public"])
 STAFF = {"super_admin", "director", "secretary"}
 EDITORS = STAFF | {"club_manager"}
 FINAL = ["official", "rectified"]
-KINDS = ("news", "interview", "gallery", "video", "match_story")
+KINDS = ("news", "interview", "gallery", "video", "match_story", "weekly")
 TMP = Path(os.environ.get("UPLOAD_TMP_DIR") or "/app/backend/.uploads")
 MAX_BYTES = 300 * 1024 * 1024
 

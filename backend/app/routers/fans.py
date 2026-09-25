@@ -185,6 +185,33 @@ def _when(m) -> str:
     return f"{when}{' · ' + m.field_name if m.field_name else ''}{' · ' + m.venue_name if m.venue_name else ''}"
 
 
+async def notify_top11(t_id: str, doc: dict):
+    """Avvisa genitori abbinati e fan che seguono i giocatori entrati nella Top 11 pubblicata."""
+    players = [s["player"] for s in doc.get("lineup", []) if s.get("player")]
+    if not players:
+        return
+    pids = [p["player_id"] for p in players]
+    t = await tournaments.get(t_id)
+    kids = {p.id: p for p in await scoped("players", t_id).list({"_id": {"$in": [__import__("bson").ObjectId(x) for x in pids if len(x) == 24]}}, limit=50)}
+    emails = sorted({e.lower() for p in kids.values() for e in (p.guardian_emails or [])})
+    parents = await users.list({"email": {"$in": emails}}, limit=200) if emails else []
+    followers = await users.list({"favorites.players": {"$in": pids}}, limit=500)
+    link = f"/tornei/{t.slug}/top11?competition_id={doc['competition_id']}&match_day={doc['match_day']}"
+    for lp in players:
+        p = kids.get(lp["player_id"])
+        if not p:
+            continue
+        mine = {e.lower() for e in (p.guardian_emails or [])}
+        for u in parents:
+            if u.email.lower() in mine:
+                await _fan_notify(t_id, u.id, "top11", f"{p.first_name} è nella TOP 11 della giornata {doc['match_day']}!", f"{lp.get('role', '')} · fantavoto {lp.get('fanta')} · {lp.get('team', '')}. Guarda la formazione ideale.", link, f"fan:{u.id}:top11:{doc['competition_id']}:{doc['match_day']}:{p.id}")
+        ok = p.profile_visibility == "public" and p.media_consent
+        for u in followers:
+            if p.id in (u.favorites or {}).get("players", []) and u.email.lower() not in mine:
+                nm = lp.get("public_name") if ok else "Un giocatore che segui"
+                await _fan_notify(t_id, u.id, "top11", f"{nm} è nella TOP 11 della giornata {doc['match_day']}", f"{lp.get('team', '')} · fantavoto {lp.get('fanta')}", link, f"fan:{u.id}:top11:{doc['competition_id']}:{doc['match_day']}:{p.id}")
+
+
 async def notify_callups(t_id: str, m, before: dict, after: dict):
     added = [pid for side in ("home", "away") for pid in after.get(side, []) if pid not in before.get(side, [])]
     if not added:

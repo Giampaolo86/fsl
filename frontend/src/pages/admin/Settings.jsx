@@ -73,6 +73,7 @@ export default function Settings() {
           fees: s.fees,
           required_documents: s.required_documents,
           notification_channels: s.notification_channels,
+          sponsors: s.sponsors || [],
         },
       });
       toast.success("Impostazioni salvate");
@@ -211,6 +212,13 @@ export default function Settings() {
             <Field label="Documenti richiesti" hint="Separati da virgola"><input className="fsl-input" value={s.required_documents.join(", ")} onChange={(e) => upd("required_documents", list(e.target.value))} data-testid="settings-documents-input" /></Field>
             <Field label="Canali notifica" hint="email, sms, whatsapp"><input className="fsl-input" value={s.notification_channels.join(", ")} onChange={(e) => upd("notification_channels", list(e.target.value))} data-testid="settings-channels-input" /></Field>
           </div>
+          <div className="mt-5" data-testid="settings-card-prices">
+            <div className="fsl-kicker mb-2">Card Player ID <span className="text-fsl-slate font-sans normal-case font-normal">· prezzi delle card digitali in stile FIFA acquistabili dalla scheda giocatore</span></div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <Field label="Card Premium (€)" hint="Default 3,99 €"><input type="number" min="0" step="0.01" className="fsl-input" value={s.fees.card_price ?? 3.99} onChange={(e) => upd("fees", { ...s.fees, card_price: Number(e.target.value) })} data-testid="settings-card-price-input" /></Field>
+              <Field label="Card Speciale Top 11 / MVP (€)" hint="Default 4,99 €"><input type="number" min="0" step="0.01" className="fsl-input" value={s.fees.card_special_price ?? 4.99} onChange={(e) => upd("fees", { ...s.fees, card_special_price: Number(e.target.value) })} data-testid="settings-card-special-price-input" /></Field>
+            </div>
+          </div>
           {s.categories.length > 0 && <div className="mt-5" data-testid="settings-fee-by-category">
             <div className="fsl-kicker mb-2">Quota atleta per categoria <span className="text-fsl-slate font-sans normal-case font-normal">· lascia vuoto per usare la quota generale ({Number(s.fees.callup_fee ?? 0).toFixed(2).replace(".", ",")} €)</span></div>
             <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -220,6 +228,22 @@ export default function Settings() {
               ); })}
             </div>
           </div>}
+        </section>
+
+        <section className="fsl-card p-6" data-testid="settings-sponsors">
+          <SectionTitle right={<button type="button" className="btn-ghost h-9" onClick={() => upd("sponsors", [...(s.sponsors || []), { name: "", logo_url: "", payoff: "" }])} data-testid="settings-sponsor-add">+ Aggiungi sponsor</button>}>Sponsor e partner</SectionTitle>
+          <p className="text-xs text-fsl-slate mb-3">Compaiono come «Presented by» nelle grafiche del Social Studio, nella Top 11 e nell'FSL Weekly. Logo: URL immagine (PNG/SVG su fondo trasparente).</p>
+          {(s.sponsors || []).length === 0 && <p className="text-sm text-fsl-slate">Nessuno sponsor configurato.</p>}
+          <div className="space-y-2">
+            {(s.sponsors || []).map((sp, i) => (
+              <div key={i} className="grid md:grid-cols-[1fr_1.4fr_1fr_auto] gap-2 items-center" data-testid={`settings-sponsor-${i}`}>
+                <input className="fsl-input" placeholder="Nome sponsor" value={sp.name} onChange={(e) => upd("sponsors", s.sponsors.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} data-testid={`settings-sponsor-name-${i}`} />
+                <input className="fsl-input" placeholder="URL logo (https://…)" value={sp.logo_url || ""} onChange={(e) => upd("sponsors", s.sponsors.map((x, j) => (j === i ? { ...x, logo_url: e.target.value } : x)))} data-testid={`settings-sponsor-logo-${i}`} />
+                <input className="fsl-input" placeholder="Payoff (facoltativo)" value={sp.payoff || ""} onChange={(e) => upd("sponsors", s.sponsors.map((x, j) => (j === i ? { ...x, payoff: e.target.value } : x)))} />
+                <button type="button" className="btn-ghost h-9 text-fsl-danger" onClick={() => upd("sponsors", s.sponsors.filter((_, j) => j !== i))} data-testid={`settings-sponsor-remove-${i}`}>Rimuovi</button>
+              </div>
+            ))}
+          </div>
         </section>
       </fieldset>
     </div>

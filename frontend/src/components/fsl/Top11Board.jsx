@@ -1,72 +1,123 @@
-import { useRef } from "react";
-import { Download } from "lucide-react";
+import { Download, Trophy } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
+import { GOLD, INK, loadFonts, loadImg, preload } from "@/components/fsl/FifaCard";
+import { StadiumCard, drawStadiumCard } from "@/components/fsl/StadiumCard";
 
 const ROWS = { P: 4, D: 3, C: 2, A: 1 };
-const GROUP_LABEL = { P: "POR", D: "DIF", C: "CEN", A: "ATT" };
-const fmt = (v) => (v == null ? "—" : Number(v).toFixed(1).replace(".", ","));
+const GROUP_LABEL = { P: "Portiere", D: "Difensore", C: "Centrocampo", A: "Attacco" };
+const rowsOf = (doc) => [1, 2, 3, 4].map((r) => doc.lineup.filter((s) => ROWS[s.slot_group] === r));
+export const STADIUM = "/brand/studio/stadium.jpg";
 
-function PlayerTile({ slot, onPick, editable }) {
-  const p = slot.player;
+export function Pitch({ children, className = "", testId }) {
   return (
-    <button type="button" disabled={!editable} onClick={() => onPick?.(slot)} className={`group relative w-[92px] sm:w-[112px] rounded-xl border ${slot.off_role ? "border-fsl-warning/70" : "border-fsl-gold/50"} bg-ink-950/85 backdrop-blur px-2 pt-2 pb-1.5 text-center shadow-[0_8px_24px_-12px_rgba(0,0,0,0.8)] ${editable ? "hover:border-fsl-gold hover:-translate-y-0.5 transition-[transform,border-color]" : ""}`} data-testid={`top11-slot-${slot.slot}`}>
-      <div className="mx-auto h-12 w-12 sm:h-14 sm:w-14 rounded-full overflow-hidden bg-navy-700 border-2 border-fsl-gold/60 flex items-center justify-center">{p?.photo_url ? <img src={p.photo_url} alt="" className="h-full w-full object-cover" /> : <span className="font-display font-extrabold text-xl text-fsl-white/80">{p ? (p.shirt_number ?? p.name[0]) : "?"}</span>}</div>
-      <div className="mt-1 font-display font-bold uppercase text-[11px] sm:text-xs leading-tight truncate text-fsl-white">{p ? p.name : "Slot vuoto"}</div>
-      <div className="text-[10px] text-fsl-slate truncate">{p?.team || slot.slot_label}</div>
-      <div className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 h-5 text-[10px] font-bold num ${slot.off_role ? "bg-fsl-warning text-ink-950" : "bg-fsl-gold text-ink-950"}`}>{p ? `${(p.role || "").slice(0, 3).toUpperCase()} · ${fmt(p.fanta)}` : GROUP_LABEL[slot.slot_group]}</div>
-    </button>
-  );
-}
-
-export function Top11Board({ doc, competition, tournamentName, editable = false, onPick }) {
-  const ref = useRef(null);
-  const rows = [1, 2, 3, 4].map((r) => doc.lineup.filter((s) => ROWS[s.slot_group] === r));
-  return (
-    <div ref={ref} className="relative overflow-hidden rounded-2xl border border-white/15 bg-[#0B2A1F]" data-testid="top11-board">
-      <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,rgba(255,255,255,0.035)_0_48px,transparent_48px_96px)]" />
-      <div className="absolute inset-x-6 top-[38%] h-px bg-white/25" /><div className="absolute left-1/2 top-[38%] -translate-x-1/2 -translate-y-1/2 h-28 w-28 rounded-full border border-white/25" />
-      <div className="absolute inset-x-[22%] bottom-0 h-16 border border-b-0 border-white/25 rounded-t-md" />
-      <div className="relative flex items-center justify-between gap-3 px-5 pt-4">
-        <div><div className="font-sans text-[10px] font-semibold tracking-[0.28em] uppercase text-fsl-gold">FSL Top 11 · Giornata {doc.match_day}</div><div className="font-display font-extrabold uppercase text-xl sm:text-2xl leading-none text-fsl-white">{competition?.name || tournamentName}</div></div>
-        <img src="/brand/logo.png" alt="FSL" className="h-10 w-10 object-contain" />
-      </div>
-      <div className="relative px-3 pb-4 pt-4 space-y-3 sm:space-y-5">
-        {rows.map((row, i) => <div key={i} className="flex justify-center gap-2 sm:gap-4">{row.map((s) => <PlayerTile key={s.slot} slot={s} editable={editable} onPick={onPick} />)}</div>)}
-      </div>
-      <div className="relative flex items-center justify-between px-5 pb-3 text-[10px] uppercase tracking-wider text-fsl-white/70"><span>{doc.formation} · Fantavoto ufficiale FSL</span>{doc.sponsor && <span className="text-fsl-gold font-bold">Presented by {doc.sponsor}</span>}</div>
+    <div className={`relative overflow-hidden bg-ink-950 ${className}`} data-testid={testId}>
+      <img src={STADIUM} alt="" className="absolute inset-0 h-full w-full object-cover object-bottom" draggable={false} />
+      <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,rgba(3,19,31,0.55) 0%,rgba(3,19,31,0.15) 30%,rgba(3,19,31,0.1) 70%,rgba(3,19,31,0.9) 100%)" }} />
+      <div className="absolute inset-0 grain opacity-50" />
+      {children}
     </div>
   );
 }
 
-export async function downloadTop11(doc, competition, ratio = "4:5") {
-  const W = 1080, H = ratio === "9:16" ? 1920 : ratio === "1:1" ? 1080 : 1350;
-  const c = document.createElement("canvas"); c.width = W; c.height = H; const ctx = c.getContext("2d");
-  ctx.fillStyle = "#0B2A1F"; ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 3; ctx.strokeRect(60, 220, W - 120, H - 340);
-  ctx.beginPath(); ctx.arc(W / 2, 220 + (H - 340) * 0.45, 110, 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = "#F4AE2B"; ctx.font = "700 28px Inter, sans-serif"; ctx.fillText(`FSL TOP 11 · GIORNATA ${doc.match_day}`, 60, 110);
-  ctx.fillStyle = "#fff"; ctx.font = "800 64px 'Barlow Condensed', sans-serif"; ctx.fillText((competition?.name || "").toUpperCase(), 60, 185);
-  const rows = [1, 2, 3, 4].map((r) => doc.lineup.filter((s) => ROWS[s.slot_group] === r));
-  const top = 300, bottom = H - 200, rowH = (bottom - top) / 4;
-  const load = (src) => new Promise((res) => { if (!src) return res(null); const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+export function Top11Header({ doc, competition, compact }) {
+  return (
+    <div className="relative pt-6 px-5 text-center">
+      <div className="inline-flex items-center gap-3 text-left"><img src="/brand/logo.png" alt="FSL" className={`${compact ? "h-9 w-9" : "h-12 w-12 sm:h-14 sm:w-14"} object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.7)]`} /><div><div className={`font-display font-extrabold uppercase leading-none text-fsl-white ${compact ? "text-base" : "text-lg sm:text-2xl"}`}>Future Stars League</div><div className={`font-sans font-semibold tracking-[0.28em] uppercase text-fsl-gold ${compact ? "text-[8px]" : "text-[9px] sm:text-[11px]"}`}>La Serie A del futuro</div></div></div>
+      <div className={`mt-2 font-display font-extrabold uppercase leading-[0.82] ${compact ? "text-5xl" : "text-6xl sm:text-8xl"}`} style={{ background: "linear-gradient(180deg,#FFF0B8 0%,#F4AE2B 50%,#C8811A 100%)", WebkitBackgroundClip: "text", color: "transparent", filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.6))" }}>Top 11</div>
+      <div className={`font-display font-extrabold uppercase leading-[0.85] text-fsl-white ${compact ? "text-3xl" : "text-4xl sm:text-6xl"}`} style={{ textShadow: "0 6px 18px rgba(0,0,0,0.7)" }}>Settimanale</div>
+      <div className="mt-2 flex items-center justify-center gap-3"><span className="h-px w-10 bg-fsl-gold/70" /><span className={`font-sans tracking-[0.3em] uppercase text-fsl-white/85 ${compact ? "text-[8px]" : "text-[10px] sm:text-xs"}`}>{competition?.name || "I migliori della settimana"}</span><span className="h-px w-10 bg-fsl-gold/70" /></div>
+      <span className={`mt-3 inline-flex h-7 items-center rounded-md border border-fsl-gold/80 bg-ink-950/70 px-4 font-sans font-bold tracking-[0.25em] uppercase text-fsl-gold ${compact ? "text-[9px]" : "text-[10px] sm:text-xs"}`}>Giornata {doc.match_day}</span>
+      {!compact && <div className="absolute right-4 sm:right-8 top-16 sm:top-24 rotate-[-10deg] text-right text-fsl-gold leading-[0.95] text-xl sm:text-3xl" style={{ fontFamily: "Caveat, cursive", textShadow: "0 4px 12px rgba(0,0,0,0.7)" }}>Il futuro<br />scende<br />in campo</div>}
+    </div>
+  );
+}
+
+export function Top11Board({ doc, competition, tournamentName, editable = false, onPick, compact = false }) {
+  const rows = rowsOf(doc);
+  const size = compact ? "sm" : "md";
+  return (
+    <Pitch className="rounded-3xl border border-white/10 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]" testId="top11-board">
+      <Top11Header doc={doc} competition={competition} compact={compact} />
+      <div className={`relative px-3 ${compact ? "pt-6 pb-4 space-y-3" : "pt-10 sm:pt-12 pb-8 space-y-4 sm:space-y-6"}`} data-testid="top11-board-rows">
+        {rows.map((row, i) => (
+          <div key={i} className={`flex justify-center flex-wrap ${compact ? "gap-2" : "gap-3 sm:gap-6"}`}>
+            {row.map((s, j) => <div key={s.slot} className="animate-rise" style={{ animationDelay: `${(i * 4 + j) * 60}ms` }}><StadiumCard player={s.player} size={size} offRole={s.off_role} label={GROUP_LABEL[s.slot_group]} onClick={editable ? () => onPick?.(s) : undefined} testId={`top11-slot-${s.slot}`} /></div>)}
+          </div>
+        ))}
+      </div>
+      <div className={`relative mx-3 mb-3 flex items-center justify-between gap-3 rounded-xl border border-fsl-gold/40 bg-ink-950/80 backdrop-blur px-4 ${compact ? "h-10 text-[9px]" : "h-12 sm:h-14 text-[10px] sm:text-xs"} font-sans font-semibold tracking-[0.18em] uppercase text-fsl-white/90`}>
+        <span className="inline-flex items-center gap-2 truncate"><Trophy className="h-4 w-4 text-fsl-gold shrink-0" /><span className="truncate">{doc.sponsor ? <>Presented by <b className="text-fsl-gold">{doc.sponsor}</b></> : <>Scopri tornei, classifiche e highlights su <b className="text-fsl-gold">Future Stars League</b></>}</span></span>
+        <span className="num text-fsl-slate shrink-0">{doc.formation}</span>
+      </div>
+    </Pitch>
+  );
+}
+
+export async function drawStadium(ctx, W, H) {
+  const im = await loadImg(STADIUM);
+  ctx.fillStyle = INK; ctx.fillRect(0, 0, W, H);
+  if (im) { const r = Math.max(W / im.width, H / im.height); const dw = im.width * r, dh = im.height * r; ctx.drawImage(im, (W - dw) / 2, H - dh, dw, dh); }
+  const v = ctx.createLinearGradient(0, 0, 0, H); v.addColorStop(0, "rgba(3,19,31,0.6)"); v.addColorStop(0.3, "rgba(3,19,31,0.15)"); v.addColorStop(0.7, "rgba(3,19,31,0.1)"); v.addColorStop(1, "rgba(3,19,31,0.92)"); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+}
+
+export async function drawTop11Header(ctx, W, doc, competition, y0 = 50, scale = 1) {
+  const s = scale;
+  ctx.textBaseline = "top";
+  const logo = await loadImg("/brand/logo.png");
+  ctx.font = `800 ${40 * s}px "Barlow Condensed", "Arial Narrow", sans-serif`; const tw = ctx.measureText("FUTURE STARS LEAGUE").width; const lw = 96 * s; const x0 = W / 2 - (lw + 18 * s + tw) / 2;
+  if (logo) ctx.drawImage(logo, x0, y0, lw, lw);
+  ctx.textAlign = "left"; ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,0.7)"; ctx.shadowBlur = 14 * s; ctx.fillText("FUTURE STARS LEAGUE", x0 + lw + 18 * s, y0 + 14 * s);
+  ctx.fillStyle = GOLD; ctx.font = `700 ${18 * s}px Inter, Arial, sans-serif`; ctx.fillText("L A   S E R I E   A   D E L   F U T U R O", x0 + lw + 18 * s, y0 + 62 * s);
+  ctx.textAlign = "center";
+  const g = ctx.createLinearGradient(0, y0 + 110 * s, 0, y0 + 260 * s); g.addColorStop(0, "#FFF0B8"); g.addColorStop(0.5, "#F4AE2B"); g.addColorStop(1, "#C8811A");
+  ctx.fillStyle = g; ctx.font = `800 ${190 * s}px "Barlow Condensed", "Arial Narrow", sans-serif`; ctx.fillText("TOP 11", W / 2, y0 + 96 * s);
+  ctx.fillStyle = "#fff"; ctx.font = `800 ${140 * s}px "Barlow Condensed", "Arial Narrow", sans-serif`; ctx.fillText("SETTIMANALE", W / 2, y0 + 262 * s);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = `500 ${22 * s}px Inter, Arial, sans-serif`; const sub = (competition?.name || "I MIGLIORI DELLA SETTIMANA").toUpperCase().split("").join(" "); ctx.fillText(sub, W / 2, y0 + 398 * s);
+  const sw = ctx.measureText(sub).width; ctx.fillStyle = "rgba(244,174,43,0.8)"; ctx.fillRect(W / 2 - sw / 2 - 110 * s, y0 + 410 * s, 90 * s, 2); ctx.fillRect(W / 2 + sw / 2 + 20 * s, y0 + 410 * s, 90 * s, 2);
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.fillStyle = "rgba(3,19,31,0.75)"; ctx.beginPath(); ctx.roundRect(W / 2 - 110 * s, y0 + 438 * s, 220 * s, 46 * s, 8 * s); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = GOLD; ctx.font = `800 ${20 * s}px Inter, Arial, sans-serif`; ctx.textBaseline = "middle"; ctx.fillText(`G I O R N A T A   ${doc.match_day}`, W / 2, y0 + 461 * s); ctx.textBaseline = "top";
+  ctx.save(); ctx.translate(W - 110 * s, y0 + 140 * s); ctx.rotate(-0.18); ctx.fillStyle = GOLD; ctx.font = `700 ${44 * s}px Caveat, cursive`; ctx.textAlign = "center"; ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 10; ["Il futuro", "scende", "in campo"].forEach((l, i) => ctx.fillText(l, 0, i * 44 * s)); ctx.restore();
+  return y0 + 500 * s;
+}
+
+export async function renderTop11(ctx, W, H, doc, competition, opts = {}) {
+  await loadFonts();
+  await drawStadium(ctx, W, H);
+  const scale = H < 1200 ? 0.5 : H > 1400 ? 1 : 0.7;
+  const top = (await drawTop11Header(ctx, W, doc, competition, H > 1400 ? 70 : 36, scale)) + (H > 1400 ? 40 : 12);
+  const rows = rowsOf(doc);
+  await preload(doc.lineup.flatMap((s) => [s.player?.photo_url, s.player?.crest_url]));
+  const footH = 120, bottom = H - footH - 30, gapY = 14;
+  const cardW = Math.min(220, Math.floor((bottom - top - 3 * gapY) / 4 / 1.17)), cardH = Math.round(cardW * 1.17);
+  const rowGap = cardH + gapY;
   for (let r = 0; r < 4; r++) {
-    const row = rows[r]; const y = top + r * rowH + rowH / 2; const gap = W / (row.length + 1);
+    const row = rows[r]; const y = top + r * rowGap; const gap = Math.min(cardW + 34, (W - 100) / row.length);
+    const x0 = W / 2 - (gap * row.length) / 2 + (gap - cardW) / 2;
     for (let i = 0; i < row.length; i++) {
-      const s = row[i]; const p = s.player; const x = gap * (i + 1);
-      ctx.fillStyle = "rgba(3,19,31,0.9)"; ctx.beginPath(); ctx.roundRect(x - 95, y - 105, 190, 210, 18); ctx.fill();
-      ctx.strokeStyle = s.off_role ? "#E0A106" : "#F4AE2B"; ctx.lineWidth = 3; ctx.stroke();
-      const im = await load(p?.photo_url);
-      ctx.save(); ctx.beginPath(); ctx.arc(x, y - 45, 46, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
-      if (im) ctx.drawImage(im, x - 46, y - 91, 92, 92); else { ctx.fillStyle = "#123"; ctx.fillRect(x - 46, y - 91, 92, 92); ctx.fillStyle = "#fff"; ctx.font = "800 40px 'Barlow Condensed'"; ctx.textAlign = "center"; ctx.fillText(String(p?.shirt_number ?? "?"), x, y - 30); }
-      ctx.restore(); ctx.textAlign = "center";
-      ctx.fillStyle = "#fff"; ctx.font = "800 22px 'Barlow Condensed', sans-serif"; ctx.fillText((p ? p.name : "—").toUpperCase().slice(0, 18), x, y + 30);
-      ctx.fillStyle = "#9FB3C8"; ctx.font = "500 16px Inter, sans-serif"; ctx.fillText((p?.team || s.slot_label).slice(0, 22), x, y + 54);
-      ctx.fillStyle = "#F4AE2B"; ctx.font = "800 20px Inter, sans-serif"; ctx.fillText(p ? `${(p.role || "").slice(0, 3).toUpperCase()} · ${fmt(p.fanta)}` : GROUP_LABEL[s.slot_group], x, y + 88);
+      const s = row[i]; const img = await loadImg(s.player?.photo_url);
+      await drawStadiumCard(ctx, { x: x0 + i * gap, y, w: cardW }, s.player, { offRole: s.off_role, img, label: GROUP_LABEL[s.slot_group] });
     }
   }
-  ctx.textAlign = "left"; ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = "600 22px Inter, sans-serif"; ctx.fillText(`${doc.formation} · FANTAVOTO UFFICIALE FSL`, 60, H - 70);
-  if (doc.sponsor) { ctx.textAlign = "right"; ctx.fillStyle = "#F4AE2B"; ctx.fillText(`PRESENTED BY ${doc.sponsor.toUpperCase()}`, W - 60, H - 70); }
-  const logo = await load("/brand/logo.png"); if (logo) ctx.drawImage(logo, W - 180, 60, 120, 120);
+  const fy = H - footH - 10; ctx.fillStyle = "rgba(3,19,31,0.85)"; ctx.beginPath(); ctx.roundRect(40, fy, W - 80, 78, 14); ctx.fill(); ctx.strokeStyle = "rgba(244,174,43,0.6)"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.textBaseline = "middle"; ctx.textAlign = "left"; ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(80, fy + 39, 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = INK; ctx.font = '800 18px "Barlow Condensed", sans-serif'; ctx.textAlign = "center"; ctx.fillText("11", 80, fy + 40); ctx.textAlign = "left";
+  const sponsor = opts.sponsor || (doc.sponsor ? { name: doc.sponsor } : null);
+  ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.font = "600 20px Inter, Arial, sans-serif";
+  if (sponsor) {
+    ctx.fillText("P R E S E N T E D   B Y", 110, fy + 39); const pw = ctx.measureText("P R E S E N T E D   B Y").width; ctx.fillStyle = GOLD; ctx.font = '800 30px "Barlow Condensed", sans-serif'; ctx.fillText(sponsor.name.toUpperCase(), 110 + pw + 16, fy + 39);
+    if (sponsor.logo) { const li = await loadImg(sponsor.logo); if (li) { const lh = 54, lw = lh * (li.width / li.height); ctx.fillStyle = "rgba(255,255,255,0.95)"; ctx.beginPath(); ctx.roundRect(W - 60 - lw - 16, fy + 39 - lh / 2 - 6, lw + 16, lh + 12, 8); ctx.fill(); ctx.drawImage(li, W - 60 - lw - 8, fy + 39 - lh / 2, lw, lh); } }
+  } else {
+    const a = "S C O P R I   T O R N E I ,   C L A S S I F I C H E   E   H I G H L I G H T S   S U"; ctx.fillText(a, 110, fy + 39); const aw = ctx.measureText(a).width; ctx.fillStyle = GOLD; ctx.font = '800 28px "Barlow Condensed", sans-serif'; ctx.fillText("FUTURE STARS LEAGUE", 110 + aw + 14, fy + 39);
+    ctx.strokeStyle = GOLD; ctx.beginPath(); ctx.arc(W - 78, fy + 39, 16, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = GOLD; ctx.font = "700 20px Inter, Arial, sans-serif"; ctx.textAlign = "center"; ctx.fillText("›", W - 78, fy + 38);
+  }
+  ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.font = "600 16px Inter, Arial, sans-serif"; ctx.fillText(`${doc.formation} · FANTAVOTO UFFICIALE FSL`, W - 44, fy + 98);
+  ctx.textBaseline = "top";
+}
+
+export async function downloadTop11(doc, competition, ratio = "4:5") {
+  const W = 1080, H = ratio === "9:16" ? 1920 : ratio === "1:1" ? 1080 : 1350;
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  await renderTop11(c.getContext("2d"), W, H, doc, competition);
   const a = document.createElement("a"); a.href = c.toDataURL("image/png"); a.download = `fsl-top11-g${doc.match_day}-${ratio.replace(":", "x")}.png`; a.click();
 }
 
@@ -74,4 +125,4 @@ export function DownloadTop11({ doc, competition }) {
   return <div className="flex flex-wrap gap-2">{["4:5", "9:16", "1:1"].map((r) => <button key={r} type="button" className="btn-ghost h-9 px-3 text-xs" onClick={() => downloadTop11(doc, competition, r)} data-testid={`top11-download-${r.replace(":", "x")}`}><Download className="h-3.5 w-3.5" /> PNG {r}</button>)}</div>;
 }
 
-export { ClubCrest };
+export { ClubCrest, INK };

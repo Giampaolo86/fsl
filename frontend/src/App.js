@@ -12,6 +12,9 @@ import Login from "@/pages/Login";
 import ChangePassword, { SecurityPage } from "@/pages/Security";
 import Top11Admin from "@/pages/admin/Top11";
 import Top11Public from "@/pages/public/Top11Public";
+import WeeklyAdmin from "@/pages/admin/Weekly";
+import Studio from "@/pages/admin/Studio";
+import { WeeklyDetail, WeeklyList } from "@/pages/public/WeeklyPublic";
 import Hub from "@/pages/admin/Hub";
 import NewTournament from "@/pages/admin/NewTournament";
 import Overview from "@/pages/admin/Overview";
@@ -108,6 +111,8 @@ function AppRoutes() {
                 <Route path="ticket" element={<Tickets />} />
                 <Route path="premi" element={<Awards />} />
                 <Route path="top11" element={<Top11Admin />} />
+                <Route path="weekly" element={<WeeklyAdmin />} />
+                <Route path="studio" element={<Studio />} />
                 <Route path="pagamenti" element={<Payments />} />
                 <Route path="media" element={<BlogManager />} />
                 <Route path="documenti" element={<Documents />} />
@@ -153,6 +158,8 @@ function AppRoutes() {
                 <Route path="partite/:matchId" element={<PublicMatchCenter />} />
                 <Route path="statistiche" element={<PublicStats />} />
                 <Route path="top11" element={<Top11Public />} />
+                <Route path="weekly" element={<WeeklyList />} />
+                <Route path="weekly/:issueId" element={<WeeklyDetail />} />
                 <Route path="news" element={<PublicNews />} />
                 <Route path="news/:postSlug" element={<PublicPost />} />
                 <Route path="segnala-errore" element={<Navigate to="../partite" replace />} />

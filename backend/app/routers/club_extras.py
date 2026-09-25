@@ -24,7 +24,7 @@ STAFF = {"super_admin", "director", "secretary"}
 OPS = {"super_admin", "director"}
 DOC_KINDS = {"certificato_medico": "Certificato medico", "documento_identita": "Documento d'identità", "consenso_privacy": "Consenso privacy", "consenso_immagine": "Consenso immagine", "iscrizione": "Modulo iscrizione", "altro": "Altro"}
 PRICES = {"video": ("fsl_video_099", 99), "photo": ("fsl_photo_049", 49), "team_card": ("fsl_digital_249", 249), "album": ("fsl_digital_249", 249)}
-DIGITAL = {"team_card", "album"}
+DIGITAL = {"team_card", "album", "player_card", "player_card_special"}
 stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
 media_repo = Repository("media_files", MediaFile)
 
@@ -431,11 +431,17 @@ async def checkout(body: CheckoutIn, request: Request):
     it = await _find_item(body.item_id)
     if not it or not it.active:
         raise not_found("Contenuto")
-    prices = stripe.Price.list(lookup_keys=[it.lookup_key], active=True, limit=1).data
-    if not prices:
-        raise conflict("Prezzo non configurato")
-    price = prices[0]
-    kwargs = dict(line_items=[{"price": price.id, "quantity": 1}], mode="payment", success_url=f"{body.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}", cancel_url=f"{body.origin_url}/payment/cancel", metadata={"item_id": it.id, "tournament_id": it.tournament_id, "lookup_key": it.lookup_key})
+    if it.lookup_key.startswith("fsl_dyn"):
+        unit_amount, currency = it.price_cents, it.currency or "eur"
+        line = {"price_data": {"currency": currency, "unit_amount": unit_amount, "product_data": {"name": it.title, "tax_code": "txcd_10302000"}}, "quantity": 1}
+    else:
+        prices = stripe.Price.list(lookup_keys=[it.lookup_key], active=True, limit=1).data
+        if not prices:
+            raise conflict("Prezzo non configurato")
+        price = prices[0]
+        unit_amount, currency = price.unit_amount or 0, price.currency
+        line = {"price": price.id, "quantity": 1}
+    kwargs = dict(line_items=[line], mode="payment", success_url=f"{body.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}", cancel_url=f"{body.origin_url}/payment/cancel", metadata={"item_id": it.id, "tournament_id": it.tournament_id, "lookup_key": it.lookup_key})
     try:
         session = stripe.checkout.Session.create(**kwargs, managed_payments={"enabled": True})
     except stripe.error.InvalidRequestError as e:
@@ -444,7 +450,7 @@ async def checkout(body: CheckoutIn, request: Request):
             session = stripe.checkout.Session.create(**kwargs, automatic_tax={"enabled": True}, billing_address_collection="required")
         else:
             raise
-    await scoped("purchases", it.tournament_id).insert(Purchase(tournament_id=it.tournament_id, item_id=it.id, session_id=session.id, lookup_key=it.lookup_key, amount=(price.unit_amount or 0) / 100, currency=price.currency, download_token=secrets.token_urlsafe(24), buyer_user_id=buyer.id if buyer else None, buyer_email=buyer.email if buyer else None))
+    await scoped("purchases", it.tournament_id).insert(Purchase(tournament_id=it.tournament_id, item_id=it.id, session_id=session.id, lookup_key=it.lookup_key, amount=unit_amount / 100, currency=currency, download_token=secrets.token_urlsafe(24), buyer_user_id=buyer.id if buyer else None, buyer_email=buyer.email if buyer else None))
     return {"checkout_url": session.url, "session_id": session.id}
 
 
