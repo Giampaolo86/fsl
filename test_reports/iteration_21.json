@@ -1,0 +1,20 @@
+{
+  "summary": "FSL 2.0 fase 1 TOP 11 engine — full backend + frontend regression. Wrote /app/backend/tests/test_top11.py (11 tests, all PASS) covering: generate + idempotency, lineup ordering by fanta desc per slot_group (P/D/C/A counts 1/4/3/3), off_role flag correctness, replace validations (reason<5 → 400, ok → 200, already-in-lineup → 409), status transitions (draft→published 409, draft→review 200, review→published by super admin 200, publish with empty slot 409, published→replace 409, published→archived 200, archived→* 409), secretary cannot publish (403), snapshot has 11 entries, top11 badge assigned and player_card.top11_count>=1, public endpoint returns only published docs with competition {name,category,series}, no candidates/changes keys, anonymized players (public_name + photo_url=null), club manager receives 403. Frontend: QA super admin (MFA) login → /admin/t/6a9b5b045d9e0985643d0a9f/top11, sidebar 'Top 11' link OK, competition select OK, generate → items OK, item click → board with 11 slots + status, slot click → top11-replace-dialog (no spare candidates on Giornata 9 draft, but dialog opens correctly), draft→review transition OK, publish attempt correctly 409 for empty slot, download PNG 4:5 triggers a real download (fsl-top11-g9-4x5.png), public /tornei/la-serie-a-dei-bambini/top11 shows public-top11 board with anonymized names, public nav 'TOP 11' visible.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_top11.py", "/app/test_reports/pytest/top11.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "top11.py: the ReplaceIn model does not validate min length via pydantic constraints — the check `len(reason.strip()) < 5` is performed after the candidate lookup, so the error hierarchy could leak information about candidates before validating input. Consider using pydantic Field(min_length=5) for stricter contract.",
+    "services/top11.py: `_rank_key` treats None goals/assists as 0 via .get default, but `fanta` and `vote` fallback to 0 which is fine; ordering assertion in test confirmed. select_formation fills empty slots with best-of-any (off_role=True) which is correct per spec.",
+    "public.py public_top11: relies on svc.out(doc, public=True) which anonymizes only when public_ok is False; matches spec. No _id leakage confirmed."
+  ],
+  "updated_files": ["/app/backend/tests/test_top11.py"],
+  "success_rate": {"backend": "100% (11/11 in test_top11.py)", "frontend": "100% of required flows (generate, list, board, replace dialog, transitions, download PNG, public page, public nav)"},
+  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C, segreteria@fsl.demo / Demo1234!, societa@fsl.demo / Demo1234!",
+  "seed_data_creation": "None. Tests operate on the already-seeded tournament la-serie-a-dei-bambini and its competitions. Giornata 1 remained published (as documented). Draft docs from other days are cycled through draft/review states and may end archived at the end of the class-level publish flow.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "TOP 11 engine is fully green — backend endpoints under /api/tournaments/{tid}/top11 and /api/public/tournaments/{slug}/top11 all behave per spec. Run `python -m pytest /app/backend/tests/test_top11.py -v -o addopts=''`. Note the test_publish_flow_full test archives one full doc — if you re-run repeatedly and archive all fully-populated drafts, that test may skip. The demo has few players so most drafts contain at least one empty slot; publish must 409 in those cases (verified). Public page rendered Giornata 1 board with anonymized 'DAVIDE R.' style names correctly.",
+  "rca of the issue": "N/A — no bugs found."
+}
