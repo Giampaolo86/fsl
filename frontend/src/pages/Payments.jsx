@@ -4,6 +4,7 @@ import { CheckCircle2, Download, Loader2, XCircle } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { api, apiError } from "@/lib/api";
 import { mediaUrl } from "@/lib/upload";
+import { StripeCatalog } from "@/components/fsl/StripeCatalog";
 
 const Shell = ({ children }) => <div className="min-h-screen bg-navy-900 text-fsl-white flex items-center justify-center p-6"><div className="fsl-card max-w-md w-full p-8 text-center space-y-4 animate-rise" data-testid="payment-page"><div className="flex justify-center"><Logo /></div>{children}</div></div>;
 
@@ -53,6 +54,7 @@ export function Sales() {
       <div><div className="fsl-kicker mb-1">Media a pagamento</div><h1 className="text-4xl sm:text-5xl font-extrabold leading-[0.95]">Vendite</h1><p className="mt-2 text-sm text-fsl-slate">Foto professionali 0,49 € e video 0,99 € acquistati dalle famiglie nel Match Center. Incassi via Stripe.</p></div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{[["Incasso", `${data.revenue.toFixed(2).replace(".", ",")} €`], ["Vendite", data.count], ["Foto vendute", data.photos], ["Video venduti", data.videos]].map(([l, v]) => <div key={l} className="fsl-card p-4"><div className="font-display font-extrabold text-3xl num">{v}</div><div className="text-[11px] uppercase tracking-wider text-fsl-slate">{l}</div></div>)}</div>
       <div className="fsl-card overflow-x-auto"><table className="w-full table-dark" data-testid="sales-table"><thead><tr><th>Data</th><th>Contenuto</th><th>Gara</th><th>Acquirente</th><th className="text-right">Importo</th></tr></thead><tbody>{data.sales.length === 0 ? <tr><td colSpan={5} className="text-center text-fsl-slate py-6">Nessuna vendita ancora · {data.items} contenuti in catalogo</td></tr> : data.sales.map((s) => <tr key={s.id}><td className="num text-xs">{new Date(s.created_at).toLocaleString("it-IT")}</td><td>{s.title} <span className="text-xs text-fsl-slate uppercase">{s.kind}</span></td><td className="text-xs text-fsl-slate">{s.match}</td><td className="text-xs">{s.buyer_email || "—"}</td><td className="num text-right font-semibold">{s.amount.toFixed(2).replace(".", ",")} €</td></tr>)}</tbody></table></div>
+      <StripeCatalog tid={tid} />
     </div>
   );
 }
