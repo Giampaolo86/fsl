@@ -74,6 +74,9 @@ async def upload_photo(tournament_id: str, player_id: str, file: UploadFile = Fi
         return {**p2.public(), "pending": True}
     p2 = await repo.update(p.id, {"photo_url": url, "photo_pending_url": None, "photo_pending_by": None}, user.id)
     await audit.record(user, "player.photo", "player", p.id, tournament_id, after={"media_id": m.id})
+    from .fans import notify_photo
+
+    await notify_photo(tournament_id, p2)
     return p2.public()
 
 
@@ -118,8 +121,11 @@ async def upload_photos_bulk(tournament_id: str, files: list[UploadFile] = File(
             results.append({"file": f.filename, "status": "troppo_grande", "player": f"{p.first_name} {p.last_name}"})
             continue
         m = await _player_photo(tournament_id, data, user.id, p.club_id)
-        await repo.update(p.id, {"photo_url": f"/api/media/{m.id}", "photo_pending_url": None, "photo_pending_by": None}, user.id)
+        p2 = await repo.update(p.id, {"photo_url": f"/api/media/{m.id}", "photo_pending_url": None, "photo_pending_by": None}, user.id)
         await audit.record(user, "player.photo", "player", p.id, tournament_id, after={"media_id": m.id, "bulk": True})
+        from .fans import notify_photo
+
+        await notify_photo(tournament_id, p2)
         results.append({"file": f.filename, "status": "ok", "player": f"{p.first_name} {p.last_name}", "player_id": p.id, "photo_url": f"/api/media/{m.id}"})
     return {"results": results, "ok": sum(r["status"] == "ok" for r in results), "total": len(results)}
 
@@ -142,6 +148,10 @@ async def review_photo(tournament_id: str, player_id: str, body: dict, user: Cur
         patch["photo_url"] = p.photo_pending_url
     p2 = await repo.update(p.id, patch, user.id)
     await audit.record(user, "player.photo_review", "player", p.id, tournament_id, after={"approved": approve})
+    if approve:
+        from .fans import notify_photo
+
+        await notify_photo(tournament_id, p2, approved=True)
     return p2.public()
 
 
@@ -276,7 +286,11 @@ async def notify(t_id: str, club_id: str, kind: str, title: str, body: str = "",
     repo = scoped("notifications", t_id)
     if dedupe_key and await repo.find_one({"dedupe_key": dedupe_key}):
         return None
-    return await repo.insert(Notification(tournament_id=t_id, club_id=club_id, kind=kind, title=title, body=body, link=link, dedupe_key=dedupe_key))
+    n = await repo.insert(Notification(tournament_id=t_id, club_id=club_id, kind=kind, title=title, body=body, link=link, dedupe_key=dedupe_key))
+    from ..services import push
+
+    await push.notify_club(t_id, club_id, title, body, link, tag=f"fsl-{kind}")
+    return n
 
 
 async def _expiry_notifications(t_id: str, club_id: str):
@@ -505,6 +519,11 @@ async def _mark_paid(p: Purchase, pi=None, email=None):
     res = await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id), "payment_status": {"$ne": "paid"}}, {"$set": {"status": "completed", "payment_status": "paid", "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": datetime.now(timezone.utc)}})
     if res.modified_count:
         await Repository("paid_media", PaidMedia).col.update_one({"_id": __import__("bson").ObjectId(p.item_id)}, {"$inc": {"sold": 1}})
+        it = await _find_item(p.item_id)
+        if it and it.kind == "push_pass" and it.ref_id:
+            from ..services import push
+
+            await push.grant_pass(it.ref_id, it.tournament_id, p.id)
 
 
 @pay_router.get("/payments/status/{session_id}")
@@ -528,6 +547,9 @@ async def payment_status(session_id: str):
         if it and it.kind in DIGITAL:
             t = await tournaments.get(it.tournament_id)
             out["open_url"] = f"/tornei/{t.slug}/prodotti/{p.download_token}" if t else None
+            out.pop("download_url", None)
+        elif it and it.kind == "push_pass":
+            out["open_url"] = "/account?push=attivo"
             out.pop("download_url", None)
     return out
 

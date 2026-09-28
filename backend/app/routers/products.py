@@ -48,6 +48,22 @@ async def get_or_create_product(slug: str, body: ProductIn, request: Request):
     from .fans import optional_user
 
     t = await _tournament(slug)
+    if body.kind == "push_pass":
+        from .fans import optional_user
+        from ..services import push
+
+        user = await optional_user(request)
+        if not user:
+            raise forbidden("Accedi con il tuo account genitori e tifosi per attivare le notifiche")
+        repo = scoped("paid_media", t.id)
+        price_cents = int(round((await push.push_price(t.id)) * 100))
+        it = await repo.find_one({"kind": "push_pass", "ref_id": user.id})
+        title = f"Notifiche push · {t.name} {t.season_label or ''}".strip()
+        if not it:
+            it = await repo.insert(PaidMedia(tournament_id=t.id, kind="push_pass", title=title, ref_id=user.id, lookup_key="fsl_dyn_push", price_cents=price_cents))
+        elif it.price_cents != price_cents:
+            it = await repo.update(it.id, {"price_cents": price_cents})
+        return {"id": it.id, "kind": it.kind, "title": it.title, "price": it.price_cents / 100}
     if body.kind not in ("team_card", "album", *CARD_KINDS):
         raise bad_request("Prodotto non disponibile")
     price_cents, lookup = PRICE_CENTS, LOOKUP

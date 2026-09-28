@@ -1,0 +1,8 @@
+crons:
+  - name: push-reminders
+    description: "Ogni ora genera e invia ai genitori con pass push i promemoria (convocazioni, prossime gare, nuove foto/video)"
+    cron: "0 * * * *"
+    endpoint: "{{BASE_URL}}/api/cron/push-reminders"
+    method: POST
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    enabled: true

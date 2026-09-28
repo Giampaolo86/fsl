@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Upload, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -77,14 +78,32 @@ function ReviewDialog({ tid, imp, onClose, onDone }) {
 export function RosterImportAdmin({ tid, onImported }) {
   const [list, setList] = useState([]);
   const [review, setReview] = useState(null);
+  const [clubs, setClubs] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [clubId, setClubId] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [busy, setBusy] = useState(false);
   const load = useCallback(() => api.get(`/tournaments/${tid}/roster-imports`).then((r) => setList(r.data)).catch(() => {}), [tid]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); api.get(`/tournaments/${tid}/clubs`).then((r) => setClubs(r.data)).catch(() => {}); api.get(`/tournaments/${tid}/teams`).then((r) => setTeams(r.data)).catch(() => {}); }, [load, tid]);
+  const clubTeams = teams.filter((t) => t.club_id === clubId);
+  useEffect(() => { setTeamId(clubTeams[0]?.id || ""); }, [clubId]); // eslint-disable-line react-hooks/exhaustive-deps
   const pending = list.filter((i) => i.status === "submitted");
-  if (list.length === 0) return null;
+  const upload = async (file) => {
+    if (!file || !teamId) return;
+    setBusy(true);
+    const fd = new FormData(); fd.append("team_id", teamId); fd.append("file", file);
+    try { const r = await api.post(`/tournaments/${tid}/roster-imports`, fd, { headers: { "Content-Type": "multipart/form-data" } }); toast.success(`${r.data.rows.length} giocatori letti dal modulo: rivedi e carica la rosa`); load(); setReview(r.data); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
+  };
   return (
-    <section className="fsl-card p-4 mb-5 space-y-2" data-testid="roster-import-admin">
-      <div className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-fsl-gold" /><span className="font-display font-bold uppercase">Moduli rosa ricevuti</span>{pending.length > 0 && <span className="h-6 px-2 rounded-full bg-fsl-warning text-ink-950 text-[11px] font-bold num" data-testid="roster-import-pending-count">{pending.length} da confermare</span>}</div>
-      <div className="divide-y divide-white/[0.06]">{list.slice(0, 8).map((i) => <div key={i.id} className="min-h-[48px] py-1.5 px-2 flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 text-sm" data-testid={`roster-import-row-${i.id}`}><span className={`h-6 px-2 rounded text-[10px] font-bold uppercase inline-flex items-center shrink-0 ${STATUS[i.status][1]}`}>{STATUS[i.status][0]}</span><span className="flex-1 min-w-0 truncate"><span className="font-semibold">{i.club_name}</span> · {i.team_label} · {i.rows.length} giocatori</span>{i.error_count ? <span className="h-6 px-2 rounded-full border border-fsl-warning/50 text-fsl-warning text-[10px] font-bold inline-flex items-center shrink-0 num" data-testid={`roster-import-anomalies-${i.id}`}>{i.error_count} anomalie</span> : null}<span className="text-xs text-fsl-slate num">{fmtDate(i.created_at, { time: true })}</span>{i.status === "submitted" && <button className="btn-gold h-9" onClick={() => setReview(i)} data-testid={`roster-import-review-${i.id}`}>Rivedi e carica</button>}</div>)}</div>
+    <section className="fsl-card p-4 mb-5 space-y-3" data-testid="roster-import-admin">
+      <div className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-fsl-gold" /><span className="font-display font-bold uppercase">Moduli rosa Excel</span>{pending.length > 0 && <span className="h-6 px-2 rounded-full bg-fsl-warning text-ink-950 text-[11px] font-bold num" data-testid="roster-import-pending-count">{pending.length} da confermare</span>}</div>
+      <div className="rounded-xl border border-fsl-gold/30 bg-ink-950/50 p-3 flex flex-wrap items-end gap-3" data-testid="roster-import-admin-upload">
+        <div className="flex-1 min-w-[200px]"><div className="fsl-label mb-1">Carica un modulo per una società</div><select className="fsl-input" value={clubId} onChange={(e) => setClubId(e.target.value)} data-testid="roster-admin-club-select"><option value="">Scegli la società…</option>{clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+        <div className="flex-1 min-w-[200px]"><div className="fsl-label mb-1">Squadra · categoria</div><select className="fsl-input" value={teamId} disabled={!clubId} onChange={(e) => setTeamId(e.target.value)} data-testid="roster-admin-team-select">{clubTeams.length === 0 && <option value="">{clubId ? "Nessuna squadra iscritta" : "—"}</option>}{clubTeams.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.category}</option>)}</select></div>
+        <button className="btn-ghost h-10" disabled={!teamId} onClick={() => downloadTemplate(tid, teamId).catch((e) => toast.error(apiError(e)))} data-testid="roster-admin-template-download"><Download className="h-4 w-4" /> Modulo Excel</button>
+        <label className={`btn-gold h-10 cursor-pointer ${busy || !teamId ? "opacity-60 pointer-events-none" : ""}`} data-testid="roster-admin-upload-label"><Upload className="h-4 w-4" /> {busy ? "Leggo il file…" : "Carica modulo compilato"}<input type="file" accept=".xlsx" className="hidden" onChange={(e) => { upload(e.target.files[0]); e.target.value = ""; }} data-testid="roster-admin-upload-input" /></label>
+      </div>
+      {list.length > 0 && <div className="divide-y divide-white/[0.06]">{list.slice(0, 8).map((i) => <div key={i.id} className="min-h-[48px] py-1.5 px-2 flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 text-sm" data-testid={`roster-import-row-${i.id}`}><span className={`h-6 px-2 rounded text-[10px] font-bold uppercase inline-flex items-center shrink-0 ${STATUS[i.status][1]}`}>{STATUS[i.status][0]}</span><span className="flex-1 min-w-0 truncate"><span className="font-semibold">{i.club_name}</span> · {i.team_label} · {i.rows.length} giocatori</span>{i.error_count ? <span className="h-6 px-2 rounded-full border border-fsl-warning/50 text-fsl-warning text-[10px] font-bold inline-flex items-center shrink-0 num" data-testid={`roster-import-anomalies-${i.id}`}>{i.error_count} anomalie</span> : null}<span className="text-xs text-fsl-slate num">{fmtDate(i.created_at, { time: true })}</span>{i.status === "submitted" && <button className="btn-gold h-9" onClick={() => setReview(i)} data-testid={`roster-import-review-${i.id}`}>Rivedi e carica</button>}</div>)}</div>}
       {review && <ReviewDialog tid={tid} imp={review} onClose={() => setReview(null)} onDone={() => { setReview(null); load(); onImported?.(); }} />}
     </section>
   );
@@ -92,6 +111,23 @@ export function RosterImportAdmin({ tid, onImported }) {
 
 
 const EMPTY_REQ = { first_name: "", last_name: "", role: "", shirt_number: "", birth_year: "", note: "" };
+
+// Pannello «Modulo rosa» per l'Area Società (home e profilo): scelta squadra + download/upload.
+export function RosterModulePanel({ tid, teams = [] }) {
+  const [teamId, setTeamId] = useState(teams[0]?.id || "");
+  useEffect(() => { if (!teamId && teams[0]) setTeamId(teams[0].id); }, [teams, teamId]);
+  if (!tid || teams.length === 0) return null;
+  return (
+    <section data-testid="roster-module-panel">
+      <div className="flex flex-wrap items-center gap-3 mb-3">
+        <h2 className="fsl-section-title flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-fsl-gold" /> Modulo rosa Excel</h2>
+        <select className="fsl-input w-auto min-w-[220px] h-10" value={teamId} onChange={(e) => setTeamId(e.target.value)} data-testid="roster-module-team-select">{teams.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.category}</option>)}</select>
+        <Link to="/societa/rose" className="text-xs text-fsl-gold hover:underline ml-auto" data-testid="roster-module-go-rose">Vai alle rose →</Link>
+      </div>
+      <RosterImportClub tid={tid} teamId={teamId} />
+    </section>
+  );
+}
 
 function AddPlayerRequest({ tid, teamId, onDone }) {
   const [open, setOpen] = useState(false);

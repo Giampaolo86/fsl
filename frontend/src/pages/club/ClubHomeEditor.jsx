@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Eye, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
+import { RosterModulePanel } from "@/components/fsl/RosterImport";
 import { EmptyState, LoadingState } from "@/components/fsl/States";
 import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
@@ -67,6 +68,13 @@ export default function ClubHomeEditor({ adminMode = false }) {
           <div><div className="fsl-label mb-1">Servizi della sede</div><div className="flex flex-wrap gap-1.5">{SERVICES.map((s) => { const on = (f.services || []).includes(s); return <button key={s} type="button" onClick={() => set("services", on ? f.services.filter((x) => x !== s) : [...(f.services || []), s])} className={`h-8 px-3 rounded-full text-xs border ${on ? "bg-fsl-gold text-ink-950 border-fsl-gold" : "border-white/20 text-fsl-slate"}`} aria-pressed={on}>{s}</button>; })}</div></div>
         </section>
       </div>
+      {!adminMode && <ClubRosterModule tid={tid} />}
     </div>
   );
+}
+
+function ClubRosterModule({ tid }) {
+  const [teams, setTeams] = useState([]);
+  useEffect(() => { api.get("/me/club", { params: { tournament_id: tid } }).then((r) => setTeams(r.data.teams || [])).catch(() => {}); }, [tid]);
+  return <RosterModulePanel tid={tid} teams={teams} />;
 }

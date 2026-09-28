@@ -8,6 +8,7 @@ import { PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
+import { PushSettings } from "@/components/fsl/PushSettings";
 
 export function PasswordForm({ onDone, forced = false }) {
   const { updateUser, setLanding } = useAuth();
@@ -122,6 +123,7 @@ export function SecuritySettings() {
       <section><SectionTitle>Cambia password</SectionTitle><div className="fsl-card p-5"><PasswordForm /></div></section>
       <Sessions />
       <TrustedDevices user={user} />
+      <PushSettings compact />
     </div>
   );
 }

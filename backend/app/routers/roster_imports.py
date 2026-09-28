@@ -1,6 +1,5 @@
 import io
 from datetime import date, datetime
-from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
@@ -16,7 +15,6 @@ from .club_extras import _store, notify
 
 router = APIRouter(prefix="/tournaments/{tournament_id}/roster-imports", tags=["roster-imports"])
 STAFF = {"super_admin", "director", "secretary"}
-TEMPLATE = Path(__file__).resolve().parents[2] / "assets" / "FSL_Modulo_Rosa_Societa.xlsx"
 ROLES = {"portiere": "Portiere", "difensore": "Difensore", "centrocampista": "Centrocampista", "esterno": "Esterno", "attaccante": "Attaccante", "por": "Portiere", "dif": "Difensore", "cen": "Centrocampista", "att": "Attaccante"}
 FIRST_ROW = 11
 
@@ -97,22 +95,23 @@ async def _out(t_id: str, items: list[RosterImport]) -> list[dict]:
 
 
 @router.get("/template")
-async def template(tournament_id: str, team_id: Optional[str] = None, user: CurrentUser = Depends(get_current_user)):
-    t, role = await require_tournament(tournament_id, user)
-    import openpyxl
+async def template(tournament_id: str, team_id: Optional[str] = None, club_id: Optional[str] = None, user: CurrentUser = Depends(get_current_user)):
+    from ..services.roster_template import build_template
 
-    wb = openpyxl.load_workbook(TEMPLATE)
-    ws = wb.active
+    t, role = await require_tournament(tournament_id, user)
+    tm = await scoped("teams", tournament_id).get(team_id) if team_id else None
+    if role == "club_manager" and tm and tm.club_id != user.club_in(tournament_id):
+        raise forbidden("Puoi scaricare solo il modulo della tua società")
+    club = await scoped("clubs", tournament_id).get(tm.club_id if tm else (club_id or user.club_in(tournament_id) or "")) if (tm or club_id or user.club_in(tournament_id)) else None
+    comp_name = ""
+    if tm and tm.competition_id:
+        comp = await scoped("competitions", tournament_id).get(tm.competition_id)
+        comp_name = comp.name if comp else ""
     name = "Modulo_Rosa"
-    if team_id:
-        tm = await scoped("teams", tournament_id).get(team_id)
-        if tm:
-            club = await scoped("clubs", tournament_id).get(tm.club_id)
-            ws["B5"] = f"{club.name if club else ''} · {tm.name}".strip(" ·")
-            name = f"Modulo_Rosa_{(club.short_name if club else tm.name).replace(' ', '_')}"
-    buf = io.BytesIO()
-    wb.save(buf)
-    return Response(content=buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="FSL_{name}.xlsx"'})
+    if club:
+        name = f"Modulo_Rosa_{(club.short_name or club.name).replace(' ', '_')}{('_' + tm.category) if tm and tm.category else ''}"
+    data = build_template(t, club, tm, comp_name)
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="FSL_{name}.xlsx"'})
 
 
 @router.post("", status_code=201)

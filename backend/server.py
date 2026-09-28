@@ -16,7 +16,7 @@ from app.core.deps import CurrentUser, require_roles  # noqa: E402
 from app.core.errors import forbidden  # noqa: E402
 from app.core.sessions import ensure_indexes  # noqa: E402
 from app.migrations import run_migrations  # noqa: E402
-from app.routers import auth, club_extras, extras, fans, roster_imports, matches, me, posts, products, public, registration, structure, top11, tournaments, users, weekly, legacy, studio  # noqa: E402
+from app.routers import auth, club_extras, extras, fans, roster_imports, matches, me, posts, products, public, registration, structure, top11, tournaments, users, weekly, legacy, studio, push  # noqa: E402
 from app.services import storage  # noqa: E402
 from app.seed import purge_demo, seed_all  # noqa: E402
 
@@ -50,7 +50,7 @@ async def seed_purge(user: CurrentUser = Depends(require_roles())):
     return {"ok": True}
 
 
-for r in (auth.router, tournaments.router, structure.router, matches.router, extras.router, users.router, public.router, me.router, posts.router, posts.media_router, posts.public_router, club_extras.router, club_extras.pay_router, club_extras.public_router, roster_imports.router, fans.router, registration.router, products.router, top11.router, weekly.router, legacy.router, studio.router):
+for r in (auth.router, tournaments.router, structure.router, matches.router, extras.router, users.router, public.router, me.router, posts.router, posts.media_router, posts.public_router, club_extras.router, club_extras.pay_router, club_extras.public_router, roster_imports.router, fans.router, registration.router, products.router, top11.router, weekly.router, legacy.router, studio.router, push.router):
     api.include_router(r)
 app.include_router(api)
 

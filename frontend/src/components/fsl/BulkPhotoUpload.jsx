@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { api, apiError } from "@/lib/api";
 import { cutoutPhoto } from "@/lib/cutout";
+import { useCutoutEditor } from "@/components/fsl/CutoutEditor";
 
 const LABEL = { ok: ["Caricata", "text-fsl-success"], non_trovato: ["Nessun giocatore", "text-fsl-danger"], ambiguo: ["Più giocatori", "text-fsl-warning"], non_immagine: ["Non è un'immagine", "text-fsl-danger"], non_autorizzato: ["Non autorizzato", "text-fsl-danger"], troppo_grande: ["Oltre 8 MB", "text-fsl-danger"] };
 
@@ -12,20 +13,23 @@ export function BulkPhotoUpload({ tid, clubId, onDone }) {
   const [res, setRes] = useState(null);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState("");
+  const [refine, cutoutEditor, resetSkip] = useCutoutEditor();
   const upload = async (files) => {
     if (!files.length) return;
-    setBusy(true);
+    setBusy(true); resetSkip();
     const fd = new FormData();
     const list = [...files];
     for (let i = 0; i < list.length; i++) {
       setStep(`Scontorno ${i + 1}/${list.length}…`);
-      fd.append("files", await cutoutPhoto(list[i], (k, pct) => k === "download" && setStep(`Modello AI ${pct}%…`)));
+      const cut = await cutoutPhoto(list[i], (k, pct) => k === "download" && setStep(`Modello AI ${pct}%…`));
+      fd.append("files", await refine(list[i], cut, list.length - i - 1));
     }
     setStep("Carico…");
     try { const { data } = await api.post(`/tournaments/${tid}/players/photos/bulk`, fd, { headers: { "Content-Type": "multipart/form-data" }, params: clubId ? { club_id: clubId } : {} }); setRes(data); toast.success(`${data.ok} foto su ${data.total} abbinate`); onDone?.(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); if (input.current) input.current.value = ""; }
   };
   return (
     <>
+      {cutoutEditor}
       <input ref={input} type="file" accept="image/*" multiple className="hidden" onChange={(e) => upload(e.target.files)} data-testid="bulk-photos-input" />
       <button type="button" className="btn-ghost h-11" disabled={busy} onClick={() => input.current?.click()} title="Nomina i file col numero di maglia (10.jpg) o nome-cognome.jpg" data-testid="bulk-photos-button"><Images className="h-4 w-4" /> {busy ? step : "Foto in blocco"}</button>
       <Dialog open={!!res} onOpenChange={(o) => !o && setRes(null)}>

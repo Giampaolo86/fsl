@@ -15,6 +15,7 @@ import { fmtVote } from "@/lib/fanta";
 import { fmtDate } from "@/lib/format";
 import { mediaUrl } from "@/lib/upload";
 import { cutoutPhoto } from "@/lib/cutout";
+import { useCutoutEditor } from "@/components/fsl/CutoutEditor";
 import { toast } from "sonner";
 
 export const profileLink = (pathname, pid) => {
@@ -40,11 +41,13 @@ export default function PlayerProfile({ mode = "public" }) {
   const [buyingAlbum, setBuyingAlbum] = useState(false);
   const [idPreview, setIdPreview] = useState(null);
   const [buyingCard, setBuyingCard] = useState(false);
+  const [refine, cutoutEditor] = useCutoutEditor();
   const buyCard = async (kind) => { setBuyingCard(true); try { await buyProduct(slug || card?.tournament?.slug || "", kind, playerId); } catch (e) { toast.error(apiError(e)); setBuyingCard(false); } };
   const buyAlbum = async () => { setBuyingAlbum(true); try { await buyProduct(slug || card?.tournament?.slug || "", "album", playerId); } catch (e) { toast.error(apiError(e)); setBuyingAlbum(false); } };
   const uploadPhoto = async (file) => {
     if (!file) return; setUploading(true);
-    const fd = new FormData(); fd.append("file", await cutoutPhoto(file, (k, pct) => k === "download" && toast.message(`Scarico il modello AI per lo scontorno… ${pct}%`, { id: "cutout-dl", duration: 1500 })));
+    const fd = new FormData(); const cut = await cutoutPhoto(file, (k, pct) => k === "download" && toast.message(`Scarico il modello AI per lo scontorno… ${pct}%`, { id: "cutout-dl", duration: 1500 }));
+    fd.append("file", card.can_edit === "guardian" ? cut : await refine(file, cut));
     try { const r = await api.post(`/tournaments/${tid}/players/${playerId}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } }); toast.success(r.data.pending ? "Foto inviata: sarà visibile dopo l'approvazione della società" : "Foto aggiornata"); load(); } catch (e) { toast.error(apiError(e)); } finally { setUploading(false); }
   };
   const reviewPhoto = async (approve) => { try { await api.post(`/tournaments/${tid}/players/${playerId}/photo/review`, { approve }); toast.success(approve ? "Foto approvata e pubblicata" : "Foto rifiutata"); load(); } catch (e) { toast.error(apiError(e)); } };
@@ -202,6 +205,7 @@ export default function PlayerProfile({ mode = "public" }) {
         )}
       </div>
       {edit && <PlayerProfileEditor open onClose={() => setEdit(false)} tournamentId={tid} card={card} onSaved={load} />}
+      {cutoutEditor}
     </div>
   );
 }

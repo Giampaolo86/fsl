@@ -224,6 +224,9 @@ async def badge_notify(t_id: str, b: dict):
     if not p:
         return
     await notify(t_id, p.club_id, "badge", f"{p.first_name} {p.last_name} ha sbloccato il badge {b['label']}", DEFS[b["code"]][2], "/societa/rose", f"badge:{b['player_id']}:{b['code']}")
+    from ..routers.fans import notify_badge
+
+    await notify_badge(t_id, p, b["label"], DEFS[b["code"]][2])
 
 
 async def for_players(t_id: str, player_ids: list[str]) -> dict:

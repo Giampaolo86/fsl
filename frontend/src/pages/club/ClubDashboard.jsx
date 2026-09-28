@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { CalendarDays, CreditCard, FileText, Shield, Users } from "lucide-react";
 import { KpiTile, PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
+import { RosterModulePanel } from "@/components/fsl/RosterImport";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
@@ -62,6 +63,7 @@ export default function ClubDashboard() {
           </div>
         )}
       </section>
+      <RosterModulePanel tid={membership.tournament_id} teams={teams} />
     </div>
   );
 }

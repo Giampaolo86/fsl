@@ -426,6 +426,9 @@ async def _after_official(t_id, m: Match, user):
     await charge_callups(t_id, m, user)
     await badges.recompute(t_id, user)
     await top11.refresh_day(t_id, m.competition_id, m.match_day)
+    from .fans import notify_result
+
+    await notify_result(t_id, m)
 
 
 @router.post("/matches/{match_id}/report")

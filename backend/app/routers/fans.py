@@ -213,6 +213,49 @@ async def _fan_notify(t_id: str, uid: str, kind: str, title: str, body: str, lin
     if await repo.find_one({"dedupe_key": key}):
         return
     await repo.insert(Notification(tournament_id=t_id, user_id=uid, kind=kind, title=title, body=body, link=link, dedupe_key=key))
+    from ..services import push
+
+    await push.notify_user(t_id, uid, title, body, link, tag=f"fsl-{kind}")
+
+
+async def notify_result(t_id: str, m):
+    """Risultato ufficiale (o rettificato): genitori dei convocati/rosa delle due squadre e fan che seguono squadre o giocatori."""
+    from bson import ObjectId
+
+    t = await tournaments.get(t_id)
+    tids = [m.home_team_id, m.away_team_id]
+    players = await scoped("players", t_id).list({"team_id": {"$in": tids}}, limit=200)
+    emails = sorted({e.lower() for p in players for e in (p.guardian_emails or [])})
+    parents = {u.id: u for u in (await users.list({"email": {"$in": emails}}, limit=300) if emails else [])}
+    followers = await users.list({"$or": [{"favorites.teams": {"$in": tids}}, {"favorites.players": {"$in": [p.id for p in players]}}]}, limit=1000)
+    label = await _match_names(t_id, m)
+    sc = m.score or {}
+    title = f"Finale: {label} {sc.get('home')}–{sc.get('away')}"
+    body = f"{m.round_name or t.name} · risultato ufficiale. Guarda tabellino, pagelle e classifica."
+    link = f"/tornei/{t.slug}/partite/{m.id}"
+    key = f"result:{m.id}:{sc.get('home')}-{sc.get('away')}:{m.status}"
+    for u in {**{u.id: u for u in followers}, **parents}.values():
+        await _fan_notify(t_id, u.id, "result", title, body, link, f"fan:{u.id}:{key}")
+
+
+async def notify_photo(t_id: str, p, approved: bool = False):
+    """Nuova foto pubblicata (o approvata) del figlio → genitori abbinati."""
+    if not p.guardian_emails:
+        return
+    t = await tournaments.get(t_id)
+    parents = await users.list({"email": {"$in": [e.lower() for e in p.guardian_emails]}}, limit=50)
+    title = f"La foto di {p.first_name} è stata approvata" if approved else f"Nuova foto di {p.first_name}"
+    body = "È ora visibile sulla scheda giocatore, sulla Card Player ID e nella Top 11." if approved else "La società ha caricato una nuova foto: guardala sulla scheda giocatore."
+    for u in parents:
+        await _fan_notify(t_id, u.id, "photo", title, body, f"/tornei/{t.slug}/giocatori/{p.id}", f"fan:{u.id}:photo:{p.id}:{p.photo_url}")
+
+
+async def notify_badge(t_id: str, p, label: str, desc: str):
+    if not p.guardian_emails:
+        return
+    t = await tournaments.get(t_id)
+    for u in await users.list({"email": {"$in": [e.lower() for e in p.guardian_emails]}}, limit=50):
+        await _fan_notify(t_id, u.id, "badge", f"{p.first_name} ha sbloccato il badge «{label}»", desc, f"/tornei/{t.slug}/giocatori/{p.id}", f"fan:{u.id}:badge:{p.id}:{label}")
 
 
 ROME = ZoneInfo("Europe/Rome")

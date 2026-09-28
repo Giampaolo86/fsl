@@ -9,6 +9,22 @@ self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
+self.addEventListener("push", (e) => {
+  let d = { title: "Future Stars League", body: "Novità dal campo", url: "/" };
+  try { d = { ...d, ...(e.data ? e.data.json() : {}) }; } catch { /* payload testuale */ }
+  e.waitUntil(self.registration.showNotification(d.title, { body: d.body, icon: "/brand/logo.png", badge: "/brand/logo.png", tag: d.tag || undefined, renotify: !!d.tag, data: { url: d.url || "/" } }));
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const target = new URL(e.notification.data?.url || "/", self.location.origin).href;
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((ws) => {
+    const w = ws.find((x) => x.url.startsWith(self.location.origin));
+    if (w) { w.focus(); return w.navigate ? w.navigate(target) : null; }
+    return self.clients.openWindow(target);
+  }));
+});
+
 const isAsset = (url) => url.pathname.startsWith("/static/") || /\.(png|jpe?g|webp|svg|woff2?|ico)$/.test(url.pathname);
 
 self.addEventListener("fetch", (e) => {

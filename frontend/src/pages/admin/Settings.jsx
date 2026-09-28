@@ -217,6 +217,8 @@ export default function Settings() {
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Card Premium (€)" hint="Default 3,99 €"><input type="number" min="0" step="0.01" className="fsl-input" value={s.fees.card_price ?? 3.99} onChange={(e) => upd("fees", { ...s.fees, card_price: Number(e.target.value) })} data-testid="settings-card-price-input" /></Field>
               <Field label="Card Speciale Top 11 / MVP (€)" hint="Default 4,99 €"><input type="number" min="0" step="0.01" className="fsl-input" value={s.fees.card_special_price ?? 4.99} onChange={(e) => upd("fees", { ...s.fees, card_special_price: Number(e.target.value) })} data-testid="settings-card-special-price-input" /></Field>
+              <Field label="Notifiche push genitori (€/stagione)" hint="Pass stagionale per ricevere sul telefono Top 11, risultati, foto e badge. Default 3,99 €"><input type="number" min="0" step="0.01" className="fsl-input" value={s.fees.push_price ?? 3.99} onChange={(e) => upd("fees", { ...s.fees, push_price: Number(e.target.value) })} data-testid="settings-push-price-input" /></Field>
+
             </div>
           </div>
           {s.categories.length > 0 && <div className="mt-5" data-testid="settings-fee-by-category">

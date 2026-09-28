@@ -35,6 +35,7 @@ class User(BaseDocument):
     picture: Optional[str] = None
     auth_provider: str = "password"
     favorites: dict = {"tournaments": [], "teams": [], "players": []}
+    push_passes: dict = {}
 
     def safe(self) -> dict:
         d = self.public()
@@ -105,7 +106,7 @@ class TournamentSettings(BaseDocument):
     relegated_per_category: int = 0
     max_matches_per_team_per_weekend: int = 1
     skip_holidays: bool = False
-    fees: dict = {"registration": 0, "currency": "EUR", "card_price": 3.99, "card_special_price": 4.99}
+    fees: dict = {"registration": 0, "currency": "EUR", "card_price": 3.99, "card_special_price": 4.99, "push_price": 3.99}
     required_documents: list[str] = []
     notification_channels: list[str] = ["email"]
     sponsors: list[dict] = []
@@ -343,7 +344,7 @@ class Notification(BaseDocument):
 class PaidMedia(BaseDocument):
     tournament_id: str
     match_id: Optional[str] = None
-    kind: Literal["video", "photo", "team_card", "album", "player_card", "player_card_special"] = "photo"
+    kind: Literal["video", "photo", "team_card", "album", "player_card", "player_card_special", "push_pass"] = "photo"
     title: str
     media_id: Optional[str] = None
     ref_id: Optional[str] = None
