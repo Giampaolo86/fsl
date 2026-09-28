@@ -15,6 +15,7 @@ import { PlayerCardDialog } from "@/components/fsl/PlayerCard";
 import { ChildCode } from "@/components/fsl/AccountTools";
 import { BadgeChips } from "@/components/fsl/BadgeChips";
 import { mediaUrl } from "@/lib/upload";
+import { cutoutPhoto } from "@/lib/cutout";
 import { RosterImportAdmin, RosterImportClub } from "@/components/fsl/RosterImport";
 import { fmtDate } from "@/lib/format";
 
@@ -89,7 +90,7 @@ export function Rosters({ clubMode = false }) {
       api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data));
     } catch (e) { toast.error(apiError(e)); }
   };
-  const uploadPhoto = async (p, file) => { const fd = new FormData(); fd.append("file", file); try { await api.post(`/tournaments/${tid}/players/${p.id}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } }); toast.success("Foto aggiornata"); api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data)); } catch (e) { toast.error(apiError(e)); } };
+  const uploadPhoto = async (p, file) => { const fd = new FormData(); toast.message("Scontorno in corso…", { id: `cut-${p.id}` }); fd.append("file", await cutoutPhoto(file)); toast.dismiss(`cut-${p.id}`); try { await api.post(`/tournaments/${tid}/players/${p.id}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } }); toast.success("Foto aggiornata"); api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data)); } catch (e) { toast.error(apiError(e)); } };
   const toggleConsent = async (p) => { try { await api.patch(`/tournaments/${tid}/players/${p.id}`, { media_consent: !p.media_consent, profile_visibility: !p.media_consent ? "public" : "private" }); api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data)); } catch (e) { toast.error(apiError(e)); } };
   return (
     <div>

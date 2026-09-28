@@ -14,6 +14,7 @@ import { api, apiError } from "@/lib/api";
 import { fmtVote } from "@/lib/fanta";
 import { fmtDate } from "@/lib/format";
 import { mediaUrl } from "@/lib/upload";
+import { cutoutPhoto } from "@/lib/cutout";
 import { toast } from "sonner";
 
 export const profileLink = (pathname, pid) => {
@@ -43,7 +44,7 @@ export default function PlayerProfile({ mode = "public" }) {
   const buyAlbum = async () => { setBuyingAlbum(true); try { await buyProduct(slug || card?.tournament?.slug || "", "album", playerId); } catch (e) { toast.error(apiError(e)); setBuyingAlbum(false); } };
   const uploadPhoto = async (file) => {
     if (!file) return; setUploading(true);
-    const fd = new FormData(); fd.append("file", file);
+    const fd = new FormData(); fd.append("file", await cutoutPhoto(file, (k, pct) => k === "download" && toast.message(`Scarico il modello AI per lo scontorno… ${pct}%`, { id: "cutout-dl", duration: 1500 })));
     try { const r = await api.post(`/tournaments/${tid}/players/${playerId}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } }); toast.success(r.data.pending ? "Foto inviata: sarà visibile dopo l'approvazione della società" : "Foto aggiornata"); load(); } catch (e) { toast.error(apiError(e)); } finally { setUploading(false); }
   };
   const reviewPhoto = async (approve) => { try { await api.post(`/tournaments/${tid}/players/${playerId}/photo/review`, { approve }); toast.success(approve ? "Foto approvata e pubblicata" : "Foto rifiutata"); load(); } catch (e) { toast.error(apiError(e)); } };

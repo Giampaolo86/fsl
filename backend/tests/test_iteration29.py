@@ -1,7 +1,7 @@
-"""Iteration 29 — cutout (rembg u2netp) + club showcase demo seed.
+"""Iteration 29 — cutout (browser-side PNG → server 3:4 framing; JPEG → square crop) + club showcase demo seed.
 
 Tests:
-  1. Upload JPEG with background → PNG w/ transparency, ~3:4 aspect
+  1. Upload JPEG (no alpha) → JPEG 512x512; upload transparent PNG → PNG RGBA ~3:4
   2. Bulk upload by shirt number for Sporting Eur → ok, PNG
   3. Public club showcase (sporting-eur) → crest, cover, gallery(4), services(6), description
   4. All 18 demo clubs have crest_is_placeholder=false
@@ -59,10 +59,19 @@ def hdr(token):
     return {"Authorization": f"Bearer {token}"}
 
 
+def _make_cutout_png() -> bytes:
+    """PNG già scontornato (come prodotto dal browser): sfondo trasparente + silhouette."""
+    img = Image.new("RGBA", (800, 1000), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.ellipse((320, 200, 480, 360), fill=(20, 20, 30, 255))
+    d.rectangle((260, 340, 540, 700), fill=(30, 30, 40, 255))
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
 def _make_jpeg_with_bg() -> bytes:
     """Gradient background + centered dark silhouette."""
-    if os.path.exists("/tmp/p_blue.jpg"):
-        return open("/tmp/p_blue.jpg", "rb").read()
     img = Image.new("RGB", (800, 1000), (200, 220, 240))
     d = ImageDraw.Draw(img)
     # gradient
@@ -80,38 +89,28 @@ def _make_jpeg_with_bg() -> bytes:
 
 # ---------- 1) Single player photo upload with cutout ----------
 class TestCutoutSinglePhoto:
-    def test_upload_jpeg_with_bg_returns_png(self, tid, hdr):
-        data = _make_jpeg_with_bg()
-        files = {"file": ("test_bg.jpg", data, "image/jpeg")}
-        r = requests.post(
-            f"{BASE_URL}/api/tournaments/{tid}/players/{PLAYER_ID}/photo",
-            headers=hdr, files=files, timeout=60,
-        )
+    def test_upload_jpeg_without_alpha_returns_square_jpeg(self, tid, hdr):
+        files = {"file": ("test_bg.jpg", _make_jpeg_with_bg(), "image/jpeg")}
+        r = requests.post(f"{BASE_URL}/api/tournaments/{tid}/players/{PLAYER_ID}/photo", headers=hdr, files=files, timeout=60)
         assert r.status_code == 200, f"Upload failed: {r.status_code} {r.text}"
-        pub = r.json()
-        photo_url = pub.get("photo_url")
-        assert photo_url and photo_url.startswith("/api/media/"), f"photo_url={photo_url}"
-
-        # Fetch the media
+        photo_url = r.json().get("photo_url")
+        assert photo_url and photo_url.startswith("/api/media/")
         r2 = requests.get(f"{BASE_URL}{photo_url}", timeout=30)
-        assert r2.status_code == 200
-        ct = r2.headers.get("content-type", "")
-        # Prefer PNG with cutout — allow JPEG fallback but require PNG for synthetic silhouette
-        assert ct.startswith("image/"), f"content-type={ct}"
+        assert r2.status_code == 200 and r2.headers.get("content-type") == "image/jpeg"
+        assert Image.open(io.BytesIO(r2.content)).size == (512, 512)
+
+    def test_upload_transparent_png_is_framed_3_4(self, tid, hdr):
+        files = {"file": ("cut.png", _make_cutout_png(), "image/png")}
+        r = requests.post(f"{BASE_URL}/api/tournaments/{tid}/players/{PLAYER_ID}/photo", headers=hdr, files=files, timeout=60)
+        assert r.status_code == 200, f"Upload failed: {r.status_code} {r.text}"
+        r2 = requests.get(f"{BASE_URL}{r.json()['photo_url']}", timeout=30)
+        assert r2.headers.get("content-type") == "image/png"
         img = Image.open(io.BytesIO(r2.content))
-        if ct == "image/png":
-            assert img.mode == "RGBA", f"mode={img.mode}"
-            alpha_min, alpha_max = img.getchannel("A").getextrema()
-            assert alpha_min == 0, f"expected transparent pixels; alpha_min={alpha_min}"
-            assert alpha_max > 200, f"expected opaque pixels; alpha_max={alpha_max}"
-            w, h = img.size
-            ratio = w / h
-            # 3:4 canvas — allow wider if subject wider
-            assert 0.65 <= ratio <= 1.1, f"aspect w/h={ratio:.3f}"
-            print(f"OK PNG {w}x{h} alpha=[{alpha_min},{alpha_max}] ratio={ratio:.3f}")
-        else:
-            # Fallback JPEG (no subject detected) — allowed but log
-            print(f"Fallback JPEG (no cutout detected) size={img.size}")
+        assert img.mode == "RGBA"
+        alpha_min, alpha_max = img.getchannel("A").getextrema()
+        assert alpha_min == 0 and alpha_max > 200
+        w, h = img.size
+        assert abs(w / h - 0.75) < 0.02, f"aspect w/h={w / h:.3f}"
 
     def test_restore_gk_green_portrait(self, tid, hdr):
         path = "/app/backend/app/demo_assets/gk_green.png"

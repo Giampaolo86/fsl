@@ -1,22 +1,9 @@
 import io
 import logging
-import os
-from pathlib import Path
 
 from PIL import Image, ImageOps
 
 log = logging.getLogger("fsl.cutout")
-os.environ.setdefault("REMBG_HOME", str(Path(__file__).resolve().parents[1] / "ml"))
-_session = None
-
-
-def _get_session():
-    global _session
-    if _session is None:
-        from rembg import new_session
-
-        _session = new_session("u2netp")
-    return _session
 
 
 def _frame(img: Image.Image, max_h: int = 900) -> Image.Image:
@@ -33,22 +20,18 @@ def _frame(img: Image.Image, max_h: int = 900) -> Image.Image:
     return canvas
 
 
+def _has_transparency(img: Image.Image) -> bool:
+    lo, hi = img.getchannel("A").getextrema()
+    return lo < 40 <= hi
+
+
 def cutout(data: bytes) -> tuple[bytes, str, str]:
-    """Foto giocatore → PNG scontornato (sfondo rimosso). Fallback: ritaglio quadrato JPEG."""
+    """Foto giocatore: se già scontornata (PNG con trasparenza, dal browser) la inquadra 3:4; altrimenti ritaglio quadrato JPEG."""
     src = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGBA")
     src.thumbnail((1400, 1400))
-    try:
-        from rembg import remove
-
-        out = remove(src, session=_get_session(), post_process_mask=True)
-        if out.getchannel("A").getextrema()[1] < 40:
-            raise ValueError("nessun soggetto rilevato")
-        buf = io.BytesIO()
-        _frame(out).save(buf, "PNG", optimize=True)
+    buf = io.BytesIO()
+    if _has_transparency(src):
+        _frame(src).save(buf, "PNG", optimize=True)
         return buf.getvalue(), "image/png", "player.png"
-    except Exception as e:  # noqa: BLE001
-        log.warning("Scontorno non riuscito, uso ritaglio quadrato: %s", e)
-        img = ImageOps.fit(src.convert("RGB"), (512, 512), method=Image.LANCZOS)
-        buf = io.BytesIO()
-        img.save(buf, "JPEG", quality=88)
-        return buf.getvalue(), "image/jpeg", "player.jpg"
+    ImageOps.fit(src.convert("RGB"), (512, 512), method=Image.LANCZOS).save(buf, "JPEG", quality=88)
+    return buf.getvalue(), "image/jpeg", "player.jpg"
