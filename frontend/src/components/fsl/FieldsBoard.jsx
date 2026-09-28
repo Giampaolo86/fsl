@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Grid3X3 } from "lucide-react";
 import { SectionTitle } from "@/components/fsl/Primitives";
 import { api } from "@/lib/api";
-import { fmtDate } from "@/lib/format";
+import { teamLabel, fmtDate } from "@/lib/format";
 
 const TONE = { in_progress: "bg-fsl-success animate-pulse", official: "bg-fsl-gold", rectified: "bg-fsl-gold", report_submitted: "bg-fsl-blue-light", cancelled: "bg-fsl-danger", postponed: "bg-fsl-warning" };
 const LABEL = { scheduled: "Programmata", confirmed: "Confermata", in_progress: "In corso", report_submitted: "Referto inviato", official: "Ufficiale", rectified: "Rettificata", cancelled: "Annullata", postponed: "Rinviata" };
@@ -23,6 +23,7 @@ export function FieldsBoard({ tournamentId, fields, slots }) {
   const byField = (f) => (state?.matches || []).filter((m) => (m.field_name || "") === f);
   const isToday = state?.day === new Date().toISOString().slice(0, 10);
   const names = Array.from(new Set([...fields, ...(state?.matches || []).map((m) => m.field_name).filter(Boolean)]));
+  const mixed = new Set((state?.matches || []).map((m) => m.category).filter(Boolean)).size > 1;
   return (
     <section>
       <SectionTitle right={<span className="text-xs text-fsl-slate" data-testid="fields-board-day">{state?.day ? `${isToday ? "Oggi" : "Prossima giornata"} · ${fmtDate(state.day)} · ${state.matches.length} gare` : "Nessuna gara nei prossimi 14 giorni"}</span>}>Campi in parallelo</SectionTitle>
@@ -38,13 +39,13 @@ export function FieldsBoard({ tournamentId, fields, slots }) {
                   return (
                     <li key={slot} className="min-h-12 px-4 py-2 flex items-center gap-3 text-sm">
                       <span className="num font-semibold text-fsl-white w-12 shrink-0">{slot}</span>
-                      {m ? <Link to={`/admin/t/${tournamentId}/partite/${m.id}`} className="flex-1 min-w-0 flex items-center gap-2 hover:text-fsl-gold" data-testid={`fields-board-match-${m.id}`}><span className={`h-2 w-2 rounded-full shrink-0 ${TONE[m.status] || "bg-fsl-slate"}`} /><span className="min-w-0 flex-1 leading-tight text-xs sm:text-sm line-clamp-2" title={`${m.home?.name} – ${m.away?.name}`}>{m.home?.name} <span className="text-fsl-slate">–</span> {m.away?.name}</span><span className="ml-auto text-[9px] sm:text-[10px] uppercase text-fsl-slate shrink-0 hidden sm:inline">{LABEL[m.status] || m.status}</span></Link>
+                      {m ? <Link to={`/admin/t/${tournamentId}/partite/${m.id}`} className="flex-1 min-w-0 flex items-center gap-2 hover:text-fsl-gold" data-testid={`fields-board-match-${m.id}`}><span className={`h-2 w-2 rounded-full shrink-0 ${TONE[m.status] || "bg-fsl-slate"}`} /><span className="min-w-0 flex-1 truncate text-xs sm:text-sm" title={`${m.home?.name} – ${m.away?.name}`}>{teamLabel(m.home)} <span className="text-fsl-slate">–</span> {teamLabel(m.away)}</span>{mixed && m.category && <span className="shrink-0 h-5 px-1.5 rounded border border-white/15 text-[10px] num text-fsl-slate">{m.category}</span>}<span className="ml-auto text-[9px] sm:text-[10px] uppercase text-fsl-slate shrink-0 hidden sm:inline">{LABEL[m.status] || m.status}</span></Link>
                         : <span className="inline-flex items-center gap-1.5 text-xs text-fsl-slate"><span className="h-2 w-2 rounded-full bg-fsl-slate/50" aria-hidden="true" /> Slot libero</span>}
                     </li>
                   );
                 })}
                 {ms.filter((x) => !slots.includes(hhmm(x.kickoff_at))).map((m) => (
-                  <li key={m.id} className="min-h-12 px-4 py-2 flex items-center gap-3 text-sm"><span className="num font-semibold text-fsl-white w-12 shrink-0">{hhmm(m.kickoff_at)}</span><Link to={`/admin/t/${tournamentId}/partite/${m.id}`} className="flex-1 min-w-0 flex items-center gap-2 hover:text-fsl-gold"><span className={`h-2 w-2 rounded-full shrink-0 ${TONE[m.status] || "bg-fsl-slate"}`} /><span className="min-w-0 flex-1 leading-tight text-xs sm:text-sm line-clamp-2" title={`${m.home?.name} – ${m.away?.name}`}>{m.home?.name} <span className="text-fsl-slate">–</span> {m.away?.name}</span><span className="ml-auto text-[9px] sm:text-[10px] uppercase text-fsl-slate shrink-0 hidden sm:inline">{LABEL[m.status] || m.status}</span></Link></li>
+                  <li key={m.id} className="min-h-12 px-4 py-2 flex items-center gap-3 text-sm"><span className="num font-semibold text-fsl-white w-12 shrink-0">{hhmm(m.kickoff_at)}</span><Link to={`/admin/t/${tournamentId}/partite/${m.id}`} className="flex-1 min-w-0 flex items-center gap-2 hover:text-fsl-gold"><span className={`h-2 w-2 rounded-full shrink-0 ${TONE[m.status] || "bg-fsl-slate"}`} /><span className="min-w-0 flex-1 truncate text-xs sm:text-sm" title={`${m.home?.name} – ${m.away?.name}`}>{teamLabel(m.home)} <span className="text-fsl-slate">–</span> {teamLabel(m.away)}</span>{mixed && m.category && <span className="shrink-0 h-5 px-1.5 rounded border border-white/15 text-[10px] num text-fsl-slate">{m.category}</span>}<span className="ml-auto text-[9px] sm:text-[10px] uppercase text-fsl-slate shrink-0 hidden sm:inline">{LABEL[m.status] || m.status}</span></Link></li>
                 ))}
               </ul>
             </div>

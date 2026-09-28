@@ -9,7 +9,7 @@ import { FanShop } from "@/components/fsl/ShopStrip";
 import { LoadingState } from "@/components/fsl/States";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, teamLabel } from "@/lib/format";
 import { mediaUrl } from "@/lib/upload";
 
 function NextMatch({ m, label = "Prossima partita" }) {
@@ -18,7 +18,7 @@ function NextMatch({ m, label = "Prossima partita" }) {
   return (
     <Link to={`/tornei/${m.tournament_slug}/partite/${m.id}`} className="block rounded-lg border border-white/10 bg-navy-900/60 p-3 hover:border-fsl-gold/60 transition-colors" data-testid={`shortcut-match-${m.id}`}>
       <div className="text-[10px] uppercase tracking-wider text-fsl-gold">{label} · {m.round_name}</div>
-      <div className="mt-1 flex items-center gap-2 text-sm font-semibold"><ClubCrest club={m.home} size={22} /><span className="truncate">{m.home.name}</span><span className="num font-display text-lg px-1">{played ? `${m.score.home}-${m.score.away}` : "vs"}</span><span className="truncate">{m.away.name}</span><ClubCrest club={m.away} size={22} /></div>
+      <div className="mt-1 flex items-center gap-2 text-sm font-semibold"><ClubCrest club={m.home} size={22} /><span className="truncate">{teamLabel(m.home)}</span><span className="num font-display text-lg px-1">{played ? `${m.score.home}-${m.score.away}` : "vs"}</span><span className="truncate">{teamLabel(m.away)}</span><ClubCrest club={m.away} size={22} /></div>
       <div className="mt-1 text-xs text-fsl-slate num">{fmtDate(m.kickoff_at, { time: true })}{m.field_name ? ` · ${m.field_name}` : ""}</div>
     </Link>
   );

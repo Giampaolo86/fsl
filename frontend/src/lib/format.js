@@ -55,3 +55,6 @@ export const TIEBREAK_LABELS = {
   fair_play: "Fair play",
   draw_lot: "Sorteggio amministrativo",
 };
+
+// Nome squadra senza l'anno di categoria ridondante: preferisce il nome società, altrimenti toglie " 2014" in coda.
+export const teamLabel = (side) => (side?.club?.name || (side?.name || "").replace(/\s+(19|20)\d{2}$/, "")).trim();
