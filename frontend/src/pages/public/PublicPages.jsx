@@ -64,7 +64,7 @@ export function PublicClubPage() {
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="fsl-card p-5">
             <SectionTitle>Sede della società</SectionTitle>
-            {venue ? <p className="text-sm">{venue.name}<br /><span className="text-fsl-slate">{venue.address}, {venue.city}</span></p> : <p className="text-sm text-fsl-slate">Sede non ancora pubblicata dalla società.</p>}
+            {venue ? <p className="text-sm">{venue.name}<br /><span className="text-fsl-slate">{venue.address}, {venue.city}</span>{venue.maps_url && <><br /><a href={venue.maps_url} target="_blank" rel="noreferrer" className="text-fsl-gold hover:underline text-xs" data-testid="public-venue-maps">Apri in Google Maps ↗</a></>}</p> : <p className="text-sm text-fsl-slate">Sede non ancora pubblicata dalla società.</p>}
           </div>
           <div className="fsl-card p-5">
             <SectionTitle>Contatti</SectionTitle>

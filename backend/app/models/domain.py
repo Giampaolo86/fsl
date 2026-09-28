@@ -235,6 +235,7 @@ class Venue(BaseDocument):
     services: list[str] = []
     accessibility: str = ""
     notes: str = ""
+    maps_url: str = ""
 
 
 class Field_(BaseDocument):

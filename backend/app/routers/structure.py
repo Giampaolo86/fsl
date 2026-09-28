@@ -1,10 +1,11 @@
 from typing import Optional
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from ..core.deps import WRITE_ROLES, CurrentUser, get_current_user, require_tournament
-from ..core.errors import conflict, not_found
+from ..core.errors import bad_request, conflict, not_found
 from ..models.domain import Club, Field_, Team, Venue
 from ..repositories.registry import scoped
 from ..services import audit
@@ -35,6 +36,17 @@ class VenueIn(BaseModel):
     address: str = ""
     city: str = ""
     services: list[str] = []
+    maps_url: str = ""
+    notes: str = ""
+
+
+class VenuePatch(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    services: Optional[list[str]] = None
+    maps_url: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class FieldIn(BaseModel):
@@ -42,6 +54,15 @@ class FieldIn(BaseModel):
     venue_id: Optional[str] = None
     size: int = 8
     surface: str = "sintetico"
+
+
+class FieldPatch(BaseModel):
+    name: Optional[str] = None
+    venue_id: Optional[str] = None
+    size: Optional[int] = None
+    surface: Optional[str] = None
+    active: Optional[bool] = None
+    code: Optional[str] = None
 
 
 @router.get("/competitions")
@@ -135,7 +156,7 @@ async def venues(tournament_id: str, user: CurrentUser = Depends(get_current_use
     await require_tournament(tournament_id, user)
     vs = await scoped("venues", tournament_id).list(sort=[("name", 1)])
     fs = await scoped("fields", tournament_id).list(sort=[("code", 1)])
-    return {"venues": [v.public() for v in vs], "fields": [f.public() for f in fs]}
+    return {"venues": [_maps(v.public()) for v in vs], "fields": [f.public() for f in fs]}
 
 
 @router.post("/venues", status_code=201)
@@ -154,3 +175,74 @@ async def create_field(tournament_id: str, body: FieldIn, user: CurrentUser = De
     f = await repo.insert(Field_(tournament_id=tournament_id, code=f"C{n}", **body.model_dump()), user.id)
     await audit.record(user, "field.create", "field", f.id, tournament_id, after={"name": f.name})
     return f.public()
+
+
+def _maps(v: dict) -> dict:
+    if not v.get("maps_url"):
+        q = ", ".join(x for x in [v.get("address"), v.get("city")] if x)
+        v["maps_url"] = f"https://www.google.com/maps/search/?api=1&query={quote_plus(q)}" if q else ""
+    return v
+
+
+@router.patch("/venues/{venue_id}")
+async def update_venue(tournament_id: str, venue_id: str, body: VenuePatch, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles=WRITE_ROLES, writable=True)
+    repo = scoped("venues", tournament_id)
+    v = await repo.get(venue_id)
+    if not v:
+        raise not_found("Sede")
+    patch = body.model_dump(exclude_none=True)
+    if patch.get("maps_url") and not patch["maps_url"].startswith(("http://", "https://")):
+        raise bad_request("Il link Google Maps deve iniziare con https://")
+    v2 = await repo.update(v.id, patch, user.id)
+    await audit.record(user, "venue.update", "venue", v.id, tournament_id, before={"name": v.name}, after=patch)
+    return v2.public()
+
+
+@router.delete("/venues/{venue_id}")
+async def delete_venue(tournament_id: str, venue_id: str, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles=WRITE_ROLES, writable=True)
+    repo = scoped("venues", tournament_id)
+    v = await repo.get(venue_id)
+    if not v:
+        raise not_found("Sede")
+    n = await scoped("fields", tournament_id).count({"venue_id": v.id})
+    if n:
+        raise conflict(f"La sede ha {n} campi: spostali o eliminali prima")
+    await repo.col.delete_one({"_id": __import__("bson").ObjectId(v.id)})
+    await audit.record(user, "venue.delete", "venue", v.id, tournament_id, before={"name": v.name})
+    return {"ok": True}
+
+
+@router.patch("/fields/{field_id}")
+async def update_field(tournament_id: str, field_id: str, body: FieldPatch, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles=WRITE_ROLES, writable=True)
+    repo = scoped("fields", tournament_id)
+    f = await repo.get(field_id)
+    if not f:
+        raise not_found("Campo")
+    patch = body.model_dump(exclude_none=True)
+    if "code" in patch:
+        patch["code"] = patch["code"].strip().upper()[:6]
+        if await repo.find_one({"code": patch["code"], "_id": {"$ne": __import__("bson").ObjectId(f.id)}}):
+            raise conflict("Codice campo già usato")
+    if patch.get("venue_id") == "":
+        patch["venue_id"] = None
+    f2 = await repo.update(f.id, patch, user.id)
+    await audit.record(user, "field.update", "field", f.id, tournament_id, before={"name": f.name}, after=patch)
+    return f2.public()
+
+
+@router.delete("/fields/{field_id}")
+async def delete_field(tournament_id: str, field_id: str, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles=WRITE_ROLES, writable=True)
+    repo = scoped("fields", tournament_id)
+    f = await repo.get(field_id)
+    if not f:
+        raise not_found("Campo")
+    n = await scoped("matches", tournament_id).count({"field_id": f.id, "status": {"$in": ["scheduled", "confirmed", "live"]}})
+    if n:
+        raise conflict(f"Il campo è assegnato a {n} partite in programma: spostale prima oppure disattivalo")
+    await repo.col.delete_one({"_id": __import__("bson").ObjectId(f.id)})
+    await audit.record(user, "field.delete", "field", f.id, tournament_id, before={"name": f.name, "code": f.code})
+    return {"ok": True}

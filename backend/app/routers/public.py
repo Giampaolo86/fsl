@@ -24,6 +24,18 @@ def _default_images(slug: str) -> tuple[str, list[str]]:
     return cover, gallery
 
 
+def _venue_pub(venue):
+    if not venue:
+        return None
+    from urllib.parse import quote_plus
+
+    d = venue.public()
+    if not d.get("maps_url"):
+        q = ", ".join(x for x in [venue.address, venue.city] if x)
+        d["maps_url"] = f"https://www.google.com/maps/search/?api=1&query={quote_plus(q)}" if q else ""
+    return d
+
+
 def _public_club(c) -> dict:
     d = c.public()
     d["contacts"] = [ct for ct in d.get("contacts", []) if ct.get("is_public")]
@@ -313,7 +325,7 @@ async def club_page(slug: str, club_slug: str):
         row = next((r for r in rows if r["team_id"] == tm.id), None)
         if row:
             standings.append({"team_id": tm.id, "team": tm.name, "competition": c.name, "category": c.category, "pos": pos, "total": len(rows), "PT": row.get("PT", 0), "PG": row.get("PG", 0), "V": row.get("V", 0), "N": row.get("N", 0), "P": row.get("P", 0), "GF": row.get("GF", 0), "GS": row.get("GS", 0)})
-    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": venue.public() if venue else None, "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "standings": standings, "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others, "history": history}
+    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": _venue_pub(venue), "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "standings": standings, "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others, "history": history}
 
 
 @router.get("/tournaments/{slug}/top11")
