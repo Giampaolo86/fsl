@@ -55,16 +55,17 @@ for r in (auth.router, tournaments.router, structure.router, matches.router, ext
 app.include_router(api)
 
 _origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip() and o.strip() != "*"]
-_origin_regex = os.environ.get("CORS_ORIGIN_REGEX") or (None if _origins else r"^https://[a-z0-9-]+\.(preview\.)?emergentagent\.com$|^https?://localhost(:\d+)?$")
+# Senza elenco esplicito (o con "*"): accetta qualsiasi origine https (dominio personalizzato, *.emergent.host, anteprima) e localhost.
+_origin_regex = os.environ.get("CORS_ORIGIN_REGEX") or (None if _origins else r"^https://[A-Za-z0-9.-]+(:\d+)?$|^https?://localhost(:\d+)?$")
 if not _origins and not os.environ.get("CORS_ORIGIN_REGEX"):
-    logger.warning("CORS_ORIGINS non impostato: uso il pattern predefinito per gli host Emergent/localhost")
+    logger.warning("CORS_ORIGINS non impostato: accetto tutte le origini https (imposta CORS_ORIGINS in produzione per restringere)")
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
     allow_origins=_origins,
     allow_origin_regex=_origin_regex,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "X-Requested-With"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "X-Requested-With", "X-Client"],
 )
 
 
