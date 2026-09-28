@@ -6,6 +6,7 @@ import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { KIND_LABEL } from "@/components/fsl/Article";
 import { fmtPrice } from "@/components/fsl/Shop";
 import { api, apiError } from "@/lib/api";
+import { useCart } from "@/context/CartContext";
 import { fmtDate } from "@/lib/format";
 import { mediaUrl } from "@/lib/upload";
 
@@ -100,7 +101,8 @@ export function InterviewsBlock({ slug, items }) {
 
 export function ShopShowcase({ slug, items }) {
   const [busy, setBusy] = useState(null);
-  const buy = async (it) => { setBusy(it.id); try { const r = await api.post("/payments/checkout", { item_id: it.id, origin_url: window.location.origin }); window.location.href = r.data.checkout_url; } catch (e) { toast.error(apiError(e)); setBusy(null); } };
+  const cart = useCart();
+  const buy = (it) => cart.add({ id: it.id, title: it.title, price: it.price, kind: it.kind, image_url: it.preview_url, scope: slug });
   return (
     <section className="mx-auto max-w-[1488px] px-6 mt-20" data-testid="home-shop">
       <HomeHeading icon={Camera} kicker="Ricordi da portare a casa" title="Foto e video delle gare" right={<div className="text-right"><div className="font-display font-bold uppercase tracking-wider text-fsl-gold text-lg">Video 0,99 € · Foto 0,49 €</div><div className="text-xs text-fsl-slate">Originali in alta qualità, pagamento sicuro Stripe</div></div>} />
@@ -121,7 +123,7 @@ export function ShopShowcase({ slug, items }) {
               </Link>
               <div className="p-3 flex flex-col gap-2 flex-1">
                 <div className="min-w-0"><div className="font-semibold truncate text-sm">{it.title}</div><div className="text-xs text-fsl-slate truncate">{it.match_label}{it.kickoff_at ? ` · ${fmtDate(it.kickoff_at)}` : ""}</div></div>
-                <button className="btn-gold h-10 w-full mt-auto" disabled={busy === it.id} onClick={() => buy(it)} data-testid={`home-shop-buy-${it.id}`}>{busy === it.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBag className="h-4 w-4" />} {fmtPrice(it.price)}</button>
+                <button className="btn-gold h-10 w-full mt-auto" disabled={busy === it.id} onClick={() => buy(it)} data-testid={`home-shop-buy-${it.id}`}>{busy === it.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBag className="h-4 w-4" />} Aggiungi · {fmtPrice(it.price)}</button>
               </div>
             </div>
           ))}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ShopStrip } from "@/components/fsl/ShopStrip";
+import { useCart } from "@/context/CartContext";
 import { Award, BarChart3, Bus, CalendarDays, Camera, Clock, Globe, Image as ImageIcon, Instagram, Mail, MapPin, Medal, MessageCircle, Newspaper, Phone, Shield, ShieldCheck, Sparkles, Star, Target, Trophy, Users, Zap } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
@@ -46,6 +47,7 @@ function MatchesTable({ recent, upcoming, teamIds, slug }) {
 
 export default function PublicClubHome() {
   const { slug, clubSlug } = useParams();
+  const cart = useCart();
   const [d, setD] = useState(null);
   const [error, setError] = useState(null);
   const [openPlayer, setOpenPlayer] = useState(null);
@@ -56,7 +58,7 @@ export default function PublicClubHome() {
   if (!d) return <LoadingState full />;
   const c = d.club, p = c.profile || {}, secondary = c.colors?.secondary || "#F4AE2B";
   const contacts = [["phone", Phone, p.phone, `tel:${p.phone}`], ["whatsapp", MessageCircle, p.whatsapp, `https://wa.me/${(p.whatsapp || "").replace(/\D/g, "")}`], ["email", Mail, p.email, `mailto:${p.email}`], ["website", Globe, p.website, p.website], ["instagram", Instagram, p.instagram, `https://instagram.com/${(p.instagram || "").replace("@", "")}`]].filter((x) => x[2]);
-  const buy = async (it) => { try { const r = await api.post("/payments/checkout", { item_id: it.id, origin_url: window.location.origin }); window.location.href = r.data.checkout_url; } catch (e) { toast.error(apiError(e)); } };
+  const buy = (it) => cart.add({ id: it.id, title: it.title, price: it.price, kind: it.kind, image_url: it.preview_url, scope: slug });
   const teamIds = new Set(d.teams.map((t) => t.id));
   const st = d.standings || [], main = st[0];
   const sum = (k) => st.reduce((a, x) => a + (x[k] || 0), 0);

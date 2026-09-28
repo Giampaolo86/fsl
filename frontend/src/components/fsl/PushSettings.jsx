@@ -35,7 +35,7 @@ export function PushSettings({ compact = false }) {
   const disable = async () => { setBusy("unsub"); try { await unsubscribePush(); toast.success("Notifiche disattivate su questo dispositivo"); load(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(""); } };
   const test = async () => { setBusy("test"); try { await api.post("/push/test"); toast.success("Notifica di prova inviata: controlla il telefono"); } catch (e) { toast.error(apiError(e)); } finally { setBusy(""); } };
   const forget = async (id) => { try { await api.delete(`/push/devices/${id}`); load(); } catch (e) { toast.error(apiError(e)); } };
-  const buy = async (t) => { setBusy(`buy-${t.slug}`); try { await buyProduct(t.slug, "push_pass", "me"); } catch (e) { toast.error(apiError(e)); setBusy(""); } };
+  const buy = async (t) => { setBusy(`buy-${t.slug}`); try { await buyProduct(t.slug, "push_pass", "me", t.name); } catch (e) { toast.error(apiError(e)); } finally { setBusy(""); } };
   return (
     <div className={compact ? "fsl-card p-5" : "fsl-card-gold p-5"} data-testid="push-settings">
       <div className="flex items-start gap-3">

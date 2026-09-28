@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Camera, Image as ImageIcon, Loader2, Lock, ShoppingBag, Upload, Video } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
+import { useCart } from "@/context/CartContext";
 import { fmtDate } from "@/lib/format";
 import { mediaUrl, uploadMedia } from "@/lib/upload";
 
@@ -17,7 +18,7 @@ export function ShopItemCard({ it, onBuy, busy }) {
       </div>
       <div className="p-3 flex items-center gap-3">
         <div className="flex-1 min-w-0"><div className="font-semibold truncate">{it.title}</div><div className="text-xs text-fsl-slate">Originale in alta qualità dopo l'acquisto</div></div>
-        <button className="btn-gold h-10 shrink-0" disabled={busy} onClick={() => onBuy(it)} data-testid={`shop-buy-${it.id}`}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBag className="h-4 w-4" />} {fmtPrice(it.price)}</button>
+        <button className="btn-gold h-10 shrink-0" disabled={busy} onClick={() => onBuy(it)} data-testid={`shop-buy-${it.id}`}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBag className="h-4 w-4" />} Aggiungi · {fmtPrice(it.price)}</button>
       </div>
     </div>
   );
@@ -27,7 +28,8 @@ export function PublicShop({ slug, matchId }) {
   const [items, setItems] = useState(null);
   const [busy, setBusy] = useState(null);
   useEffect(() => { api.get(`/public/tournaments/${slug}/matches/${matchId}/shop`).then((r) => setItems(r.data)).catch(() => setItems([])); }, [slug, matchId]);
-  const buy = async (it) => { setBusy(it.id); try { const r = await api.post("/payments/checkout", { item_id: it.id, origin_url: window.location.origin }); window.location.href = r.data.checkout_url; } catch (e) { toast.error(apiError(e)); setBusy(null); } };
+  const cart = useCart();
+  const buy = (it) => cart.add({ id: it.id, title: it.title, price: it.price, kind: it.kind, image_url: it.preview_url, scope: slug });
   if (!items?.length) return null;
   return (
     <section className="mt-8" data-testid="match-center-shop">

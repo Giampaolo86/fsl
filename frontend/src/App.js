@@ -2,6 +2,8 @@ import "@/App.css";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { CartProvider } from "@/context/CartContext";
+import { CartDrawer } from "@/components/fsl/CartDrawer";
 import { TournamentProvider } from "@/context/TournamentContext";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import AdminShell from "@/components/layout/AdminShell";
@@ -87,8 +89,11 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <TournamentProvider>
+            <CartProvider>
             <Toaster theme="dark" position="top-right" toastOptions={{ className: "bg-navy-800 border border-white/20 text-fsl-white" }} />
             <AppRoutes />
+            <CartDrawer />
+            </CartProvider>
           </TournamentProvider>
         </AuthProvider>
       </BrowserRouter>

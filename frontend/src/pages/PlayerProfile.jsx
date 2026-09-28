@@ -17,6 +17,7 @@ import { mediaUrl } from "@/lib/upload";
 import { cutoutPhoto } from "@/lib/cutout";
 import { useCutoutEditor } from "@/components/fsl/CutoutEditor";
 import { ShopStrip } from "@/components/fsl/ShopStrip";
+import { useCart } from "@/context/CartContext";
 import { toast } from "sonner";
 
 export const profileLink = (pathname, pid) => {
@@ -41,10 +42,11 @@ export default function PlayerProfile({ mode = "public" }) {
   const [uploading, setUploading] = useState(false);
   const [buyingAlbum, setBuyingAlbum] = useState(false);
   const [idPreview, setIdPreview] = useState(null);
+  const cart = useCart();
   const [buyingCard, setBuyingCard] = useState(false);
   const [refine, cutoutEditor] = useCutoutEditor();
-  const buyCard = async (kind) => { setBuyingCard(true); try { await buyProduct(slug || card?.tournament?.slug || "", kind, playerId); } catch (e) { toast.error(apiError(e)); setBuyingCard(false); } };
-  const buyAlbum = async () => { setBuyingAlbum(true); try { await buyProduct(slug || card?.tournament?.slug || "", "album", playerId); } catch (e) { toast.error(apiError(e)); setBuyingAlbum(false); } };
+  const buyCard = async (kind) => { setBuyingCard(true); try { await buyProduct(slug || card?.tournament?.slug || "", kind, playerId, `${card?.first_name || ""} ${card?.last_name || ""}`.trim()); } catch (e) { toast.error(apiError(e)); } finally { setBuyingCard(false); } };
+  const buyAlbum = async () => { setBuyingAlbum(true); try { await buyProduct(slug || card?.tournament?.slug || "", "album", playerId, `${card?.first_name || ""} ${card?.last_name || ""}`.trim()); } catch (e) { toast.error(apiError(e)); } finally { setBuyingAlbum(false); } };
   const uploadPhoto = async (file) => {
     if (!file) return; setUploading(true);
     const fd = new FormData(); const cut = await cutoutPhoto(file, (k, pct) => k === "download" && toast.message(`Scarico il modello AI per lo scontorno… ${pct}%`, { id: "cutout-dl", duration: 1500 }));
@@ -76,7 +78,7 @@ export default function PlayerProfile({ mode = "public" }) {
   const backTo = mode === "admin" ? `/admin/t/${tid}/rose` : mode === "club" ? "/societa/rose" : `/tornei/${slug}`;
   const matchTo = (mid) => (mode === "admin" ? `/admin/t/${tid}/partite/${mid}` : mode === "club" ? `/societa/partite/${mid}` : `/tornei/${slug}/partite/${mid}`);
   const newsTo = (po) => (mode === "public" ? `/tornei/${slug}/news/${po.slug}` : undefined);
-  const buy = async (it) => { try { const r = await api.post("/payments/checkout", { item_id: it.id, origin_url: window.location.origin }); window.location.href = r.data.checkout_url; } catch (e) { toast.error(apiError(e)); } };
+  const buy = (it) => cart.add({ id: it.id, title: it.title, price: it.price, kind: it.kind, image_url: it.preview_url, scope: slug || card?.tournament?.slug });
   const [first, ...rest] = card.name.split(" "); const last = rest.join(" ");
   const tags = p.tagline ? p.tagline.split(/\s*[·,|]\s*/).filter(Boolean) : autoTags(card);
   const strengths = p.strengths?.length ? p.strengths : [];

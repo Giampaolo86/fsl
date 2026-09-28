@@ -7,14 +7,15 @@ import { PlayerIdProduct } from "@/components/fsl/PlayerIdCard";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
 import { TeamCard } from "@/components/fsl/TeamCard";
 import { api, apiError } from "@/lib/api";
+import { cartRef } from "@/context/CartContext";
 import { fmtVote } from "@/lib/fanta";
 import { fmtDate } from "@/lib/format";
 import { mediaUrl } from "@/lib/upload";
 
-export async function buyProduct(slug, kind, refId) {
+// Crea (o recupera) il prodotto e lo mette nel carrello: il pagamento parte dal carrello, con conferma esplicita.
+export async function buyProduct(slug, kind, refId, meta) {
   const it = (await api.post(`/public/tournaments/${slug}/products`, { kind, ref_id: refId })).data;
-  const r = await api.post("/payments/checkout", { item_id: it.id, origin_url: window.location.origin });
-  window.location.href = r.data.checkout_url;
+  cartRef.current?.add({ id: it.id, title: it.title, price: it.price, kind: it.kind, scope: slug, meta });
 }
 
 function Album({ d, slug }) {
