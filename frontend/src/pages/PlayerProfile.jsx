@@ -16,6 +16,7 @@ import { fmtDate } from "@/lib/format";
 import { mediaUrl } from "@/lib/upload";
 import { cutoutPhoto } from "@/lib/cutout";
 import { useCutoutEditor } from "@/components/fsl/CutoutEditor";
+import { ShopStrip } from "@/components/fsl/ShopStrip";
 import { toast } from "sonner";
 
 export const profileLink = (pathname, pid) => {
@@ -193,11 +194,12 @@ export default function PlayerProfile({ mode = "public" }) {
           <section className="space-y-6" data-testid="player-products">
             <SectionHead icon={BookOpen} title="Ricordi e prodotti FSL" />
             {idPreview && <PlayerIdOffer preview={idPreview} onBuy={buyCard} busy={buyingCard} />}
+            {tSlug && <ShopStrip slug={tSlug} placement="player" clubId={card.club?.id} title="Negozio FSL" />}
             <div className="grid lg:grid-cols-2 gap-6">
               {tSlug && <Link to={`/tornei/${tSlug}/giocatori/${playerId}/capsule`} className="rounded-2xl border border-fsl-gold/40 bg-navy-800/80 p-5 flex items-center gap-4 hover:border-fsl-gold transition-colors" data-testid="player-capsule-link"><span className="h-14 w-14 rounded-2xl bg-fsl-gold/15 border border-fsl-gold/50 inline-flex items-center justify-center font-display font-extrabold text-fsl-gold text-lg">TC</span><div className="flex-1"><div className="font-display font-extrabold uppercase text-xl leading-none">FSL Time Capsule</div><div className="text-xs text-fsl-slate mt-1">L'album digitale della stagione: numeri, partite, momenti Top 11, badge e foto</div></div><span className="text-fsl-gold text-sm font-bold">Apri →</span></Link>}
               <div className="relative overflow-hidden rounded-2xl border border-fsl-gold/40 bg-navy-800/80 p-5 flex items-center gap-4" data-testid="album-offer">
                 <div className="flex-1"><div className="fsl-kicker flex items-center gap-2"><BookOpen className="h-4 w-4 text-fsl-gold" /> Album stagione</div><div className="mt-1 font-display font-extrabold uppercase text-xl leading-none">Tutta la stagione di {first} in un album</div><p className="mt-1 text-xs text-fsl-slate">Cartolina, badge, interviste, foto e ogni partita: si aggiorna fino all'ultima giornata, stampabile in PDF.</p></div>
-                <div className="flex flex-col items-stretch gap-1 min-w-[150px]"><div className="font-display font-extrabold text-3xl text-fsl-gold num text-center">2,49 €</div><button className="btn-gold h-9" disabled={buyingAlbum} onClick={buyAlbum} data-testid="album-buy">{buyingAlbum ? "Reindirizzamento…" : "Acquista"}</button></div>
+                <div className="flex flex-col items-stretch gap-1 min-w-[150px]"><div className="font-display font-extrabold text-3xl text-fsl-gold num text-center">{`${Number(card.prices?.album ?? 2.49).toFixed(2).replace(".", ",")} €`}</div><button className="btn-gold h-9" disabled={buyingAlbum} onClick={buyAlbum} data-testid="album-buy">{buyingAlbum ? "Reindirizzamento…" : "Acquista"}</button></div>
               </div>
             </div>
             <div><h3 className="fsl-label mb-3">La cartolina</h3><PlayerPostcard card={card} colors={card.club?.colors} /></div>

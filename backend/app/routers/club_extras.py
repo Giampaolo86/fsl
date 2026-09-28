@@ -23,7 +23,6 @@ public_router = APIRouter(prefix="/public/tournaments/{slug}", tags=["public"])
 STAFF = {"super_admin", "director", "secretary"}
 OPS = {"super_admin", "director"}
 DOC_KINDS = {"certificato_medico": "Certificato medico", "documento_identita": "Documento d'identità", "consenso_privacy": "Consenso privacy", "consenso_immagine": "Consenso immagine", "iscrizione": "Modulo iscrizione", "altro": "Altro"}
-PRICES = {"video": ("fsl_video_099", 99), "photo": ("fsl_photo_049", 49), "team_card": ("fsl_digital_249", 249), "album": ("fsl_digital_249", 249)}
 DIGITAL = {"team_card", "album", "player_card", "player_card_special"}
 stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
 media_repo = Repository("media_files", MediaFile)
@@ -402,14 +401,16 @@ async def _items_out(t_id: str, items: list[PaidMedia]) -> list[dict]:
 @router.post("/shop/items", status_code=201)
 async def create_item(tournament_id: str, body: PaidMediaIn, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user, roles=STAFF, writable=True)
-    if body.kind not in PRICES or body.kind in DIGITAL:
+    if body.kind not in ("video", "photo"):
         raise bad_request("Tipo non valido")
     m = await scoped("matches", tournament_id).get(body.match_id)
     media = await scoped("media", tournament_id).get(body.media_id)
     if not m or not media:
         raise not_found("Partita o file")
     preview_id = await _make_preview(tournament_id, body.kind, media, user.id)
-    lookup, cents = PRICES[body.kind]
+    from ..services import pricing
+
+    lookup, cents = "fsl_dyn", await pricing.price_cents(tournament_id, body.kind)
     teams = {tm.id: tm.club_id for tm in await scoped("teams", tournament_id).list({"_id": {"$in": [__import__("bson").ObjectId(m.home_team_id), __import__("bson").ObjectId(m.away_team_id)]}})}
     it = await scoped("paid_media", tournament_id).insert(PaidMedia(tournament_id=tournament_id, match_id=m.id, kind=body.kind, title=body.title.strip() or media.original_filename, media_id=media.id, preview_media_id=preview_id, lookup_key=lookup, price_cents=cents, club_ids=list(set(teams.values())), player_ids=body.player_ids[:30]), user.id)
     await audit.record(user, "shop.item_create", "paid_media", it.id, tournament_id, after={"kind": it.kind, "title": it.title, "price": cents})
@@ -491,16 +492,17 @@ async def checkout(body: CheckoutIn, request: Request):
     it = await _find_item(body.item_id)
     if not it or not it.active:
         raise not_found("Contenuto")
-    if it.lookup_key.startswith("fsl_dyn"):
-        unit_amount, currency = it.price_cents, it.currency or "eur"
-        line = {"price_data": {"currency": currency, "unit_amount": unit_amount, "product_data": {"name": it.title, "tax_code": "txcd_10302000"}}, "quantity": 1}
-    else:
-        prices = stripe.Price.list(lookup_keys=[it.lookup_key], active=True, limit=1).data
-        if not prices:
-            raise conflict("Prezzo non configurato")
-        price = prices[0]
-        unit_amount, currency = price.unit_amount or 0, price.currency
-        line = {"price": price.id, "quantity": 1}
+    if it.stock is not None and it.sold >= it.stock:
+        raise conflict("Prodotto esaurito")
+    from ..services import pricing
+
+    unit_amount = await pricing.price_cents(it.tournament_id, it.kind) if it.kind in pricing.PRICE_KEYS else it.price_cents
+    if unit_amount <= 0:
+        raise conflict("Prezzo non configurato")
+    if unit_amount != it.price_cents:
+        await Repository("paid_media", PaidMedia).col.update_one({"_id": __import__("bson").ObjectId(it.id)}, {"$set": {"price_cents": unit_amount}})
+    currency = it.currency or "eur"
+    line = {"price_data": {"currency": currency, "unit_amount": unit_amount, "product_data": {"name": it.title, "tax_code": pricing.TAX_CODE}}, "quantity": 1}
     kwargs = dict(line_items=[line], mode="payment", success_url=f"{body.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}", cancel_url=f"{body.origin_url}/payment/cancel", metadata={"item_id": it.id, "tournament_id": it.tournament_id, "lookup_key": it.lookup_key})
     try:
         session = stripe.checkout.Session.create(**kwargs, managed_payments={"enabled": True})
@@ -524,6 +526,10 @@ async def _mark_paid(p: Purchase, pi=None, email=None):
             from ..services import push
 
             await push.grant_pass(it.ref_id, it.tournament_id, p.id)
+        if it and it.kind == "custom" and it.delivery == "voucher":
+            from .shop import new_voucher
+
+            await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id)}, {"$set": {"voucher_code": new_voucher()}})
 
 
 @pay_router.get("/payments/status/{session_id}")
@@ -550,6 +556,9 @@ async def payment_status(session_id: str):
             out.pop("download_url", None)
         elif it and it.kind == "push_pass":
             out["open_url"] = "/account?push=attivo"
+            out.pop("download_url", None)
+        elif it and it.kind == "custom":
+            out["open_url"] = f"/acquisto/{p.download_token}"
             out.pop("download_url", None)
     return out
 

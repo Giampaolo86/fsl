@@ -100,7 +100,7 @@ async def seed_showcase(slug: str = "la-serie-a-dei-bambini") -> None:
             cid = await _asset(t_id, cover)
             await scoped("posts", t_id).insert(Post(tournament_id=t_id, kind=kind, title=title.format(c=club.name, cat=cat), slug=pslug, excerpt=excerpt.format(c=club.name), body=excerpt.format(c=club.name) + "\n\nContenuto dimostrativo della redazione FSL.", cover_url=f"/api/media/{cid}" if cid else None, status="published", published_at=now, author_name="Redazione FSL", club_ids=[club.id], player_ids=pids[:30], auto=True, auto_key=pslug))
         for kind, title, cover, cents in SHOP:
-            lookup = "fsl_video_099" if kind == "video" else "fsl_photo_049"
+            lookup = "fsl_dyn"
             if await db.paid_media.find_one({"tournament_id": t_id, "club_ids": club.id, "title": title, "kind": kind}):
                 continue
             cid = await _asset(t_id, cover)

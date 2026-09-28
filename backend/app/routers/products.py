@@ -11,9 +11,6 @@ from ..services import badges as badge_svc
 from ..services import engine
 
 router = APIRouter(tags=["products"])
-PRICE_CENTS = 249
-LOOKUP = "fsl_digital_249"
-DYN_LOOKUP = "fsl_dyn_card"
 FINAL = ["official", "rectified"]
 CARD_KINDS = {"player_card": ("card_price", 3.99, "Card Player ID Premium"), "player_card_special": ("card_special_price", 4.99, "Card Player ID Speciale Top 11 / MVP")}
 
@@ -60,13 +57,15 @@ async def get_or_create_product(slug: str, body: ProductIn, request: Request):
         it = await repo.find_one({"kind": "push_pass", "ref_id": user.id})
         title = f"Notifiche push · {t.name} {t.season_label or ''}".strip()
         if not it:
-            it = await repo.insert(PaidMedia(tournament_id=t.id, kind="push_pass", title=title, ref_id=user.id, lookup_key="fsl_dyn_push", price_cents=price_cents))
+            it = await repo.insert(PaidMedia(tournament_id=t.id, kind="push_pass", title=title, ref_id=user.id, lookup_key="fsl_dyn", price_cents=price_cents))
         elif it.price_cents != price_cents:
             it = await repo.update(it.id, {"price_cents": price_cents})
         return {"id": it.id, "kind": it.kind, "title": it.title, "price": it.price_cents / 100}
     if body.kind not in ("team_card", "album", *CARD_KINDS):
         raise bad_request("Prodotto non disponibile")
-    price_cents, lookup = PRICE_CENTS, LOOKUP
+    from ..services import pricing
+
+    price_cents, lookup = await pricing.price_cents(t.id, body.kind), "fsl_dyn"
     if body.kind == "team_card":
         tm = await scoped("teams", t.id).get(body.ref_id)
         if not tm:
@@ -85,13 +84,12 @@ async def get_or_create_product(slug: str, body: ProductIn, request: Request):
             title = f"Album stagione · {_pname(p)}"
         else:
             title = f"{CARD_KINDS[body.kind][2]} · {_pname(p)}"
-            price_cents, lookup = int(round((await card_prices(t.id))[body.kind] * 100)), DYN_LOOKUP
         club_ids = [p.club_id]
     repo = scoped("paid_media", t.id)
     it = await repo.find_one({"kind": body.kind, "ref_id": body.ref_id})
     if not it:
         it = await repo.insert(PaidMedia(tournament_id=t.id, kind=body.kind, title=title, ref_id=body.ref_id, lookup_key=lookup, price_cents=price_cents, club_ids=club_ids, player_ids=[body.ref_id] if body.kind != "team_card" else []))
-    elif body.kind in CARD_KINDS and it.price_cents != price_cents:
+    elif it.price_cents != price_cents:
         it = await repo.update(it.id, {"price_cents": price_cents})
     return {"id": it.id, "kind": it.kind, "title": it.title, "price": it.price_cents / 100}
 
@@ -130,7 +128,7 @@ async def team_card_payload(t, tm) -> dict:
         ok = p.profile_visibility == "public" and p.media_consent
         roster.append({"name": _pname(p) if ok else "Giocatore", "shirt_number": p.shirt_number, "role": p.role, "goals": goals.get(p.id, 0), "badges": len(bmap.get(p.id, [])), "photo_url": p.photo_url if ok else None})
     top = sorted([r for r in roster if r["goals"]], key=lambda r: -r["goals"])[:3]
-    return {"team": {"id": tm.id, "name": tm.name, "category": tm.category}, "competition": comp.name if comp else "", "club": {"name": club.name, "short_name": club.short_name, "colors": club.colors, "crest_url": club.crest_url if not club.crest_is_placeholder else None, "slug": club.slug} if club else None, "tournament": {"name": t.name, "season_label": t.season_label, "slug": t.slug}, "standing": row, "matches_played": len(matches), "roster": roster, "top_scorers": top, "badges_total": sum(len(v) for v in bmap.values())}
+    return {"team": {"id": tm.id, "name": tm.name, "category": tm.category}, "competition": comp.name if comp else "", "club": {"id": club.id, "name": club.name, "short_name": club.short_name, "colors": club.colors, "crest_url": club.crest_url if not club.crest_is_placeholder else None, "slug": club.slug} if club else None, "tournament": {"name": t.name, "season_label": t.season_label, "slug": t.slug}, "standing": row, "matches_played": len(matches), "roster": roster, "top_scorers": top, "badges_total": sum(len(v) for v in bmap.values())}
 
 
 async def album_payload(t, p, full: bool) -> dict:
@@ -189,7 +187,9 @@ async def player_card_preview(slug: str, player_id: str, request: Request):
     full = bool(user and await can_edit_player(user, t.id, p))
     d = await player_card_payload(t, p, False, full)
     d["preview"] = True
-    d["prices"] = await card_prices(t.id)
+    from ..services import pricing
+
+    d["prices"] = await pricing.all_prices(t.id)
     d["purchasable"] = full or (p.profile_visibility == "public" and p.media_consent)
     return d
 

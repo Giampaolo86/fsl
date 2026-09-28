@@ -212,13 +212,12 @@ export default function Settings() {
             <Field label="Documenti richiesti" hint="Separati da virgola"><input className="fsl-input" value={s.required_documents.join(", ")} onChange={(e) => upd("required_documents", list(e.target.value))} data-testid="settings-documents-input" /></Field>
             <Field label="Canali notifica" hint="email, sms, whatsapp"><input className="fsl-input" value={s.notification_channels.join(", ")} onChange={(e) => upd("notification_channels", list(e.target.value))} data-testid="settings-channels-input" /></Field>
           </div>
-          <div className="mt-5" data-testid="settings-card-prices">
-            <div className="fsl-kicker mb-2">Card Player ID <span className="text-fsl-slate font-sans normal-case font-normal">· prezzi delle card digitali in stile FIFA acquistabili dalla scheda giocatore</span></div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <Field label="Card Premium (€)" hint="Default 3,99 €"><input type="number" min="0" step="0.01" className="fsl-input" value={s.fees.card_price ?? 3.99} onChange={(e) => upd("fees", { ...s.fees, card_price: Number(e.target.value) })} data-testid="settings-card-price-input" /></Field>
-              <Field label="Card Speciale Top 11 / MVP (€)" hint="Default 4,99 €"><input type="number" min="0" step="0.01" className="fsl-input" value={s.fees.card_special_price ?? 4.99} onChange={(e) => upd("fees", { ...s.fees, card_special_price: Number(e.target.value) })} data-testid="settings-card-special-price-input" /></Field>
-              <Field label="Notifiche push genitori (€/stagione)" hint="Pass stagionale per ricevere sul telefono Top 11, risultati, foto e badge. Default 3,99 €"><input type="number" min="0" step="0.01" className="fsl-input" value={s.fees.push_price ?? 3.99} onChange={(e) => upd("fees", { ...s.fees, push_price: Number(e.target.value) })} data-testid="settings-push-price-input" /></Field>
-
+          <div className="mt-5" data-testid="settings-prices">
+            <div className="fsl-kicker mb-2">Prezzi <span className="text-fsl-slate font-sans normal-case font-normal">· listino unico del torneo: ogni modifica vale subito per i nuovi acquisti, Stripe riceve l'importo dall'app (IVA inclusa)</span></div>
+            <div className="grid md:grid-cols-4 gap-4">
+              {[["video_price", "Video della gara (€)", "Default 0,99 €", 0.99, "settings-video-price-input"], ["photo_price", "Foto della gara (€)", "Default 0,49 €", 0.49, "settings-photo-price-input"], ["digital_price", "Cartolina squadra / Album (€)", "Default 2,49 €", 2.49, "settings-digital-price-input"], ["card_price", "Card Premium (€)", "Default 3,99 €", 3.99, "settings-card-price-input"], ["card_special_price", "Card Speciale Top 11 / MVP (€)", "Default 4,99 €", 4.99, "settings-card-special-price-input"], ["push_price", "Notifiche push genitori (€/stagione)", "Pass stagionale: Top 11, risultati, foto e badge sul telefono. Default 3,99 €", 3.99, "settings-push-price-input"]].map(([key, label, hint, def_, tid]) => (
+                <Field key={key} label={label} hint={hint}><input type="number" min="0" step="0.01" className="fsl-input" value={s.fees[key] ?? def_} onChange={(e) => upd("fees", { ...s.fees, [key]: Number(e.target.value) })} data-testid={tid} /></Field>
+              ))}
             </div>
           </div>
           {s.categories.length > 0 && <div className="mt-5" data-testid="settings-fee-by-category">

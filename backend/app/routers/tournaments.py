@@ -166,6 +166,10 @@ async def patch(tournament_id: str, body: PatchIn, user: CurrentUser = Depends(g
         await audit.record(user, "tournament.update", "tournament", t.id, t.id, before={k: (v.model_dump() if hasattr(v, "model_dump") else v) for k, v in before.items()}, after=fields)
     if body.settings:
         await svc.update_settings(t, body.settings, user)
+        if "fees" in body.settings:
+            from ..services import pricing
+
+            await pricing.sync_items(t.id)
     return await _enrich(t)
 
 

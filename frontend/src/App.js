@@ -33,6 +33,8 @@ import ModulePlaceholder from "@/pages/admin/ModulePlaceholder";
 import BlogManager from "@/pages/admin/Blog";
 import Documents from "@/pages/club/Documents";
 import { PaymentCancel, PaymentSuccess, Sales } from "@/pages/Payments";
+import Shop from "@/pages/admin/Shop";
+import Receipt from "@/pages/Receipt";
 import Register, { AuthCallback } from "@/pages/Register";
 import { ForgotPassword, ResetPassword } from "@/pages/PasswordReset";
 import { RegisterClub, RequestAccess } from "@/pages/RegisterClub";
@@ -71,7 +73,7 @@ function AdminWeeklyHub({ children }) {
 
 function AdminMoneyHub({ children }) {
   const { tournamentId } = useParams();
-  return <TabbedSection testId="money-hub-tabs" tabs={[{ to: `/admin/t/${tournamentId}/pagamenti`, label: "Pagamenti" }, { to: `/admin/t/${tournamentId}/vendite`, label: "Vendite" }]}>{children}</TabbedSection>;
+  return <TabbedSection testId="money-hub-tabs" tabs={[{ to: `/admin/t/${tournamentId}/pagamenti`, label: "Pagamenti" }, { to: `/admin/t/${tournamentId}/vendite`, label: "Vendite" }, { to: `/admin/t/${tournamentId}/negozio`, label: "Negozio" }]}>{children}</TabbedSection>;
 }
 
 function PublicWeeklyHub({ children }) {
@@ -109,6 +111,7 @@ function AppRoutes() {
               <Route path="/richiedi-accesso" element={<RequestAccess />} />
               <Route path="/payment/success" element={<PaymentSuccess />} />
               <Route path="/payment/cancel" element={<PaymentCancel />} />
+              <Route path="/acquisto/:token" element={<Receipt />} />
               <Route path="/logout" element={<Logout />} />
 
               <Route element={<ProtectedRoute roles={ADMIN_ROLES}><AdminShell /></ProtectedRoute>}>
@@ -142,6 +145,7 @@ function AppRoutes() {
                 <Route path="media" element={<BlogManager />} />
                 <Route path="documenti" element={<Documents />} />
                 <Route path="vendite" element={<AdminMoneyHub><Sales /></AdminMoneyHub>} />
+                <Route path="negozio" element={<AdminMoneyHub><Shop /></AdminMoneyHub>} />
                 <Route path="comunicazioni" element={<ModulePlaceholder module="comunicazioni" />} />
               </Route>
 

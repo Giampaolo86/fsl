@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { ShopStrip } from "@/components/fsl/ShopStrip";
 import { Award, BarChart3, Bus, CalendarDays, Camera, Clock, Globe, Image as ImageIcon, Instagram, Mail, MapPin, Medal, MessageCircle, Newspaper, Phone, Shield, ShieldCheck, Sparkles, Star, Target, Trophy, Users, Zap } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
@@ -114,6 +115,7 @@ export default function PublicClubHome() {
           <SectionHead icon={Camera} title="Foto e video" to={d.shop.length ? `/tornei/${slug}` : undefined} linkLabel="Vedi tutti" />
           {d.shop.length ? <MediaStrip items={d.shop} onBuy={buy} /> : <p className="text-sm text-fsl-slate">Le foto professionali e i video delle gare compariranno qui.</p>}
         </section>
+        <ShopStrip slug={slug} placement="club" clubId={d.club?.id} title="Negozio FSL · prodotti per la società" />
 
         <div className="grid lg:grid-cols-[1.2fr_0.8fr_1fr] gap-6 items-start">
           <Panel icon={ShieldCheck} title="Chi siamo" testId="club-home-about">

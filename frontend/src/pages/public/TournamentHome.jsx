@@ -5,6 +5,7 @@ import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
 import { FeaturedNews, HomeHeading, InterviewsBlock, ShopShowcase } from "@/components/fsl/HomeSections";
 import { MatchCard } from "@/components/fsl/MatchCard";
+import { ShopStrip } from "@/components/fsl/ShopStrip";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { usePublicTournament } from "@/hooks/usePublicTournament";
 import { apiError } from "@/lib/api";
@@ -82,6 +83,7 @@ export default function TournamentHome() {
       <FeaturedNews slug={slug} posts={data.news || []} />
       <InterviewsBlock slug={slug} items={data.interviews || []} />
       <ShopShowcase slug={slug} items={data.shop || []} />
+      <ShopStrip slug={slug} placement="tournament_home" className="mx-auto max-w-[1488px] px-6 mt-16" />
 
       <section className="mx-auto max-w-[1488px] px-6 mt-20" data-testid="home-dashboard">
         <HomeHeading icon={BarChart3} kicker="Solo risultati ufficiali" title="Risultati, classifica e marcatori" />
