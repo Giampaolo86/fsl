@@ -116,7 +116,7 @@ export default function TournamentHome() {
             {clubs.slice(0, 16).map((c) => (
               <Link key={c.id} to={`/tornei/${slug}/squadre/${c.slug}`} className="flex flex-col items-center text-center gap-2 opacity-70 hover:opacity-100 transition-opacity" data-testid={`public-club-${c.slug}`}>
                 <ClubCrest club={c} size={56} />
-                <span className="text-xs font-semibold leading-tight">{c.short_name || c.name}</span>
+                <span className="text-[11px] sm:text-xs font-semibold leading-tight max-w-[110px] line-clamp-2">{c.name}</span>
               </Link>
             ))}
           </div>
