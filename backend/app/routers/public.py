@@ -326,6 +326,43 @@ async def club_entity(org_club_id: str, request: Request):
     return {"club": _public_club(club), "org_club_id": org_club_id, "participations": parts, "kpis": {"tournaments": len(parts), "teams": sum(len(p["groups"]) for p in parts), "players": sum(p["players"] for p in parts)}, "history": await legacy_svc.club_history(org_club_id)}
 
 
+@router.get("/tournaments/{slug}/bracket")
+async def public_bracket(slug: str, request: Request, category: Optional[str] = None):
+    """Tabellone fase finale per categoria: turni, finale 3°/4°, campione."""
+    t = await _published(slug, request)
+    comps = [c for c in await scoped("competitions", t.id).list({"category": category} if category else {}, sort=[("category", 1), ("series", 1)]) if c.kind != "league" and int(c.finals.get("qualifiers") or 0) >= 2]
+    out = []
+    for c in comps:
+        ms = await scoped("matches", t.id).list({"competition_id": c.id, "stage": "finals"}, sort=[("bracket_round", -1), ("bracket_slot", 1)], limit=100)
+        if not ms:
+            continue
+        enriched = {m.id: d for m, d in zip(ms, await _public_matches(t.id, ms))}
+        rounds = []
+        for m in ms:
+            if not m.bracket_round:
+                continue
+            r = next((x for x in rounds if x["bracket_round"] == m.bracket_round), None)
+            if not r:
+                r = {"bracket_round": m.bracket_round, "name": m.round_name, "matches": []}
+                rounds.append(r)
+            d = enriched[m.id]
+            d["winner_team_id"] = engine.winner_of(m) if m.status in FINAL else None
+            r["matches"].append(d)
+        third = next((enriched[m.id] for m in ms if m.bracket_round == 0), None)
+        if third:
+            third["winner_team_id"] = engine.winner_of(next(m for m in ms if m.bracket_round == 0)) if third["status"] in FINAL else None
+        final = next((m for m in ms if m.bracket_round == 1), None)
+        champion = None
+        if final and final.status in FINAL:
+            w = engine.winner_of(final)
+            if w:
+                d = enriched[final.id]
+                champion = d["home"] if d["home"]["id"] == w else d["away"]
+        total_rounds = max(1, int(c.finals.get("qualifiers") or 2)).bit_length() - 1
+        out.append({"competition": c.public(), "rounds": rounds, "third_place": third, "champion": champion, "total_rounds": total_rounds, "sources": [g.public() for g in await engine.finals_sources(t.id, c)] if c.finals.get("mode") == "cross_groups" else []})
+    return out
+
+
 @router.get("/tournaments/{slug}/standings")
 async def public_standings(slug: str, category: Optional[str] = None):
     t = await _published(slug)

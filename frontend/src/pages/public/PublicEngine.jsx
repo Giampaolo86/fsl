@@ -13,6 +13,7 @@ import { STAT_META } from "@/lib/fanta";
 import { AwardsBoard, OutcomesList } from "@/pages/admin/Extras";
 import { PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { StandingsTable } from "@/components/fsl/StandingsTable";
+import { BracketSection } from "@/components/fsl/Bracket";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { usePublicTournament } from "@/hooks/usePublicTournament";
 import { api, apiError } from "@/lib/api";
@@ -40,6 +41,7 @@ export function PublicMatches() {
   return (
     <Wrap>
       <PageHeader kicker={home.tournament.name} title="Partite" subtitle="Risultati ufficiali e prossime gare. Un risultato in verifica non incide sulla classifica." actions={<select className="fsl-input w-40" value={cat} onChange={(e) => setParams({ cat: e.target.value })} data-testid="public-matches-category">{home.settings.categories.map((c) => <option key={c}>{c}</option>)}</select>} />
+      <BracketSection slug={slug} category={cat} className="mb-10" />
       {data.length === 0 ? <EmptyState icon={CalendarDays} title="Calendario in preparazione" description="Le gare compariranno dopo la pubblicazione del calendario." /> : Object.entries(groups).map(([round, ms]) => (
         <section key={round} className="mb-8"><SectionTitle right={<span className="text-xs text-fsl-slate num">{kickoffLabel(ms[0].kickoff_at).split(" · ")[0]}</span>}>{round}</SectionTitle><div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="public-matches-grid">{ms.map((m) => <MatchCard key={m.id} m={m} to={`/tornei/${slug}/partite/${m.id}`} />)}</div></section>
       ))}
