@@ -7,7 +7,8 @@ class ApiError(HTTPException):
 
 
 def not_found(entity: str = "Risorsa"):
-    return ApiError(404, "NOT_FOUND", f"{entity} non trovata")
+    masc = entity.split()[0].lower().endswith("o") if entity else False
+    return ApiError(404, "NOT_FOUND", f"{entity} non trovat{'o' if masc else 'a'}")
 
 
 def forbidden(message: str = "Operazione non consentita per il tuo ruolo"):
