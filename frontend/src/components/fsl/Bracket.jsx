@@ -91,8 +91,10 @@ export function BracketSection({ slug, category, title = "Fase finale", classNam
   const [data, setData] = useState(null);
   useEffect(() => {
     let on = true;
-    api.get(`/public/tournaments/${slug}/bracket`, { params: category ? { category } : {} }).then((r) => on && setData(r.data)).catch(() => on && setData([]));
-    return () => { on = false; };
+    const load = () => api.get(`/public/tournaments/${slug}/bracket`, { params: category ? { category } : {} }).then((r) => on && setData(r.data)).catch(() => on && setData((d) => d || []));
+    load();
+    const id = setInterval(() => document.visibilityState === "visible" && load(), 60000);
+    return () => { on = false; clearInterval(id); };
   }, [slug, category]);
   if (!data || data.length === 0) return null;
   return (
