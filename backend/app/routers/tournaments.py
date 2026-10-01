@@ -153,6 +153,15 @@ async def get_one(tournament_id: str, user: CurrentUser = Depends(get_current_us
     return data
 
 
+@router.get("/{tournament_id}/dashboard")
+async def dashboard(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Home del torneo: checklist operativa, attenzioni, prossime gare e ultimi risultati."""
+    from ..services import dashboard as dash
+
+    t, _ = await require_tournament(tournament_id, user)
+    return await dash.build(t, await _counts(t.id))
+
+
 @router.patch("/{tournament_id}")
 async def patch(tournament_id: str, body: PatchIn, user: CurrentUser = Depends(get_current_user)):
     t, _ = await require_tournament(tournament_id, user, roles=WRITE_ROLES, writable=True)

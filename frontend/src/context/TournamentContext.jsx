@@ -9,7 +9,14 @@ export function TournamentProvider({ children }) {
   const [tournaments, setTournaments] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentId, setCurrentId] = useState(() => localStorage.getItem("fsl_tournament") || null);
+  const [currentId, setCurrentIdState] = useState(() => {
+    const v = localStorage.getItem("fsl_tournament");
+    return v && v !== "all" ? v : null;
+  });
+  const setCurrentId = useCallback((id) => {
+    setCurrentIdState(id || null);
+    localStorage.setItem("fsl_tournament", id || "all");
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -18,11 +25,7 @@ export function TournamentProvider({ children }) {
       const { data } = await api.get("/tournaments/hub");
       setTournaments(data.tournaments);
       setStats(data.stats);
-      setCurrentId((prev) => {
-        if (prev && data.tournaments.some((t) => t.id === prev)) return prev;
-        const first = data.tournaments.find((t) => t.status === "active") || data.tournaments[0];
-        return first ? first.id : null;
-      });
+      setCurrentIdState((prev) => (prev && !data.tournaments.some((t) => t.id === prev) ? null : prev));
     } finally {
       setLoading(false);
     }
@@ -31,10 +34,6 @@ export function TournamentProvider({ children }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
-
-  useEffect(() => {
-    if (currentId) localStorage.setItem("fsl_tournament", currentId);
-  }, [currentId]);
 
   const current = useMemo(() => tournaments.find((t) => t.id === currentId) || null, [tournaments, currentId]);
 

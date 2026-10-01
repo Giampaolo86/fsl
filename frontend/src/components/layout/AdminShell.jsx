@@ -65,13 +65,15 @@ export default function AdminShell() {
   const location = useLocation();
 
   useEffect(() => {
-    if (tournamentId && tournamentId !== currentId) setCurrentId(tournamentId);
-  }, [tournamentId, currentId, setCurrentId]);
+    if (tournamentId) setCurrentId(tournamentId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournamentId]);
 
   useEffect(() => setOpen(false), [location.pathname]);
 
   const scopeId = tournamentId || currentId;
-  const nav = [...HUB_NAV.filter((n) => !n.roles || user.is_super_admin || n.roles.includes(user.role)), ...(scopeId ? TOURNAMENT_NAV(scopeId) : [])];
+  const hubNav = HUB_NAV.filter((n) => !n.roles || user.is_super_admin || n.roles.includes(user.role));
+  const leaveScope = () => setCurrentId(null);
 
   const sidebar = (
     <aside className="flex h-full w-[220px] flex-col bg-ink-950 border-r border-white/10" data-testid="admin-sidebar">
@@ -85,9 +87,7 @@ export default function AdminShell() {
       </div>
       <nav className="flex-1 overflow-y-auto py-3 fsl-scroll" aria-label="Navigazione amministrativa">
         <div className="px-4 pb-1 text-[10px] uppercase tracking-widest text-fsl-slate/70">Hub</div>
-        {nav.slice(0, HUB_NAV.filter((n) => !n.roles || user.is_super_admin || n.roles.includes(user.role)).length).map((n) => (
-          <NavItem key={n.to} {...n} />
-        ))}
+        {hubNav.map((n) => (n.end && scopeId ? <NavItem key={n.to} to={n.to} label="Tutti i tornei" icon={LayoutGrid} end onClick={leaveScope} /> : <NavItem key={n.to} {...n} />))}
         {scopeId && (
           <>
             <div className="px-4 pt-4 pb-1 text-[10px] uppercase tracking-widest text-fsl-slate/70 truncate" title={current?.name}>

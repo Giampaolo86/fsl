@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Archive, ChevronDown, Search, Trophy } from "lucide-react";
+import { Archive, ChevronDown, LayoutGrid, Search, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useTournaments } from "@/context/TournamentContext";
@@ -26,6 +26,11 @@ export function TournamentSwitcher() {
     setOpen(false);
     navigate(`/admin/t/${t.id}`);
   };
+  const pickAll = () => {
+    setCurrentId(null);
+    setOpen(false);
+    navigate("/admin");
+  };
 
   return (
     <>
@@ -35,11 +40,11 @@ export function TournamentSwitcher() {
         data-testid="tournament-switcher-button"
         aria-haspopup="dialog"
       >
-        <Trophy className="h-4 w-4 shrink-0 text-fsl-gold" aria-hidden="true" />
+        {current ? <Trophy className="h-4 w-4 shrink-0 text-fsl-gold" aria-hidden="true" /> : <LayoutGrid className="h-4 w-4 shrink-0 text-fsl-gold" aria-hidden="true" />}
         <span className="min-w-0">
-          <span className="block text-[10px] uppercase tracking-wider text-fsl-slate leading-none">Torneo corrente</span>
+          <span className="block text-[10px] uppercase tracking-wider text-fsl-slate leading-none">{current ? "Torneo corrente" : "Vista"}</span>
           <span className="block truncate text-sm font-semibold text-fsl-white leading-tight" data-testid="tournament-switcher-current">
-            {current ? current.name : "Seleziona torneo"}
+            {current ? current.name : "Tutti i tornei"}
           </span>
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-fsl-slate" aria-hidden="true" />
@@ -48,10 +53,21 @@ export function TournamentSwitcher() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md bg-navy-900 border-white/15 text-fsl-white p-0 flex flex-col" data-testid="tournament-drawer">
           <SheetHeader className="px-5 pt-5 pb-3 border-b border-white/10">
-            <SheetTitle className="font-display uppercase text-2xl text-fsl-white">Tutti i tornei</SheetTitle>
-            <SheetDescription className="text-fsl-slate text-xs">Seleziona il torneo su cui lavorare: tutti i moduli mostreranno solo i suoi dati.</SheetDescription>
+            <SheetTitle className="font-display uppercase text-2xl text-fsl-white">Cambia vista</SheetTitle>
+            <SheetDescription className="text-fsl-slate text-xs">Scegli un torneo per lavorare solo sui suoi dati, oppure la vista globale con tutti i tornei.</SheetDescription>
           </SheetHeader>
           <div className="px-5 pt-4 space-y-3">
+            <button
+              onClick={pickAll}
+              data-testid="tournament-drawer-all"
+              className={`w-full text-left fsl-card px-4 py-3 flex items-center gap-3 hover:border-fsl-gold/50 transition-colors ${!current ? "border-fsl-gold/60" : ""}`}
+            >
+              <span className="h-12 w-16 shrink-0 rounded-md bg-fsl-gold/15 text-fsl-gold inline-flex items-center justify-center"><LayoutGrid className="h-5 w-5" aria-hidden="true" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-sm">Tutti i tornei</span>
+                <span className="block text-xs text-fsl-slate">Hub globale: numeri complessivi, elenco tornei, crea nuovo torneo</span>
+              </span>
+            </button>
             <div className="grid grid-cols-2 gap-2" role="tablist">
               {[
                 { k: "active", label: `Attivi (${activeCount})`, Icon: Trophy },

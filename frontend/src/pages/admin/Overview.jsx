@@ -1,8 +1,10 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { Archive, Calendar, CheckCircle2, ClipboardList, Grid3X3, Lock, PlayCircle, RotateCcw, Shield, Trophy, Users, Volleyball } from "lucide-react";
 import { toast } from "sonner";
-import { KpiTile, PageHeader, SectionTitle } from "@/components/fsl/Primitives";
+import { KpiTile, PageHeader } from "@/components/fsl/Primitives";
+import { TournamentChecklist, AttentionList } from "@/components/fsl/TournamentChecklist";
+import { MatchList } from "@/components/fsl/MatchList";
 import { StatusBadge } from "@/components/fsl/StatusBadge";
 import { FieldsBoard } from "@/components/fsl/FieldsBoard";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
@@ -15,9 +17,17 @@ import { DAYS, FORMULA, fmtNum, fmtPeriod } from "@/lib/format";
 
 export default function Overview() {
   const { data, error, loading, reload } = useTournamentDetail();
+  const { tournamentId } = useParams();
+  const [dash, setDash] = useState(null);
   const { refresh } = useTournaments();
   const { user } = useAuth();
   const [dialog, setDialog] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    api.get(`/tournaments/${tournamentId}/dashboard`).then((r) => alive && setDash(r.data)).catch(() => alive && setDash({ steps: [], steps_done: 0, attention: [], upcoming: [], recent: [], next_step: null }));
+    return () => { alive = false; };
+  }, [tournamentId, data]);
 
   if (loading) return <LoadingState label="Caricamento torneo…" />;
   if (error) return <ErrorState message={apiError(error)} onRetry={reload} />;
@@ -99,9 +109,24 @@ export default function Overview() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiTile icon={Trophy} value={t.counts.competitions} label="Campionati" hint={`${s.categories.length} categorie · ${s.series.length} serie`} testId="overview-kpi-competitions" to={`/admin/t/${t.id}/competizioni`} />
         <KpiTile icon={Users} value={`${t.counts.teams}/${t.summary.teams_capacity}`} label="Squadre iscritte" hint={`${t.counts.clubs} società`} testId="overview-kpi-teams" to={`/admin/t/${t.id}/societa`} />
-        <KpiTile icon={Volleyball} value={fmtNum(t.summary.matches_total)} label="Gare previste" hint={`${t.summary.rounds} giornate · ${t.summary.weekends_needed ?? "—"} weekend`} testId="overview-kpi-matches" to={`/admin/t/${t.id}/calendario`} />
+        <KpiTile icon={Volleyball} value={`${t.counts.matches_official}/${t.counts.matches_total || fmtNum(t.summary.matches_total)}`} label="Gare giocate" hint={`${t.counts.completion_pct}% completamento · ${t.summary.rounds} giornate`} testId="overview-kpi-matches" to={`/admin/t/${t.id}/partite`} />
         <KpiTile icon={Grid3X3} value={t.counts.fields} label="Campi" hint={`${s.slots.length} slot/giorno · ${t.summary.matches_per_day} gare/giorno`} testId="overview-kpi-fields" to={`/admin/t/${t.id}/campi`} />
       </div>
+
+      {dash ? (
+        <div className="grid lg:grid-cols-5 gap-4">
+          <div className="lg:col-span-2 space-y-4">
+            <TournamentChecklist data={dash} />
+            <AttentionList items={dash.attention} />
+          </div>
+          <div className="lg:col-span-3 space-y-4">
+            <MatchList title="Prossime partite" matches={dash.upcoming} tid={t.id} to={`/admin/t/${t.id}/calendario`} emptyText={t.counts.matches_total ? "Nessuna gara in programma" : "Genera il calendario per vedere qui le prossime gare"} testId="overview-upcoming" />
+            <MatchList title="Ultimi risultati ufficiali" matches={dash.recent} tid={t.id} showScore to={`/admin/t/${t.id}/partite`} emptyText="Nessun risultato ufficializzato finora" testId="overview-recent" />
+          </div>
+        </div>
+      ) : (
+        <LoadingState label="Caricamento home torneo…" />
+      )}
 
       <FieldsBoard tournamentId={t.id} fields={fields} slots={s.slots} />
 
@@ -113,7 +138,7 @@ export default function Overview() {
           <div className="grid gap-2">
             <Link to={`/admin/t/${t.id}/impostazioni`} className="btn-ghost justify-start" data-testid="overview-quick-settings">Configura formula, categorie e slot</Link>
             <Link to={`/admin/t/${t.id}/societa`} className="btn-ghost justify-start" data-testid="overview-quick-clubs">Gestisci società e squadre</Link>
-            <Link to={`/admin/t/${t.id}/campi`} className="btn-ghost justify-start" data-testid="overview-quick-fields">Sedi e campi</Link>
+            <a href={`/tornei/${t.slug}`} target="_blank" rel="noreferrer" className="btn-ghost justify-start" data-testid="overview-quick-public">Apri il sito pubblico del torneo</a>
             <Link to={`/admin/t/${t.id}/audit`} className="btn-ghost justify-start" data-testid="overview-quick-audit">Audit log</Link>
           </div>
         </div>
