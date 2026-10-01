@@ -1,10 +1,10 @@
-import { Copy, LayoutGrid, Settings, Trophy, Users, Calendar, Grid3X3 } from "lucide-react";
+import { Copy, LayoutGrid, Settings, Trophy, Users, Calendar, Grid3X3, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { StatusBadge } from "./StatusBadge";
 import { ProgressBar } from "./Primitives";
 import { FORMULA, fmtPeriod } from "@/lib/format";
 
-export function TournamentCard({ t, onDuplicate, canWrite }) {
+export function TournamentCard({ t, onDuplicate, onDelete, canWrite }) {
   const isArchived = t.status === "archived";
   return (
     <article className="fsl-card overflow-hidden flex flex-col animate-rise" data-testid={`tournament-card-${t.slug}`}>
@@ -49,6 +49,11 @@ export function TournamentCard({ t, onDuplicate, canWrite }) {
               <Copy className="h-4 w-4" aria-hidden="true" /> Duplica
             </button>
           </div>
+          {onDelete && (
+            <button className="btn-ghost w-full h-9 text-xs text-fsl-danger hover:bg-fsl-danger/10" onClick={() => onDelete(t)} data-testid={`tournament-card-delete-${t.slug}`}>
+              <Trash2 className="h-4 w-4" aria-hidden="true" /> Elimina definitivamente
+            </button>
+          )}
         </div>
       </div>
     </article>

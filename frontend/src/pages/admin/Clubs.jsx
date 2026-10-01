@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, KeyRound, Pencil, Plus, Shield, Users } from "lucide-react";
+import { ExternalLink, KeyRound, Pencil, Plus, Shield, Trash2, Users } from "lucide-react";
 import { InviteDialog } from "@/components/fsl/ClubOnboarding";
 import { ClubRegistryPicker } from "@/components/fsl/ClubRegistryPicker";
 import { toast } from "sonner";
@@ -42,6 +42,11 @@ export default function Clubs() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const deleteClub = async (c) => {
+    if (!window.confirm(`Eliminare la società «${c.name}» da questo torneo? Possibile solo senza squadre iscritte.`)) return;
+    try { await api.delete(`/tournaments/${t.id}/clubs/${c.id}`); toast.success("Società eliminata"); clubs.reload(); } catch (e) { toast.error(apiError(e)); }
   };
 
   const addTeam = async () => {
@@ -120,6 +125,9 @@ export default function Clubs() {
                     <td className="text-right">
                       <button className="btn-ghost h-9" onClick={() => { setOpen(c); setTeamForm({ competition_id: comps.data?.[0]?.id || "" }); }} data-testid={`club-add-team-${c.slug}`}>
                         <Users className="h-4 w-4" aria-hidden="true" /> Iscrivi squadra
+                      </button>
+                      <button className="btn-ghost h-9 text-fsl-danger" title="Elimina società (solo senza squadre)" onClick={() => deleteClub(c)} data-testid={`club-delete-${c.slug}`}>
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
                       </button>
                     </td>
                   )}

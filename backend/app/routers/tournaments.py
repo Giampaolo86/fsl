@@ -7,6 +7,7 @@ from ..core.db import db
 from ..core.deps import WRITE_ROLES, CurrentUser, get_current_user, require_tournament
 from ..core.errors import forbidden
 from ..repositories.registry import audit_repo, memberships, scoped, settings_repo, tournaments, users
+from ..services import audit, cleanup
 from ..services import tournaments as svc
 
 router = APIRouter(prefix="/tournaments", tags=["tournaments"])
@@ -171,6 +172,34 @@ async def patch(tournament_id: str, body: PatchIn, user: CurrentUser = Depends(g
 
             await pricing.sync_items(t.id)
     return await _enrich(t)
+
+
+class PurgeIn(BaseModel):
+    keep_slugs: list[str]
+    keep_emails: list[str] = []
+
+
+@router.delete("/{tournament_id}")
+async def delete_tournament(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Eliminazione definitiva (solo Super Admin): torneo e tutti i dati collegati."""
+    if not user.is_super_admin:
+        raise forbidden("Solo il Super Admin può eliminare un torneo")
+    t, _ = await require_tournament(tournament_id, user)
+    removed = await cleanup.delete_tournament(t.id)
+    await audit.record(user, "tournament.delete", "tournament", t.id, None, before={"name": t.name, "slug": t.slug}, after=removed)
+    return {"deleted": t.slug, "removed": removed}
+
+
+@router.post("/purge-test-data")
+async def purge_test_data(body: PurgeIn, user: CurrentUser = Depends(get_current_user)):
+    """Pulizia dati di test (solo Super Admin): elimina i tornei non in keep_slugs e gli utenti di test."""
+    if not user.is_super_admin:
+        raise forbidden("Solo il Super Admin può eseguire la pulizia")
+    if not body.keep_slugs:
+        raise forbidden("Indica almeno un torneo da conservare")
+    out = await cleanup.purge_test_data(body.keep_slugs, body.keep_emails + [user.email])
+    await audit.record(user, "admin.purge_test_data", "organization", "fsl", None, after=out)
+    return out
 
 
 @router.post("/{tournament_id}/status")

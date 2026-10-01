@@ -8,17 +8,25 @@ import { useTournaments } from "@/context/TournamentContext";
 import { useAuth } from "@/context/AuthContext";
 import { StatusBadge } from "@/components/fsl/StatusBadge";
 import { fmtNum, fmtPeriod } from "@/lib/format";
+import { toast } from "sonner";
+import { api, apiError } from "@/lib/api";
 
 const HERO = "https://images.unsplash.com/photo-1551958219-acbc608c6377?crop=entropy&cs=srgb&fm=jpg&q=80&w=1800";
 
 export default function Hub() {
-  const { tournaments, stats, loading, currentId } = useTournaments();
+  const { tournaments, stats, loading, currentId, refresh } = useTournaments();
   const current = currentId || tournaments.find((t) => t.status === "active")?.id || tournaments[0]?.id;
   const { user } = useAuth();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("created");
   const canWrite = user.is_super_admin || user.role === "director";
+  const deleteTournament = async (t) => {
+    const typed = window.prompt(`Eliminazione DEFINITIVA di «${t.name}»: società, squadre, rose, gare, risultati, foto e vendite del torneo verranno cancellati per sempre.\n\nPer confermare scrivi il nome del torneo:`);
+    if (typed === null) return;
+    if (typed.trim().toLowerCase() !== t.name.trim().toLowerCase()) { toast.error("Nome non corrispondente: eliminazione annullata"); return; }
+    try { await api.delete(`/tournaments/${t.id}`); toast.success(`Torneo «${t.name}» eliminato`); refresh(); } catch (e) { toast.error(apiError(e)); }
+  };
 
   const visible = useMemo(() => {
     const list = tournaments.filter((t) => t.status !== "archived" && t.name.toLowerCase().includes(q.toLowerCase()));
@@ -82,7 +90,7 @@ export default function Hub() {
         ) : (
           <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-4" data-testid="hub-tournament-grid">
             {visible.map((t) => (
-              <TournamentCard key={t.id} t={t} canWrite={canWrite} onDuplicate={(src) => navigate(`/admin/tornei/nuovo?mode=duplicate&source=${src.id}`)} />
+              <TournamentCard key={t.id} t={t} canWrite={canWrite} onDuplicate={(src) => navigate(`/admin/tornei/nuovo?mode=duplicate&source=${src.id}`)} onDelete={user.is_super_admin ? deleteTournament : undefined} />
             ))}
           </div>
         )}

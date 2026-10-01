@@ -161,6 +161,36 @@ async def create_club(tournament_id: str, body: ClubIn, user: CurrentUser = Depe
     return club.public()
 
 
+@router.delete("/clubs/{club_id}")
+async def delete_club(tournament_id: str, club_id: str, user: CurrentUser = Depends(get_current_user)):
+    t, _ = await require_tournament(tournament_id, user, roles=STRUCTURE_ROLES, writable=True)
+    club = await scoped("clubs", tournament_id).get(club_id)
+    if not club:
+        raise not_found("Società")
+    n = await scoped("teams", tournament_id).count({"club_id": club_id})
+    if n:
+        raise conflict(f"La società ha {n} squadre iscritte: elimina prima le squadre dalla pagina Rose")
+    await db.club_invites.delete_many({"tournament_id": tournament_id, "club_id": club_id})
+    await db.club_documents.delete_many({"tournament_id": tournament_id, "club_id": club_id})
+    await db.tournament_memberships.delete_many({"tournament_id": tournament_id, "club_id": club_id})
+    await db.clubs.delete_one({"_id": __import__("bson").ObjectId(club_id)})
+    await audit.record(user, "club.delete", "club", club_id, tournament_id, before={"name": club.name})
+    return {"deleted": club.name}
+
+
+@router.delete("/teams/{team_id}")
+async def delete_team(tournament_id: str, team_id: str, user: CurrentUser = Depends(get_current_user)):
+    from ..services import cleanup
+
+    t, _ = await require_tournament(tournament_id, user, roles=STRUCTURE_ROLES, writable=True)
+    team = await scoped("teams", tournament_id).get(team_id)
+    if not team:
+        raise not_found("Squadra")
+    removed = await cleanup.delete_team(tournament_id, team_id)
+    await audit.record(user, "team.delete", "team", team_id, tournament_id, before={"name": team.name}, after=removed)
+    return removed
+
+
 @router.get("/teams")
 async def teams(tournament_id: str, competition_id: Optional[str] = None, club_id: Optional[str] = None, user: CurrentUser = Depends(get_current_user)):
     t, role = await require_tournament(tournament_id, user)
