@@ -240,7 +240,7 @@ async def patch_player(tournament_id: str, player_id: str, body: dict, user: Cur
 @router.post("/calendar/generate")
 async def calendar_generate(tournament_id: str, body: dict = None, user: CurrentUser = Depends(get_current_user)):
     t, _ = await require_tournament(tournament_id, user, roles=OPS, writable=True)
-    res = await engine.generate_calendar(t, user, (body or {}).get("competition_ids"))
+    res = await engine.generate_calendar(t, user, (body or {}).get("competition_ids"), bool((body or {}).get("publish")))
     await audit.record(user, "calendar.generated", "tournament", t.id, t.id, after=res)
     return res
 

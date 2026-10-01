@@ -235,6 +235,7 @@ async def public_matches(slug: str, category: Optional[str] = None, competition_
         f["competition_id"] = competition_id
     if match_day:
         f["match_day"] = match_day
+    f["status"] = {"$ne": "draft"}
     ms = await scoped("matches", t.id).list(f, sort=[("kickoff_at", 1)], limit=3000)
     return await _public_matches(t.id, ms)
 
@@ -333,7 +334,7 @@ async def public_bracket(slug: str, request: Request, category: Optional[str] = 
     comps = [c for c in await scoped("competitions", t.id).list({"category": category} if category else {}, sort=[("category", 1), ("series", 1)]) if c.kind != "league" and int(c.finals.get("qualifiers") or 0) >= 2]
     out = []
     for c in comps:
-        ms = await scoped("matches", t.id).list({"competition_id": c.id, "stage": "finals"}, sort=[("bracket_round", -1), ("bracket_slot", 1)], limit=100)
+        ms = await scoped("matches", t.id).list({"competition_id": c.id, "stage": "finals", "status": {"$ne": "draft"}}, sort=[("bracket_round", -1), ("bracket_slot", 1)], limit=100)
         if not ms:
             continue
         enriched = {m.id: d for m, d in zip(ms, await _public_matches(t.id, ms))}

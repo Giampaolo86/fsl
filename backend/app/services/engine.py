@@ -50,7 +50,7 @@ def round_robin(team_ids: list[str]):
     return rounds
 
 
-async def generate_calendar(t, actor, competition_ids: Optional[list] = None):
+async def generate_calendar(t, actor, competition_ids: Optional[list] = None, publish: bool = False):
     fields = await scoped("fields", t.id).list({"active": True}, sort=[("code", 1)])
     if not fields:
         raise bad_request("Configura almeno un campo prima di generare il calendario")
@@ -81,12 +81,24 @@ async def generate_calendar(t, actor, competition_ids: Optional[list] = None):
         idx = s.slots.index(tm) if tm in s.slots else -1
         return not any(0 <= j < len(s.slots) and (team, f"{day}T{s.slots[j]}") in team_times for j in (idx - 1, idx + 1))
 
+    regen_ids = {c.id for c in comps}
+    for m in await matches_repo.list({"status": {"$nin": ["cancelled"]}}, limit=5000):
+        if m.stage == "qualification" and m.status in ("scheduled", "draft") and m.competition_id in regen_ids:
+            continue
+        used.add((m.kickoff_at, m.field_id))
+        wk = weekend_key(m.kickoff_at)
+        for tid in (m.home_team_id, m.away_team_id):
+            wk_count[f"{tid}|{wk}"] += 1
+            team_times.add((tid, m.kickoff_at))
     plan = []
     for c in comps:
-        team_ids = [tm.id for tm in await teams_repo.list({"competition_id": c.id}, sort=[("name", 1)])]
+        team_ids = [tm.id for tm in await teams_repo.list({"competition_id": c.id, "status": {"$ne": "withdrawn"}}, sort=[("name", 1)])]
         if len(team_ids) < 2:
             continue
-        for r_idx, pairs in enumerate(round_robin(team_ids)):
+        rounds = round_robin(team_ids)
+        if c.format == "double_round_robin" or s.formula == "double_round_robin":
+            rounds = rounds + [[(a, h) for h, a in r] for r in rounds]
+        for r_idx, pairs in enumerate(rounds):
             plan.append((r_idx, c, pairs))
     if groups_mode:
         plan.sort(key=lambda x: x[0])
@@ -115,10 +127,11 @@ async def generate_calendar(t, actor, competition_ids: Optional[list] = None):
                     field_id=slot["field_id"],
                     field_name=slot["field_name"],
                     venue_name=venue_name,
+                    status="scheduled" if publish else "draft",
                 )
             )
     comp_filter = {"competition_id": {"$in": [c.id for c in comps]}} if competition_ids else {}
-    await matches_repo.col.update_many({"tournament_id": t.id, "deleted_at": None, "status": "scheduled", "stage": "qualification", **comp_filter}, {"$set": {"deleted_at": utcnow(), "updated_by": actor.id}})
+    await matches_repo.col.update_many({"tournament_id": t.id, "deleted_at": None, "status": {"$in": ["scheduled", "draft"]}, "stage": "qualification", **comp_filter}, {"$set": {"deleted_at": utcnow(), "updated_by": actor.id}})
     for m in pending:
         await matches_repo.insert(m, actor.id)
 
@@ -255,6 +268,8 @@ async def finals_preview(t, c) -> dict:
     teams = []
     for g in sources:
         teams += await teams_repo.list({"competition_id": g.id}, sort=[("name", 1)])
+    if c.kind == "knockout":
+        teams += await teams_repo.list({"competition_id": c.id}, sort=[("name", 1)])
     cands = [{"id": tm.id, "name": tm.name, "series": tm.series, "crest_url": None if tm.club_id not in clubs or clubs[tm.club_id].crest_is_placeholder else clubs[tm.club_id].crest_url} for tm in teams]
     existing = await matches_repo.list({"competition_id": c.id, "stage": "finals"}, sort=[("bracket_round", -1)])
     warnings, pairs, bracket_round, replace = [], [], 0, False

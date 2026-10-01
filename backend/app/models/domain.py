@@ -286,11 +286,14 @@ class Club(BaseDocument):
 
 class Team(BaseDocument):
     tournament_id: str
-    club_id: str
-    competition_id: str
+    club_id: Optional[str] = None
+    competition_id: Optional[str] = None
     name: str
     category: str
-    series: str
+    series: str = ""
+    placeholder: bool = False
+    qualifier: Optional[dict] = None
+    status: Literal["active", "withdrawn", "disqualified"] = "active"
 
 
 class PlayerBadge(BaseDocument):

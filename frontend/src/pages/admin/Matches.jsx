@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { CalendarClock, CalendarPlus, Plus, Wand2 } from "lucide-react";
+import { CalendarClock, CalendarPlus, LayoutGrid, List, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { MatchCard, MATCH_STATUS } from "@/components/fsl/MatchCard";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
-import { ReasonDialog } from "@/components/fsl/ReasonDialog";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useScoped, useTournamentDetail } from "@/hooks/useTournamentData";
 import { api, apiError } from "@/lib/api";
+import { GroupsBoard, STATE_LABEL, useBoard } from "@/components/fsl/GroupsBoard";
+import { CalendarGrid, CalendarTools, FinalsPanel, MatchEditDialog } from "@/components/fsl/CalendarStudio";
 
 export default function Matches({ mode = "matches" }) {
   const { data: t, reload: reloadT } = useTournamentDetail();
@@ -18,8 +19,13 @@ export default function Matches({ mode = "matches" }) {
   const fields = useScoped("venues");
   const [list, setList] = useState(null);
   const [error, setError] = useState(null);
-  const [gen, setGen] = useState(false);
   const [create, setCreate] = useState(false);
+  const [editM, setEditM] = useState(null);
+  const [view, setView] = useState("list");
+  const [conflicts, setConflicts] = useState([]);
+  const step = mode === "reports" ? "" : params.get("step") || "gironi";
+  const category = params.get("cat") || "";
+  const [board, reloadBoard] = useBoard(t?.id, category);
   const [form, setForm] = useState({ competition_id: "", home_team_id: "", away_team_id: "", kickoff_at: "", field_id: "", match_day: 1 });
   const [busy, setBusy] = useState(false);
   const comp = params.get("comp") || "";
@@ -30,7 +36,9 @@ export default function Matches({ mode = "matches" }) {
   const load = () => {
     if (!t) return;
     api.get(`/tournaments/${t.id}/matches`, { params: { competition_id: comp || undefined, status: status || undefined, date: day || undefined, upcoming_days: upcoming ? 7 : undefined } }).then((r) => setList(r.data)).catch(setError);
+    if (mode !== "reports") api.get(`/tournaments/${t.id}/groups/conflicts`).then((r) => setConflicts(r.data)).catch(() => {});
   };
+  const refreshAll = () => { load(); reloadBoard(); teams.reload?.(); reloadT(); };
   useEffect(load, [t?.id, comp, status, day, upcoming]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setP = (k, v) => { const p = new URLSearchParams(params); v ? p.set(k, v) : p.delete(k); setParams(p); };
@@ -43,15 +51,11 @@ export default function Matches({ mode = "matches" }) {
   if (!t || comps.loading) return <LoadingState />;
   if (error) return <ErrorState message={apiError(error)} onRetry={load} />;
   const canWrite = ["super_admin", "director"].includes(t.my_role) && !t.read_only;
-
-  const generate = async () => {
-    try {
-      const { data } = await api.post(`/tournaments/${t.id}/calendar/generate`, {});
-      toast.success(`Calendario generato: ${data.count} gare · qualità ${data.quality.score}/100`);
-      data.quality.warnings.forEach((w) => toast.warning(w));
-      load(); reloadT();
-    } catch (e) { toast.error(apiError(e)); throw e; }
-  };
+  const fieldList = fields.data?.fields || [];
+  const teamList = (teams.data || []).map((tm) => ({ ...tm, name: tm.name || tm.club?.name }));
+  const draftCount = (list || []).filter((m) => m.status === "draft").length;
+  const STEPS = [["gironi", "1 · Gironi"], ["calendario", "2 · Calendario gironi"], ["finali", "3 · Fasi finali"]];
+  const stepState = board ? STATE_LABEL[board.state] : "";
   const submitCreate = async () => {
     setBusy(true);
     try {
@@ -66,42 +70,52 @@ export default function Matches({ mode = "matches" }) {
       <PageHeader
         kicker={mode === "reports" ? "Referti, risultati e disciplina" : "Generatore e calendario"}
         title={mode === "reports" ? "Referti" : "Partite"}
-        subtitle={mode === "reports" ? "Gare in corso, referti inviati e risultati ufficiali. Solo il Direttore ufficializza o rettifica." : `${list?.length ?? 0} gare · generatore su ${t.counts.fields} campi × ${t.settings.slots.length} slot`}
+        subtitle={mode === "reports" ? "Gare in corso, referti inviati e risultati ufficiali. Solo il Direttore ufficializza o rettifica." : `${list?.length ?? 0} gare${draftCount ? ` (${draftCount} in bozza, non visibili al pubblico)` : ""} · ${t.counts.fields} campi × ${t.settings.slots.length} slot${stepState ? ` · Stato: ${stepState}` : ""}`}
         actions={canWrite && mode !== "reports" && (
-          <>
-            <button className="btn-ghost" onClick={() => setCreate(true)} data-testid="matches-create-button"><Plus className="h-4 w-4" /> Nuova gara</button>
-            <button className="btn-gold" onClick={() => setGen(true)} data-testid="matches-generate-button"><Wand2 className="h-4 w-4" /> Genera calendario</button>
-          </>
+          <button className="btn-ghost" onClick={() => setCreate(true)} data-testid="matches-create-button"><Plus className="h-4 w-4" /> Nuova gara</button>
         )}
       />
+      {mode !== "reports" && (
+        <div className="flex flex-wrap items-center gap-2 mb-4" data-testid="matches-steps">
+          {STEPS.map(([k, l]) => <button key={k} className={`h-10 px-4 rounded-full text-sm font-semibold border transition-colors ${step === k ? "bg-fsl-gold text-ink-950 border-fsl-gold" : "border-white/15 text-fsl-white/80 hover:border-fsl-gold/50"}`} onClick={() => setP("step", k)} data-testid={`matches-step-${k}`}>{l}</button>)}
+          {board?.categories?.length > 1 && <select className="fsl-input h-10 w-40 ml-auto" value={category} onChange={(e) => setP("cat", e.target.value)} data-testid="matches-category-filter"><option value="">Tutte le categorie</option>{board.categories.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
+          {stepState && <span className="h-10 px-3 rounded-full border border-fsl-gold/40 text-fsl-gold text-xs inline-flex items-center" data-testid="matches-state-badge">{stepState}</span>}
+        </div>
+      )}
+      {step === "gironi" && <GroupsBoard tid={t.id} category={category || board?.categories?.[0] || ""} board={board} reload={refreshAll} canWrite={canWrite} />}
+      {step === "finali" && <FinalsPanel tid={t.id} board={board} reload={refreshAll} canWrite={canWrite} list={list || []} onEdit={setEditM} />}
+      {step === "calendario" && canWrite && board && <div className="mb-4 space-y-3"><CalendarTools tid={t.id} groups={board.groups} fields={fieldList} teams={teamList} comps={comps.data} onDone={refreshAll} draftCount={draftCount} conflicts={conflicts} /></div>}
+      {(step === "calendario" || mode === "reports") && (<>
       <div className="fsl-card px-4 py-3 mb-4 flex flex-col md:flex-row gap-3">
         <select className="fsl-input md:w-64" value={comp} onChange={(e) => setP("comp", e.target.value)} data-testid="matches-filter-competition"><option value="">Tutte le competizioni</option>{comps.data.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         {mode !== "reports" && <select className="fsl-input md:w-48" value={status} onChange={(e) => setP("status", e.target.value)} data-testid="matches-filter-status"><option value="">Tutti gli stati</option>{Object.entries(MATCH_STATUS).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}</select>}
         <input type="date" className="fsl-input md:w-48" value={day} onChange={(e) => setP("day", e.target.value)} data-testid="matches-filter-date" aria-label="Data" />
         <button type="button" onClick={() => { const p = new URLSearchParams(params); if (upcoming) p.delete("upcoming"); else { p.set("upcoming", "1"); p.delete("day"); } setParams(p); }} className={`${upcoming ? "btn-gold" : "btn-ghost"} md:ml-auto`} aria-pressed={upcoming} data-testid="matches-upcoming-button"><CalendarClock className="h-4 w-4" /> Prossimi impegni · 7 giorni</button>
+        {mode !== "reports" && <button type="button" className="btn-ghost" onClick={() => setView(view === "list" ? "grid" : "list")} data-testid="matches-view-toggle">{view === "list" ? <><LayoutGrid className="h-4 w-4" /> Vista campi/orari</> : <><List className="h-4 w-4" /> Vista elenco</>}</button>}
       </div>
       {upcoming && <p className="text-xs text-fsl-slate -mt-2 mb-4" data-testid="matches-upcoming-hint">Gare da oggi ai prossimi 7 giorni: assegna arbitri e campi, verifica le distinte e organizza in anticipo.</p>}
       {!list ? <LoadingState /> : list.length === 0 ? (
-        <EmptyState icon={CalendarPlus} title={upcoming ? "Nessuna gara nei prossimi 7 giorni" : "Nessuna gara"} description={upcoming ? "Nessun impegno in programma da oggi a 7 giorni: rimuovi il filtro per vedere tutto il calendario." : canWrite ? "Genera il calendario dalle competizioni con squadre iscritte oppure crea una gara manualmente." : "Il calendario non è ancora stato pubblicato."} action={canWrite && !upcoming && <button className="btn-gold" onClick={() => setGen(true)}>Genera calendario</button>} testId="matches-empty" />
-      ) : (
+        <EmptyState icon={CalendarPlus} title={upcoming ? "Nessuna gara nei prossimi 7 giorni" : "Nessuna gara"} description={upcoming ? "Nessun impegno in programma da oggi a 7 giorni: rimuovi il filtro per vedere tutto il calendario." : canWrite ? "Componi prima i gironi (anche con squadre segnaposto), poi genera la bozza del calendario da «Genera calendario gironi»." : "Il calendario non è ancora stato pubblicato."} action={canWrite && !upcoming && mode !== "reports" && <button className="btn-gold" onClick={() => setP("step", "gironi")}>Vai a 1 · Gironi</button>} testId="matches-empty" />
+      ) : view === "grid" && mode !== "reports" ? <CalendarGrid list={list} slots={t.settings.slots} fields={fieldList} onPick={(m) => canWrite ? setEditM(m) : null} /> : (
         <div className="space-y-6">
           {Object.entries(byRound).map(([round, ms]) => (
             <section key={round}>
               <h2 className="fsl-section-title mb-2">{round} <span className="text-fsl-slate text-sm font-sans normal-case">· {ms.length} gare</span></h2>
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">{ms.map((m) => <MatchCard key={m.id} m={m} to={`/admin/t/${t.id}/partite/${m.id}`} />)}</div>
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">{ms.map((m) => <div key={m.id} className="relative group"><MatchCard m={m} to={`/admin/t/${t.id}/partite/${m.id}`} />{canWrite && mode !== "reports" && <button className="absolute top-2 right-2 h-8 w-8 rounded-full bg-ink-950/80 border border-white/15 inline-flex items-center justify-center opacity-80 hover:opacity-100 hover:border-fsl-gold" onClick={() => setEditM(m)} title="Modifica data, ora, campo, squadre" data-testid={`match-edit-${m.id}`}><Pencil className="h-3.5 w-3.5" /></button>}</div>)}</div>
             </section>
           ))}
         </div>
       )}
-      <ReasonDialog open={gen} onOpenChange={setGen} title="Genera calendario" description="Le gare programmate della fase a gironi verranno sostituite da una nuova bozza (le gare ufficiali restano). Usa campi, giorni e slot configurati nel torneo." confirmLabel="Genera" requireReason={false} onConfirm={generate} />
+      </>)}
+      {editM && <MatchEditDialog tid={t.id} m={editM} teams={teamList} fields={fieldList} comps={comps.data} onClose={() => setEditM(null)} onDone={refreshAll} />}
       <Dialog open={create} onOpenChange={setCreate}>
         <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl" aria-describedby={undefined} data-testid="match-create-dialog">
           <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Nuova gara</DialogTitle></DialogHeader>
           <div className="grid gap-3">
             <select className="fsl-input" value={form.competition_id} onChange={(e) => setForm({ ...form, competition_id: e.target.value, home_team_id: "", away_team_id: "" })} data-testid="match-create-competition"><option value="">Competizione…</option>{comps.data.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
             <div className="grid grid-cols-2 gap-3">
-              <select className="fsl-input" value={form.home_team_id} onChange={(e) => setForm({ ...form, home_team_id: e.target.value })} data-testid="match-create-home"><option value="">Casa…</option>{compTeams.map((tm) => <option key={tm.id} value={tm.id}>{tm.club?.name}</option>)}</select>
-              <select className="fsl-input" value={form.away_team_id} onChange={(e) => setForm({ ...form, away_team_id: e.target.value })} data-testid="match-create-away"><option value="">Trasferta…</option>{compTeams.map((tm) => <option key={tm.id} value={tm.id}>{tm.club?.name}</option>)}</select>
+              <select className="fsl-input" value={form.home_team_id} onChange={(e) => setForm({ ...form, home_team_id: e.target.value })} data-testid="match-create-home"><option value="">Casa…</option>{compTeams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name || tm.club?.name}</option>)}</select>
+              <select className="fsl-input" value={form.away_team_id} onChange={(e) => setForm({ ...form, away_team_id: e.target.value })} data-testid="match-create-away"><option value="">Trasferta…</option>{compTeams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name || tm.club?.name}</option>)}</select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <input type="datetime-local" className="fsl-input" value={form.kickoff_at} onChange={(e) => setForm({ ...form, kickoff_at: e.target.value })} data-testid="match-create-kickoff" />

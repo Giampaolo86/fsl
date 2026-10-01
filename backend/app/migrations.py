@@ -36,7 +36,11 @@ async def m004_clubs_venues():
     await db.clubs.create_index("tournament_id")
     await db.venues.create_index("tournament_id")
     await db.fields.create_index([("tournament_id", ASCENDING), ("code", ASCENDING)], unique=True, partialFilterExpression={"deleted_at": None})
-    await db.teams.create_index([("tournament_id", ASCENDING), ("competition_id", ASCENDING), ("club_id", ASCENDING)], unique=True, partialFilterExpression={"deleted_at": None})
+    try:
+        await db.teams.drop_index("tournament_id_1_competition_id_1_club_id_1")
+    except Exception:
+        pass
+    await db.teams.create_index([("tournament_id", ASCENDING), ("competition_id", ASCENDING), ("club_id", ASCENDING)], unique=True, name="teams_unique_club_per_group", partialFilterExpression={"deleted_at": None, "club_id": {"$type": "string"}})
     await db.teams.create_index("tournament_id")
 
 
@@ -50,6 +54,15 @@ async def m006_matches_placeholder():
     await db.matches.create_index([("tournament_id", ASCENDING), ("kickoff_at", ASCENDING)])
 
 
+async def m007_teams_placeholders():
+    """Placeholder teams have no club: the uniqueness (tournament, group, club) applies only to real clubs."""
+    try:
+        await db.teams.drop_index("tournament_id_1_competition_id_1_club_id_1")
+    except Exception:
+        pass
+    await db.teams.create_index([("tournament_id", ASCENDING), ("competition_id", ASCENDING), ("club_id", ASCENDING)], unique=True, name="teams_unique_club_per_group", partialFilterExpression={"deleted_at": None, "club_id": {"$type": "string"}})
+
+
 MIGRATIONS = [
     ("001_core_auth", m001_core_auth),
     ("002_tournaments", m002_tournaments),
@@ -57,6 +70,7 @@ MIGRATIONS = [
     ("004_clubs_venues", m004_clubs_venues),
     ("005_audit", m005_audit),
     ("006_matches_placeholder", m006_matches_placeholder),
+    ("007_teams_placeholders", m007_teams_placeholders),
 ]
 
 
