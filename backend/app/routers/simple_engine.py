@@ -117,10 +117,19 @@ async def setup_groups(tournament_id: str, body: SetupIn, user: CurrentUser = De
             c = await comps_repo.insert(Competition(tournament_id=tournament_id, code=svc.competition_code(cat, ser), name=f"{cat} · {ser}", category=cat, series=ser, format="single_round_robin", teams_count=body.teams_per_group, rounds=svc._rounds(body.teams_per_group, False), points=s.points, tiebreakers=s.tiebreakers), user.id)
         groups.append(c)
     removed = 0
+    matches_repo = scoped("matches", tournament_id)
     for c in existing:
         if c.series not in wanted:
-            if await teams_repo.count({"competition_id": c.id}) or await scoped("matches", tournament_id).count({"competition_id": c.id}):
-                raise conflict(f"{c.series} contiene squadre o gare: spostale o eliminale prima di ridurre il numero di gironi")
+            ms = await matches_repo.list({"competition_id": c.id, "status": {"$ne": "cancelled"}}, limit=5000)
+            if any(m.status in PLAYED for m in ms):
+                raise conflict(f"{c.series} ha gare già giocate: non è possibile ridurre il numero di gironi")
+            for m in ms:
+                await matches_repo.soft_delete(m.id, user.id)
+            for tm in await teams_repo.list({"competition_id": c.id}, limit=2000):
+                if tm.club_id:
+                    await teams_repo.update(tm.id, {"competition_id": None, "series": ""}, user.id)
+                else:
+                    await teams_repo.soft_delete(tm.id, user.id)
             await comps_repo.soft_delete(c.id, user.id)
             removed += 1
     all_teams = await teams_repo.list({"category": cat}, limit=2000)
@@ -444,3 +453,53 @@ async def calendar_pdf(tournament_id: str, category: str | None = None, user: Cu
         raise bad_request("Nessuna partita da stampare")
     pdf = calendar_sheet.build(t.name, cat, b)
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="FSL_Calendario_{t.slug}.pdf"'})
+
+
+# ---------- eliminazioni ----------
+async def _delete_team_matches(tid: str, team_id: str, user) -> None:
+    repo = scoped("matches", tid)
+    ms = await repo.list({"$or": [{"home_team_id": team_id}, {"away_team_id": team_id}], "status": {"$ne": "cancelled"}}, limit=2000)
+    if any(m.status in PLAYED for m in ms):
+        raise conflict("La squadra ha gare già giocate: non può essere eliminata")
+    for m in ms:
+        await repo.soft_delete(m.id, user.id)
+
+
+@router.delete("/teams/{team_id}")
+async def delete_team(tournament_id: str, team_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Elimina un segnaposto (o toglie dal girone una squadra reale) e le sue gare non giocate."""
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    teams_repo = scoped("teams", tournament_id)
+    tm = await teams_repo.get(team_id)
+    if not tm:
+        raise not_found("Squadra")
+    await _delete_team_matches(tournament_id, tm.id, user)
+    if tm.club_id:
+        await teams_repo.update(tm.id, {"competition_id": None, "series": ""}, user.id)
+    else:
+        await teams_repo.soft_delete(tm.id, user.id)
+    await audit.record(user, "simple.team_delete", "team", tm.id, t.id, before={"name": tm.name})
+    return await _board(tournament_id, tm.category)
+
+
+@router.delete("/groups/{competition_id}")
+async def delete_group(tournament_id: str, competition_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Elimina un girone: via i segnaposto e le gare non giocate; le squadre reali restano fuori girone."""
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    comps_repo, teams_repo, matches_repo = scoped("competitions", tournament_id), scoped("teams", tournament_id), scoped("matches", tournament_id)
+    g = await comps_repo.get(competition_id)
+    if not g:
+        raise not_found("Girone")
+    ms = await matches_repo.list({"competition_id": g.id, "status": {"$ne": "cancelled"}}, limit=5000)
+    if any(m.status in PLAYED for m in ms):
+        raise conflict(f"{g.series} ha gare già giocate: non può essere eliminato")
+    for m in ms:
+        await matches_repo.soft_delete(m.id, user.id)
+    for tm in await teams_repo.list({"competition_id": g.id}, limit=2000):
+        if tm.club_id:
+            await teams_repo.update(tm.id, {"competition_id": None, "series": ""}, user.id)
+        else:
+            await teams_repo.soft_delete(tm.id, user.id)
+    await comps_repo.soft_delete(g.id, user.id)
+    await audit.record(user, "simple.group_delete", "competition", g.id, t.id, before={"series": g.series, "matches": len(ms)})
+    return await _board(tournament_id, g.category)

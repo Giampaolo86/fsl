@@ -30,11 +30,18 @@ PRESETS = [
 
 
 def normalize(items: list[dict]) -> list[dict]:
-    """Merge saved items over presets, keep order, auto Maps link."""
-    saved = {i.get("key"): i for i in (items or []) if i.get("key")}
+    """Lista libera di servizi/pacchetti (compat: vecchi preset senza label). Genera il link Maps dall'indirizzo."""
+    presets = {p["key"]: p for p in PRESETS}
     out = []
-    for p in PRESETS:
-        it = {**p, "enabled": False, "price": 0, "venue_name": "", "address": "", "maps_url": "", "when": "", "notes": "", **saved.get(p["key"], {})}
+    for raw in items or []:
+        if not raw.get("key"):
+            continue
+        base = presets.get(raw["key"], {})
+        it = {"label": "", "audience": "all", "unit": "a persona", "includes": [], "enabled": True, "price": 0, "description": "", "venue_name": "", "address": "", "maps_url": "", "when": "", "notes": "", **base, **raw}
+        if not it["includes"]:
+            it["includes"] = [k for k, flag in (("lodging", base.get("lodging")), ("transport", base.get("transport"))) if flag] or (["lunch"] if "lunch" in it["key"] else ["dinner"] if "dinner" in it["key"] else [])
+        it["lodging"] = "lodging" in it["includes"]
+        it["transport"] = "transport" in it["includes"]
         if not it.get("maps_url") and it.get("address"):
             it["maps_url"] = f"https://www.google.com/maps/search/?api=1&query={quote_plus(it['address'])}"
         out.append(it)

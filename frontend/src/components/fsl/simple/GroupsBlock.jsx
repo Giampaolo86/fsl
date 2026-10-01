@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRightLeft, Check, Pencil, Shuffle, X } from "lucide-react";
+import { ArrowRightLeft, Check, Pencil, Shuffle, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 
@@ -14,6 +14,10 @@ function TeamRow({ tid, team, groups, clubs, onDone, canWrite }) {
       await api.patch(`/tournaments/${tid}/groups/teams/${team.id}`, clubId ? { club_id: clubId } : { name: name.trim() });
       toast.success("Nome aggiornato: tutte le partite sono allineate"); setEdit(false); onDone();
     } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
+  };
+  const remove = async () => {
+    if (!window.confirm(`Eliminare «${team.name || "squadra senza nome"}»${team.club_id ? " dal girone" : ""}? Le sue gare non giocate verranno rimosse.`)) return;
+    try { await api.delete(`/tournaments/${tid}/simple/teams/${team.id}`); toast.success("Squadra rimossa"); onDone(); } catch (e) { toast.error(apiError(e)); }
   };
   const move = async (gid) => {
     if (!gid) return;
@@ -38,8 +42,9 @@ function TeamRow({ tid, team, groups, clubs, onDone, canWrite }) {
     <li className="py-1.5 flex items-center gap-2 group" data-testid={`team-row-${team.id}`}>
       {team.crest_url && <img src={team.crest_url} alt="" className="h-5 w-5 rounded-full object-cover" />}
       <button type="button" className={`flex-1 text-left text-sm truncate hover:text-fsl-gold ${team.placeholder ? "text-fsl-slate italic" : "font-semibold"}`} onClick={() => canWrite && setEdit(true)} title="Clicca per rinominare o sostituire con la squadra reale" data-testid={`team-name-${team.id}`}>
-        {team.name} {canWrite && <Pencil className="inline h-3 w-3 opacity-0 group-hover:opacity-70" aria-hidden="true" />}
+        {team.name || <span className="text-fsl-danger">(senza nome)</span>} {canWrite && <Pencil className="inline h-3 w-3 opacity-0 group-hover:opacity-70" aria-hidden="true" />}
       </button>
+      {canWrite && <button type="button" onClick={remove} className="text-fsl-slate/50 hover:text-fsl-danger" aria-label="Elimina squadra" data-testid={`team-delete-${team.id}`}><Trash2 className="h-3.5 w-3.5" /></button>}
       {canWrite && groups.length > 1 && (
         <select className="fsl-input h-7 w-24 text-[11px] py-0 px-1 opacity-60 group-hover:opacity-100" value="" onChange={(e) => move(e.target.value)} aria-label="Sposta in" data-testid={`team-move-${team.id}`}>
           <option value="">Sposta…</option>
@@ -56,8 +61,15 @@ export function GroupsBlock({ tid, board, reload, canWrite }) {
   const [busy, setBusy] = useState(false);
   const run = async (fn, ok) => { setBusy(true); try { await fn(); toast.success(ok); reload(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); } };
   const create = () => {
-    if (board.matches.length && !window.confirm("Il calendario esistente dei gironi verrà eliminato (le squadre e i nomi restano). Continuare?")) return;
+    const msg = board.matches.length ? "Il calendario esistente dei gironi verrà eliminato (le squadre e i nomi restano)." : "";
+    const extra = board.groups.filter((g) => !/^Girone [A-Z]$/.test(g.name) || g.name.charCodeAt(7) - 64 > Number(n));
+    const msg2 = extra.length ? `I gironi ${extra.map((g) => g.name).join(", ")} verranno eliminati (segnaposto rimossi, squadre reali messe fuori girone).` : "";
+    if ((msg || msg2) && !window.confirm(`${msg} ${msg2} Continuare?`.trim())) return;
     run(() => api.post(`/tournaments/${tid}/simple/groups`, { category: board.category, groups: Number(n), teams_per_group: Number(size) }), "Gironi pronti");
+  };
+  const removeGroup = (g) => {
+    if (!window.confirm(`Eliminare ${g.name}? Segnaposto e gare non giocate verranno rimossi; le squadre reali restano fuori girone.`)) return;
+    run(() => api.delete(`/tournaments/${tid}/simple/groups/${g.id}`), `${g.name} eliminato`);
   };
   const shuffle = () => {
     if (board.matches.length && !window.confirm("Sorteggiando, il calendario dei gironi verrà eliminato: dovrai rigenerarlo. Continuare?")) return;
@@ -82,7 +94,7 @@ export function GroupsBlock({ tid, board, reload, canWrite }) {
         <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3" data-testid="groups-grid">
           {board.groups.map((g) => (
             <div key={g.id} className="rounded-lg border border-white/10 bg-ink-950/40 p-3" data-testid={`group-card-${g.name.replace(/\s+/g, "-")}`}>
-              <div className="flex items-center justify-between mb-1"><div className="font-display font-extrabold uppercase text-fsl-gold">{g.name}</div><span className="text-[11px] text-fsl-slate num">{g.teams.length} squadre</span></div>
+              <div className="flex items-center justify-between mb-1 gap-2"><div className="font-display font-extrabold uppercase text-fsl-gold">{g.name}</div><span className="text-[11px] text-fsl-slate num ml-auto">{g.teams.length} squadre</span>{canWrite && <button type="button" onClick={() => removeGroup(g)} className="text-fsl-slate/50 hover:text-fsl-danger" aria-label={`Elimina ${g.name}`} data-testid={`group-delete-${g.id}`}><Trash2 className="h-3.5 w-3.5" /></button>}</div>
               <ul className="divide-y divide-white/[0.06]">{g.teams.map((tm) => <TeamRow key={tm.id} tid={tid} team={tm} groups={board.groups} clubs={board.clubs} onDone={reload} canWrite={canWrite} />)}</ul>
             </div>
           ))}
