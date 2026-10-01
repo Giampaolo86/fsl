@@ -47,11 +47,20 @@ export function AttentionList({ items }) {
       <div className="fsl-kicker mb-2 text-fsl-warning">Richiede attenzione</div>
       <div className="grid gap-2">
         {items.map((a) => (
-          <Link key={a.key} to={a.to} className="flex items-center gap-3 rounded-md bg-fsl-warning/10 px-3 h-11 text-sm hover:bg-fsl-warning/20 transition-colors" data-testid={`attention-${a.key}`}>
-            <AlertTriangle className="h-4 w-4 text-fsl-warning shrink-0" aria-hidden="true" />
-            <span className="flex-1 truncate">{a.label}</span>
-            <span className="font-display font-extrabold num text-fsl-warning">{a.count}</span>
-          </Link>
+          <div key={a.key}>
+            <Link to={a.to} className={`flex items-center gap-3 rounded-md px-3 h-11 text-sm transition-colors ${a.key === "no_referee" ? "bg-fsl-danger/15 hover:bg-fsl-danger/25" : "bg-fsl-warning/10 hover:bg-fsl-warning/20"}`} data-testid={`attention-${a.key}`}>
+              <AlertTriangle className={`h-4 w-4 shrink-0 ${a.key === "no_referee" ? "text-fsl-danger" : "text-fsl-warning"}`} aria-hidden="true" />
+              <span className="flex-1 truncate">{a.label}</span>
+              <span className={`font-display font-extrabold num ${a.key === "no_referee" ? "text-fsl-danger" : "text-fsl-warning"}`}>{a.count}</span>
+            </Link>
+            {a.matches?.length > 0 && (
+              <ul className="mt-1 ml-3 pl-4 border-l border-fsl-danger/30 space-y-1" data-testid="attention-no-referee-list">
+                {a.matches.map((m) => (
+                  <li key={m.id}><Link to={a.to.replace(/\/partite$/, `/partite/${m.id}`)} className="text-xs text-fsl-slate hover:text-fsl-white num" data-testid={`no-referee-match-${m.id}`}>{m.kickoff_at.slice(11, 16)} · {m.home} vs {m.away}{m.field_name ? ` · ${m.field_name}` : ""}</Link></li>
+                ))}
+              </ul>
+            )}
+          </div>
         ))}
       </div>
     </div>

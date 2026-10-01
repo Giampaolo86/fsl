@@ -212,3 +212,5 @@ Parziale / da completare: consenso privacy digitale del genitore (oggi flag gest
 
 ## Decisioni aperte
 Provider email/SMS; policy retention; Pantone su mazzetta fisica. Stripe: sandbox da reclamare (link onboarding nel riepilogo), modalità fiscale attuale «Stripe gestisce tutto» (cambiabile su richiesta).
+
+- [x] **Promemoria arbitro + attività personali (2026-06)**: `services/dashboard.py` → attention `no_referee` (gare scheduled/confirmed nelle prossime 24h senza `referee_user_id`, con elenco gare cliccabili) in testa al riquadro «Richiede attenzione», badge rosso «senza arbitro» nelle Prossime partite; `todos_overdue` se attività scadute. To-do manuale per torneo: modello `TournamentTodo` (collezione `tournament_todos`, scoped `todos`), `routers/todos.py` GET/POST `/tournaments/{tid}/todos`, PATCH/DELETE `/{id}` (ruoli super_admin/director/secretary, soft delete), `components/fsl/TodoList.jsx` nella home torneo (titolo + scadenza, spunta, elimina, scadute in rosso). SW `fsl-shell-v7`. Verificato via UI.

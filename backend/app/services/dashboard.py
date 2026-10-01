@@ -1,6 +1,6 @@
 """Home del torneo in Control Room: checklist operativa, attenzioni, prossime gare e ultimi risultati."""
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from ..core.db import db
 from ..repositories.registry import scoped, settings_repo
@@ -76,6 +76,14 @@ async def build(t, counts: dict) -> dict:
 
     now = datetime.now(timezone.utc).isoformat()
     upcoming = sorted([m for m in ms if m.status in ("scheduled", "confirmed", "draft") and m.kickoff_at >= now[:16]], key=lambda m: m.kickoff_at)[:8]
+    horizon = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()[:16]
+    no_ref = [m for m in ms if m.status in ("scheduled", "confirmed") and now[:16] <= m.kickoff_at <= horizon and not m.referee_user_id]
+    if no_ref:
+        attention.insert(0, {"key": "no_referee", "label": "Gare nelle prossime 24 ore senza arbitro", "count": len(no_ref), "to": f"{base}/partite", "matches": [_match_pub(m, names) for m in sorted(no_ref, key=lambda m: m.kickoff_at)[:5]]})
+    todos = await scoped("todos", tid).list({"done": False}, limit=500)
+    overdue = [x for x in todos if x.due_date and x.due_date < now[:10]]
+    if overdue:
+        attention.append({"key": "todos_overdue", "label": "Attività personali scadute", "count": len(overdue), "to": base})
     recent = sorted([m for m in ms if m.status in PLAYED], key=lambda m: m.kickoff_at, reverse=True)[:6]
     done_steps = sum(1 for x in steps if x["done"])
     return {"steps": steps, "steps_done": done_steps, "attention": attention, "upcoming": [_match_pub(m, names) for m in upcoming], "recent": [_match_pub(m, names) for m in recent], "next_step": next((x for x in steps if not x["done"]), None)}

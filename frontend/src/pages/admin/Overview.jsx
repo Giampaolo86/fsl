@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { KpiTile, PageHeader } from "@/components/fsl/Primitives";
 import { TournamentChecklist, AttentionList } from "@/components/fsl/TournamentChecklist";
 import { MatchList } from "@/components/fsl/MatchList";
+import { TodoList } from "@/components/fsl/TodoList";
 import { StatusBadge } from "@/components/fsl/StatusBadge";
 import { FieldsBoard } from "@/components/fsl/FieldsBoard";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
@@ -23,11 +24,12 @@ export default function Overview() {
   const { user } = useAuth();
   const [dialog, setDialog] = useState(null);
 
+  const [dashTick, setDashTick] = useState(0);
   useEffect(() => {
     let alive = true;
     api.get(`/tournaments/${tournamentId}/dashboard`).then((r) => alive && setDash(r.data)).catch(() => alive && setDash({ steps: [], steps_done: 0, attention: [], upcoming: [], recent: [], next_step: null }));
     return () => { alive = false; };
-  }, [tournamentId, data]);
+  }, [tournamentId, data, dashTick]);
 
   if (loading) return <LoadingState label="Caricamento torneo…" />;
   if (error) return <ErrorState message={apiError(error)} onRetry={reload} />;
@@ -116,8 +118,9 @@ export default function Overview() {
       {dash ? (
         <div className="grid lg:grid-cols-5 gap-4">
           <div className="lg:col-span-2 space-y-4">
-            <TournamentChecklist data={dash} />
             <AttentionList items={dash.attention} />
+            <TournamentChecklist data={dash} />
+            {["super_admin", "director", "secretary"].includes(t.my_role) && <TodoList tournamentId={t.id} onChange={() => setDashTick((n) => n + 1)} />}
           </div>
           <div className="lg:col-span-3 space-y-4">
             <MatchList title="Prossime partite" matches={dash.upcoming} tid={t.id} to={`/admin/t/${t.id}/calendario`} emptyText={t.counts.matches_total ? "Nessuna gara in programma" : "Genera il calendario per vedere qui le prossime gare"} testId="overview-upcoming" />

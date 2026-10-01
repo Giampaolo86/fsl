@@ -17,6 +17,8 @@ function Row({ m, tid, showScore }) {
       </div>
       {showScore ? (
         <div className="font-display font-extrabold text-xl num text-fsl-gold shrink-0">{m.score?.home ?? "–"} - {m.score?.away ?? "–"}</div>
+      ) : !m.referee_name && m.status !== "draft" ? (
+        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 bg-fsl-danger/15 text-fsl-danger" data-testid={`match-no-referee-${m.id}`}>senza arbitro</span>
       ) : (
         <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${m.status === "draft" ? "bg-fsl-warning/15 text-fsl-warning" : "bg-white/10 text-fsl-slate"}`}>{m.status === "draft" ? "bozza" : m.status === "confirmed" ? "confermata" : "programmata"}</span>
       )}

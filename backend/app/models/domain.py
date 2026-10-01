@@ -414,6 +414,16 @@ class Purchase(BaseDocument):
     redeemed_at: Optional[datetime] = None
 
 
+class TournamentTodo(BaseDocument):
+    tournament_id: str
+    title: str
+    notes: str = ""
+    due_date: Optional[str] = None
+    done: bool = False
+    done_at: Optional[str] = None
+
+
+
 class HospitalityBooking(BaseDocument):
     tournament_id: str
     code: str = ""
