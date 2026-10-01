@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileDown, Pencil } from "lucide-react";
+import { FileDown, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -32,20 +32,31 @@ export function MatchTable({ rows, onEdit, canWrite, showGroup = true, testId })
   );
 }
 
+const WEEKDAYS = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+const dayLabel = (d) => (d ? `${WEEKDAYS[new Date(d + "T12:00").getDay()]} ${fmtDate(d)}` : "");
+
 export function CalendarBlock({ tid, board, reload, canWrite, onEdit }) {
   const c = board.calendar;
-  const [f, setF] = useState({ date: c.date || new Date().toISOString().slice(0, 10), fields_count: c.fields_count || 2, start_time: c.start_time || "08:30", end_time: c.end_time || "13:30", match_minutes: c.match_minutes || 25, buffer_minutes: c.buffer_minutes ?? 10 });
+  const today = new Date().toISOString().slice(0, 10);
+  const [sessions, setSessions] = useState(c.sessions?.length ? c.sessions : [{ date: c.date || today, start_time: c.start_time || "15:00", end_time: c.end_time || "19:00" }]);
+  const [f, setF] = useState({ fields_count: c.fields_count || 2, match_minutes: c.match_minutes || 25, buffer_minutes: c.buffer_minutes ?? 10 });
   const [busy, setBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const updS = (i, k, v) => setSessions(sessions.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const addSession = () => {
+    const last = sessions[sessions.length - 1];
+    const d = new Date((last?.date || today) + "T12:00"); d.setDate(d.getDate() + 1);
+    setSessions([...sessions, { date: d.toISOString().slice(0, 10), start_time: "08:30", end_time: "12:30" }]);
+  };
   const generate = async () => {
-    if (board.matches.length && !window.confirm("Il calendario attuale dei gironi verrà sostituito. Continuare?")) return;
+    if (board.matches.length && !window.confirm("Il calendario attuale dei gironi verrà sostituito (le modifiche manuali andranno perse). Continuare?")) return;
     setBusy(true);
     try {
-      const { data } = await api.post(`/tournaments/${tid}/simple/calendar`, { ...f, category: board.category, fields_count: Number(f.fields_count), match_minutes: Number(f.match_minutes), buffer_minutes: Number(f.buffer_minutes) });
-      toast.success(`${data.count} partite generate su ${data.days} giornat${data.days === 1 ? "a" : "e"}`); reload();
+      const { data } = await api.post(`/tournaments/${tid}/simple/calendar`, { category: board.category, sessions, fields_count: Number(f.fields_count), match_minutes: Number(f.match_minutes), buffer_minutes: Number(f.buffer_minutes) });
+      toast.success(`${data.count} partite distribuite su ${data.sessions} session${data.sessions === 1 ? "e" : "i"}`); reload();
     } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
   };
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const [pdfBusy, setPdfBusy] = useState(false);
   const pdf = async () => {
     setPdfBusy(true);
     try {
@@ -53,27 +64,38 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit }) {
       const url = URL.createObjectURL(r.data); const a = document.createElement("a"); a.href = url; a.download = `FSL_Calendario_${board.category}.pdf`; a.click(); URL.revokeObjectURL(url);
     } catch (e) { toast.error(apiError(e)); } finally { setPdfBusy(false); }
   };
+  const days = [...new Set(board.matches.map((m) => m.kickoff_at.slice(0, 10)))];
   return (
     <section className="fsl-card p-5" data-testid="block-calendar">
-      <div className="flex flex-wrap items-end gap-3 mb-4">
-        <div><div className="fsl-kicker">B</div><h2 className="font-display font-extrabold uppercase text-2xl leading-none">Calendario</h2><p className="text-xs text-fsl-slate mt-1">Girone all'italiana, sola andata: partite solo tra squadre dello stesso girone.</p></div>
+      <div className="flex flex-wrap items-start gap-4 mb-4">
+        <div><div className="fsl-kicker">B</div><h2 className="font-display font-extrabold uppercase text-2xl leading-none">Calendario</h2><p className="text-xs text-fsl-slate mt-1">All'italiana, sola andata, solo tra squadre dello stesso girone. Ogni partita resta modificabile (anche il giorno).</p></div>
         {canWrite && board.groups.length > 0 && (
-          <div className="flex flex-wrap items-end gap-2 ml-auto">
-            <label className="text-xs text-fsl-slate">Data inizio<input type="date" className="fsl-input h-10 w-40 mt-1" value={f.date} onChange={set("date")} data-testid="cal-date" /></label>
-            <label className="text-xs text-fsl-slate">Campi<input type="number" min="1" max="20" className="fsl-input h-10 w-16 mt-1" value={f.fields_count} onChange={set("fields_count")} data-testid="cal-fields" /></label>
-            <label className="text-xs text-fsl-slate">Inizio<input type="time" className="fsl-input h-10 w-28 mt-1" value={f.start_time} onChange={set("start_time")} data-testid="cal-start" /></label>
-            <label className="text-xs text-fsl-slate">Fine<input type="time" className="fsl-input h-10 w-28 mt-1" value={f.end_time} onChange={set("end_time")} data-testid="cal-end" /></label>
-            <label className="text-xs text-fsl-slate">Durata (min)<input type="number" min="5" max="120" className="fsl-input h-10 w-20 mt-1" value={f.match_minutes} onChange={set("match_minutes")} data-testid="cal-duration" /></label>
-            <label className="text-xs text-fsl-slate">Intervallo (min)<input type="number" min="0" max="60" className="fsl-input h-10 w-20 mt-1" value={f.buffer_minutes} onChange={set("buffer_minutes")} data-testid="cal-buffer" /></label>
-            <button className="btn-gold h-10" disabled={busy} onClick={generate} data-testid="cal-generate-button">Genera calendario</button>
+          <div className="ml-auto rounded-lg border border-white/10 bg-ink-950/40 p-3 space-y-2 min-w-[520px]" data-testid="cal-setup">
+            <div className="flex items-center justify-between"><span className="text-[11px] uppercase tracking-wider text-fsl-slate">Quando si gioca</span><button type="button" className="text-xs text-fsl-gold hover:underline" onClick={addSession} data-testid="cal-add-session">+ Aggiungi sessione</button></div>
+            {sessions.map((sess, i) => (
+              <div key={i} className="flex items-center gap-2" data-testid={`cal-session-${i}`}>
+                <input type="date" className="fsl-input h-9 w-40" value={sess.date} onChange={(e) => updS(i, "date", e.target.value)} data-testid={`cal-session-date-${i}`} />
+                <span className="text-xs text-fsl-slate w-20 truncate">{dayLabel(sess.date)}</span>
+                <input type="time" className="fsl-input h-9 w-28" value={sess.start_time} onChange={(e) => updS(i, "start_time", e.target.value)} data-testid={`cal-session-start-${i}`} />
+                <span className="text-xs text-fsl-slate">→</span>
+                <input type="time" className="fsl-input h-9 w-28" value={sess.end_time} onChange={(e) => updS(i, "end_time", e.target.value)} data-testid={`cal-session-end-${i}`} />
+                {sessions.length > 1 && <button type="button" className="text-fsl-slate hover:text-fsl-danger" onClick={() => setSessions(sessions.filter((_, j) => j !== i))} aria-label="Rimuovi sessione" data-testid={`cal-session-remove-${i}`}><X className="h-4 w-4" /></button>}
+              </div>
+            ))}
+            <div className="flex flex-wrap items-end gap-2 pt-1">
+              <label className="text-xs text-fsl-slate">Campi<input type="number" min="1" max="20" className="fsl-input h-9 w-16 mt-1" value={f.fields_count} onChange={set("fields_count")} data-testid="cal-fields" /></label>
+              <label className="text-xs text-fsl-slate">Durata gara (min)<input type="number" min="5" max="120" className="fsl-input h-9 w-24 mt-1" value={f.match_minutes} onChange={set("match_minutes")} data-testid="cal-duration" /></label>
+              <label className="text-xs text-fsl-slate">Pausa tra gare (min)<input type="number" min="0" max="60" className="fsl-input h-9 w-24 mt-1" value={f.buffer_minutes} onChange={set("buffer_minutes")} data-testid="cal-buffer" /></label>
+              <button className="btn-gold h-9 ml-auto" disabled={busy} onClick={generate} data-testid="cal-generate-button">{board.matches.length ? "Rigenera calendario" : "Genera calendario"}</button>
+            </div>
           </div>
         )}
       </div>
       {board.matches.length === 0 ? (
-        <p className="text-sm text-fsl-slate" data-testid="cal-empty">{board.groups.length ? "Imposta campi e orari, poi premi «Genera calendario». Ogni partita resterà modificabile." : "Crea prima i gironi."}</p>
+        <p className="text-sm text-fsl-slate" data-testid="cal-empty">{board.groups.length ? "Indica quando si gioca (es. sabato 15:00→19:00 e domenica 08:30→12:30), campi e durata, poi premi «Genera calendario»." : "Crea prima i gironi."}</p>
       ) : (
         <div className="space-y-4">
-          <button className="btn-ghost h-10" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa calendario PDF (una pagina per girone)"}</button>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-fsl-slate"><span data-testid="cal-summary">{board.matches.length} partite · {days.map(dayLabel).join(" · ")}</span><button className="btn-ghost h-9 ml-auto" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button></div>
           {board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
         </div>
       )}

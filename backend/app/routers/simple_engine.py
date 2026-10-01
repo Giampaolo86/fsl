@@ -2,7 +2,7 @@
 import random
 import re
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -80,7 +80,7 @@ async def _board(tid: str, cat: str) -> dict:
         "matches": group_ms,
         "finals": finals_ms,
         "finals_competition_id": ko.id if ko else None,
-        "calendar": {"fields_count": s.fields_count, "start_time": s.day_start, "end_time": s.day_end, "match_minutes": s.match_duration_min, "buffer_minutes": s.buffer_min, "date": group_ms[0]["kickoff_at"][:10] if group_ms else None},
+        "calendar": {"fields_count": s.fields_count, "start_time": s.day_start, "end_time": s.day_end, "match_minutes": s.match_duration_min, "buffer_minutes": s.buffer_min, "date": group_ms[0]["kickoff_at"][:10] if group_ms else None, "sessions": s.calendar_sessions or []},
         "played": sum(1 for m in group_ms if m["played"]),
         "finals_played": sum(1 for m in finals_ms if m["played"]),
     }
@@ -211,21 +211,34 @@ async def move_team(tournament_id: str, team_id: str, body: MoveIn, user: Curren
     regenerated = False
     if had:
         s = await settings_repo.find_one({"tournament_id": tournament_id})
-        await _generate(tournament_id, cat, user, CalendarIn(category=cat, date=first[0].kickoff_at[:10], fields_count=s.fields_count, start_time=s.day_start, end_time=s.day_end, match_minutes=s.match_duration_min, buffer_minutes=s.buffer_min))
+        await _generate(tournament_id, cat, user, CalendarIn(category=cat, date=first[0].kickoff_at[:10], sessions=[SessionIn(**w) for w in (s.calendar_sessions or [])], fields_count=s.fields_count, start_time=s.day_start, end_time=s.day_end, match_minutes=s.match_duration_min, buffer_minutes=s.buffer_min))
         regenerated = True
     await audit.record(user, "simple.move", "team", tm.id, t.id, after={"to": g.series, "regenerated": regenerated})
     return {"regenerated": regenerated, **await _board(tournament_id, cat)}
 
 
 # ---------- B. calendario ----------
+class SessionIn(BaseModel):
+    date: str
+    start_time: str = "08:30"
+    end_time: str = "13:00"
+
+
 class CalendarIn(BaseModel):
     category: str | None = None
-    date: str
+    date: str | None = None
+    sessions: list[SessionIn] = []
     fields_count: int = Field(ge=1, le=20)
     start_time: str = "08:30"
     end_time: str = "19:00"
     match_minutes: int = Field(ge=5, le=120)
     buffer_minutes: int = Field(ge=0, le=60)
+
+    def windows(self) -> list[SessionIn]:
+        """Sessioni esplicite (sabato pomeriggio, domenica mattina…) oppure una sola finestra da `date`."""
+        if self.sessions:
+            return sorted(self.sessions, key=lambda x: (x.date, x.start_time))
+        return [SessionIn(date=self.date or date.today().isoformat(), start_time=self.start_time, end_time=self.end_time)]
 
 
 def _slots_for(day: str, times: list[str], fields):
@@ -236,10 +249,12 @@ async def _generate(tid: str, cat: str, user, body: CalendarIn) -> dict:
     from ..repositories.registry import tournaments as t_repo
 
     s = await settings_repo.find_one({"tournament_id": tid})
-    times = svc.compute_slots(body.start_time, body.end_time, body.match_minutes, body.buffer_minutes)
-    if not times:
-        raise bad_request("La finestra oraria non consente nemmeno una gara")
-    s = await settings_repo.update(s.id, {"fields_count": body.fields_count, "day_start": body.start_time, "day_end": body.end_time, "match_duration_min": body.match_minutes, "buffer_min": body.buffer_minutes, "slots": times}, user.id)
+    windows = body.windows()
+    slot_times = {id(w): svc.compute_slots(w.start_time, w.end_time, body.match_minutes, body.buffer_minutes) for w in windows}
+    if not any(slot_times.values()):
+        raise bad_request("Nessuna sessione consente almeno una gara: allarga la fascia oraria")
+    first = windows[0]
+    s = await settings_repo.update(s.id, {"fields_count": body.fields_count, "day_start": first.start_time, "day_end": first.end_time, "match_duration_min": body.match_minutes, "buffer_min": body.buffer_minutes, "slots": slot_times[id(first)], "calendar_sessions": [w.model_dump() for w in windows]}, user.id)
     await svc.ensure_fields(await t_repo.get(tid), s, user)
     fields = (await scoped("fields", tid).list({"active": True}, sort=[("code", 1)]))[: body.fields_count]
     groups = await _groups(tid, cat)
@@ -258,14 +273,13 @@ async def _generate(tid: str, cat: str, user, body: CalendarIn) -> dict:
         raise bad_request("Nessun girone con almeno 2 squadre")
     venue = (await scoped("venues", tid).list(limit=1) or [None])[0]
     other = {(m.kickoff_at, m.field_id) for m in await matches_repo.list({"status": {"$ne": "cancelled"}}, limit=5000)}
-    busy, prev_time = defaultdict(set), defaultdict(set)
-    start_day = date.fromisoformat(body.date)
-    slots, used, created, days = [], set(), [], 0
-
-    def extend():
-        nonlocal days
-        slots.extend(_slots_for((start_day + timedelta(days=days)).isoformat(), times, fields))
-        days += 1
+    slots = [sl for w in windows for sl in _slots_for(w.date, slot_times[id(w)], fields)]
+    next_time = {}
+    for w in windows:
+        ts = slot_times[id(w)]
+        for i, tm in enumerate(ts[:-1]):
+            next_time[f"{w.date}T{tm}"] = f"{w.date}T{ts[i + 1]}"
+    busy, prev_time, used, created = defaultdict(set), defaultdict(set), set(), []
 
     def pick(h, a, strict):
         for sl in slots:
@@ -277,24 +291,18 @@ async def _generate(tid: str, cat: str, user, body: CalendarIn) -> dict:
             return sl
         return None
 
-    extend()
-    for r, g, h, a in plan:
+    for idx, (r, g, h, a) in enumerate(plan):
         chosen = pick(h, a, True) or pick(h, a, False)
-        while not chosen:
-            if days > 120:
-                raise conflict("Impossibile collocare tutte le gare: aumenta campi o fascia oraria")
-            extend()
-            chosen = pick(h, a, True) or pick(h, a, False)
+        if not chosen:
+            raise conflict(f"Le sessioni non bastano: {len(plan) - idx} gare su {len(plan)} restano fuori. Aggiungi una sessione, un campo o accorcia le gare.")
         used.add((chosen["kickoff_at"], chosen["field_id"]))
         busy[chosen["kickoff_at"]].update({h, a})
-        d, tm = chosen["kickoff_at"][:10], chosen["kickoff_at"][11:]
-        i = times.index(tm)
-        if i + 1 < len(times):
-            prev_time[f"{d}T{times[i + 1]}"].update({h, a})
+        if chosen["kickoff_at"] in next_time:
+            prev_time[next_time[chosen["kickoff_at"]]].update({h, a})
         created.append(Match(tournament_id=tid, competition_id=g.id, home_team_id=h, away_team_id=a, category=g.category, series=g.series, match_day=r + 1, round_name=f"Giornata {r + 1}", kickoff_at=chosen["kickoff_at"], field_id=chosen["field_id"], field_name=chosen["field_name"], venue_name=venue.name if venue else "", status="scheduled"))
     for m in created:
         await matches_repo.insert(m, user.id)
-    return {"count": len(created), "days": days}
+    return {"count": len(created), "days": len({w.date for w in windows}), "sessions": len(windows)}
 
 
 @router.post("/calendar")
