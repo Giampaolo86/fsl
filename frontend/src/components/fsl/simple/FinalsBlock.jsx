@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Users } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { MatchTable } from "./CalendarBlock";
@@ -14,6 +15,16 @@ export function FinalsBlock({ tid, board, reload, canWrite, onEdit }) {
       const { data } = await api.post(`/tournaments/${tid}/simple/finals`, { ...f, teams: Number(f.teams), category: board.category });
       toast.success(`Fase finale creata: ${data.count} partite`); reload();
     } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
+  };
+  const fill = async (force = false) => {
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/tournaments/${tid}/simple/finals/fill`, null, { params: { category: board.category, force } });
+      toast.success(`${data.replaced} caselle compilate${data.missing.length ? ` · da definire: ${data.missing.join(", ")}` : ""}`); reload();
+    } catch (e) {
+      if (e?.response?.status === 409 && !force && window.confirm(`${apiError(e)}\n\nPotrai comunque correggere a mano con Modifica.`)) return fill(true);
+      toast.error(apiError(e));
+    } finally { setBusy(false); }
   };
   return (
     <section className="fsl-card p-5" data-testid="block-finals">
@@ -32,7 +43,10 @@ export function FinalsBlock({ tid, board, reload, canWrite, onEdit }) {
       {board.finals.length === 0 ? (
         <p className="text-sm text-fsl-slate" data-testid="finals-empty">Nessuna fase finale generata.</p>
       ) : (
-        <MatchTable rows={board.finals} onEdit={onEdit} canWrite={canWrite} testId="finals-table" />
+        <div className="space-y-3">
+          {canWrite && <div className="flex flex-wrap items-center gap-3"><button className="btn-ghost h-10" disabled={busy} onClick={() => fill(false)} data-testid="finals-fill-button"><Users className="h-4 w-4" /> Inserisci le qualificate</button><span className="text-xs text-fsl-slate">Prende 1ª/2ª dalle classifiche e vincenti/perdenti dai risultati ufficiali. Puoi sempre correggere con Modifica.</span></div>}
+          <MatchTable rows={board.finals} onEdit={onEdit} canWrite={canWrite} testId="finals-table" />
+        </div>
       )}
     </section>
   );

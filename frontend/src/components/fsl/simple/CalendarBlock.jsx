@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil } from "lucide-react";
+import { FileDown, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -45,6 +45,14 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit }) {
     } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
   };
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const pdf = async () => {
+    setPdfBusy(true);
+    try {
+      const r = await api.get(`/tournaments/${tid}/simple/calendar.pdf`, { params: { category: board.category }, responseType: "blob" });
+      const url = URL.createObjectURL(r.data); const a = document.createElement("a"); a.href = url; a.download = `FSL_Calendario_${board.category}.pdf`; a.click(); URL.revokeObjectURL(url);
+    } catch (e) { toast.error(apiError(e)); } finally { setPdfBusy(false); }
+  };
   return (
     <section className="fsl-card p-5" data-testid="block-calendar">
       <div className="flex flex-wrap items-end gap-3 mb-4">
@@ -65,6 +73,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit }) {
         <p className="text-sm text-fsl-slate" data-testid="cal-empty">{board.groups.length ? "Imposta campi e orari, poi premi «Genera calendario». Ogni partita resterà modificabile." : "Crea prima i gironi."}</p>
       ) : (
         <div className="space-y-4">
+          <button className="btn-ghost h-10" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa calendario PDF (una pagina per girone)"}</button>
           {board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
         </div>
       )}

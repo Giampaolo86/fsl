@@ -377,3 +377,70 @@ async def generate_finals(tournament_id: str, body: FinalsIn, user: CurrentUser 
     await scoped("competitions", tournament_id).update(ko.id, {"finals": {"mode": "cross_groups", "qualifiers": n, "qualifiers_per_group": per_group, "third_place": body.third_place}}, user.id)
     await audit.record(user, "simple.finals", "competition", ko.id, t.id, after={"teams": n, "matches": created})
     return {"count": created, **await _board(tournament_id, cat)}
+
+
+# ---------- qualificate automatiche ----------
+QUAL_RE = re.compile(r"^(Vincente|Perdente) (OF|QF|SF)(\d+)$")
+RND = {"OF": 8, "QF": 4, "SF": 2}
+
+
+@router.post("/finals/fill")
+async def fill_finals(tournament_id: str, category: str | None = None, force: bool = False, user: CurrentUser = Depends(get_current_user)):
+    """Sostituisce i segnaposto: «1ª Girone A» dalle classifiche, «Vincente QF1»/«Perdente SF1» dai risultati ufficiali. Modifica manuale sempre possibile."""
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    cat = await _category(tournament_id, category)
+    ko = await _knockout(tournament_id, cat)
+    if not ko:
+        raise not_found("Fase finale")
+    teams_repo, matches_repo, comps_repo = scoped("teams", tournament_id), scoped("matches", tournament_id), scoped("competitions", tournament_id)
+    finals = await matches_repo.list({"competition_id": ko.id, "stage": "finals", "status": {"$ne": "cancelled"}}, limit=200)
+    if not finals:
+        raise bad_request("Genera prima la fase finale")
+    pending = await matches_repo.count({"category": cat, "stage": "qualification", "status": {"$nin": ["official", "rectified", "cancelled"]}})
+    if pending and not force:
+        raise conflict(f"{pending} gare dei gironi non sono ancora ufficiali: la classifica può cambiare. Inserire comunque le qualificate attuali?")
+    placeholders = await teams_repo.list({"competition_id": ko.id, "placeholder": True}, limit=200)
+    standings, replaced, missing = {}, 0, []
+    by_round = {(m.bracket_round, m.bracket_slot): m for m in finals}
+    for ph in placeholders:
+        real = None
+        if ph.qualifier:
+            gid, pos = ph.qualifier["competition_id"], int(ph.qualifier["pos"])
+            if gid not in standings:
+                g = await comps_repo.get(gid)
+                standings[gid] = await engine.compute_standings(tournament_id, g) if g else []
+            rows = standings[gid]
+            real = rows[pos - 1]["team_id"] if len(rows) >= pos else None
+        else:
+            mm = QUAL_RE.match(ph.name)
+            if mm:
+                src = by_round.get((RND[mm.group(2)], int(mm.group(3)) - 1))
+                if src and src.status in PLAYED:
+                    real = engine.winner_of(src) if mm.group(1) == "Vincente" else engine.loser_of(src)
+        if not real:
+            missing.append(ph.name)
+            continue
+        for side in ("home_team_id", "away_team_id"):
+            for m in await matches_repo.list({"competition_id": ko.id, "stage": "finals", side: ph.id}, limit=50):
+                await matches_repo.update(m.id, {side: real}, user.id)
+                replaced += 1
+    await audit.record(user, "simple.finals_fill", "competition", ko.id, t.id, after={"replaced": replaced, "missing": missing})
+    return {"replaced": replaced, "missing": missing, **await _board(tournament_id, cat)}
+
+
+# ---------- stampa calendario ----------
+@router.get("/calendar.pdf")
+async def calendar_pdf(tournament_id: str, category: str | None = None, user: CurrentUser = Depends(get_current_user)):
+    from fastapi import Response
+
+    from ..repositories.registry import tournaments as t_repo
+    from ..services import calendar_sheet
+
+    await _ctx(tournament_id, user)
+    cat = await _category(tournament_id, category)
+    t = await t_repo.get(tournament_id)
+    b = await _board(tournament_id, cat)
+    if not b["matches"] and not b["finals"]:
+        raise bad_request("Nessuna partita da stampare")
+    pdf = calendar_sheet.build(t.name, cat, b)
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="FSL_Calendario_{t.slug}.pdf"'})
