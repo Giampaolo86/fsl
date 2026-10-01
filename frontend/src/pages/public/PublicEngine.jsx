@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Award, CalendarDays, Target, TrendingUp } from "lucide-react";
+import { Award, CalendarDays, Target, TrendingUp, Trophy } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { MatchCard, MatchStatusBadge, kickoffLabel } from "@/components/fsl/MatchCard";
 import { RatingsColumns } from "@/components/fsl/Ratings";
@@ -128,12 +128,20 @@ export function PublicStandingsLive() {
   const [params, setParams] = useSearchParams();
   const cat = params.get("cat") || home?.settings?.categories?.[0] || "";
   const { slug, data, error } = useSlugData("/standings", cat ? { category: cat } : {});
+  const setP = (k, v) => { const p = new URLSearchParams(params); if (v) p.set(k, v); else p.delete(k); setParams(p); };
   if (error) return <Wrap><ErrorState message={apiError(error)} /></Wrap>;
   if (!data || !home) return <LoadingState full />;
+  const list = data.filter((s) => !cat || s.competition.category === cat);
+  const serie = list.find((s) => s.competition.id === params.get("serie")) || list[0];
   return (
     <Wrap>
       <PageHeader kicker={home.tournament.name} title="Classifiche" subtitle="Solo risultati ufficiali o rettificati alimentano la classifica pubblica." actions={<select className="fsl-input w-40" value={cat} onChange={(e) => setParams({ cat: e.target.value })} aria-label="Categoria" data-testid="standings-category-select">{home.settings.categories.map((c) => <option key={c}>{c}</option>)}</select>} />
-      <div className="grid xl:grid-cols-2 gap-4">{data.map((s) => <StandingsTable key={s.competition.id} competition={s.competition} rows={s.rows} clubBase={`/tornei/${slug}/squadre`} />)}</div>
+      {list.length > 1 && (
+        <div className="flex flex-wrap gap-2 mb-5" role="tablist" aria-label="Serie o girone" data-testid="standings-serie-tabs">
+          {list.map((s) => <button key={s.competition.id} role="tab" aria-selected={serie?.competition.id === s.competition.id} onClick={() => setP("serie", s.competition.id)} className={`h-10 px-4 rounded-full font-display font-bold uppercase text-sm tracking-wide border transition-colors ${serie?.competition.id === s.competition.id ? "bg-fsl-gold text-ink-950 border-fsl-gold" : "border-fsl-gold/40 text-fsl-white hover:bg-fsl-gold/10"}`} data-testid={`standings-serie-tab-${s.competition.code}`}>{s.competition.series}<span className="ml-2 num text-xs opacity-70">{s.rows.length}</span></button>)}
+        </div>
+      )}
+      {serie ? <StandingsTable key={serie.competition.id} competition={serie.competition} rows={serie.rows} clubBase={`/tornei/${slug}/squadre`} /> : <EmptyState icon={Trophy} title="Nessuna classifica" description="Le classifiche compariranno con le prime gare ufficiali." />}
     </Wrap>
   );
 }
