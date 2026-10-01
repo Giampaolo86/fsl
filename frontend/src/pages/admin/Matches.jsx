@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { CalendarClock, CalendarPlus, LayoutGrid, List, Pencil, Plus } from "lucide-react";
+import { CalendarClock, CalendarPlus, LayoutGrid, List, Pencil, Plus, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { MatchCard, MATCH_STATUS } from "@/components/fsl/MatchCard";
@@ -10,6 +10,7 @@ import { useScoped, useTournamentDetail } from "@/hooks/useTournamentData";
 import { api, apiError } from "@/lib/api";
 import { GroupsBoard, STATE_LABEL, useBoard } from "@/components/fsl/GroupsBoard";
 import { CalendarGrid, CalendarTools, FinalsPanel, MatchEditDialog } from "@/components/fsl/CalendarStudio";
+import { RefereeAssignments } from "@/components/fsl/RefereeAssignments";
 
 export default function Matches({ mode = "matches" }) {
   const { data: t, reload: reloadT } = useTournamentDetail();
@@ -21,7 +22,6 @@ export default function Matches({ mode = "matches" }) {
   const [error, setError] = useState(null);
   const [create, setCreate] = useState(false);
   const [editM, setEditM] = useState(null);
-  const [view, setView] = useState("list");
   const [conflicts, setConflicts] = useState([]);
   const step = mode === "reports" ? "" : params.get("step") || "gironi";
   const category = params.get("cat") || "";
@@ -32,6 +32,8 @@ export default function Matches({ mode = "matches" }) {
   const status = params.get("status") || (mode === "reports" ? "in_progress,finished,report_submitted,under_review,official,rectified" : "");
   const day = params.get("day") || "";
   const upcoming = params.get("upcoming") === "1";
+  const view = params.get("view") || "list";
+  const setView = (v) => setP("view", v === "list" ? "" : v);
 
   const load = () => {
     if (!t) return;
@@ -91,12 +93,13 @@ export default function Matches({ mode = "matches" }) {
         {mode !== "reports" && <select className="fsl-input md:w-48" value={status} onChange={(e) => setP("status", e.target.value)} data-testid="matches-filter-status"><option value="">Tutti gli stati</option>{Object.entries(MATCH_STATUS).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}</select>}
         <input type="date" className="fsl-input md:w-48" value={day} onChange={(e) => setP("day", e.target.value)} data-testid="matches-filter-date" aria-label="Data" />
         <button type="button" onClick={() => { const p = new URLSearchParams(params); if (upcoming) p.delete("upcoming"); else { p.set("upcoming", "1"); p.delete("day"); } setParams(p); }} className={`${upcoming ? "btn-gold" : "btn-ghost"} md:ml-auto`} aria-pressed={upcoming} data-testid="matches-upcoming-button"><CalendarClock className="h-4 w-4" /> Prossimi impegni · 7 giorni</button>
-        {mode !== "reports" && <button type="button" className="btn-ghost" onClick={() => setView(view === "list" ? "grid" : "list")} data-testid="matches-view-toggle">{view === "list" ? <><LayoutGrid className="h-4 w-4" /> Vista campi/orari</> : <><List className="h-4 w-4" /> Vista elenco</>}</button>}
+        {mode !== "reports" && <button type="button" className="btn-ghost" onClick={() => setView(view === "grid" ? "list" : "grid")} data-testid="matches-view-toggle">{view === "grid" ? <><List className="h-4 w-4" /> Vista elenco</> : <><LayoutGrid className="h-4 w-4" /> Vista campi/orari</>}</button>}
+        {mode !== "reports" && <button type="button" className={view === "referees" ? "btn-gold" : "btn-ghost"} onClick={() => setView(view === "referees" ? "list" : "referees")} aria-pressed={view === "referees"} data-testid="matches-referees-button"><UserCheck className="h-4 w-4" /> Designazioni arbitri</button>}
       </div>
       {upcoming && <p className="text-xs text-fsl-slate -mt-2 mb-4" data-testid="matches-upcoming-hint">Gare da oggi ai prossimi 7 giorni: assegna arbitri e campi, verifica le distinte e organizza in anticipo.</p>}
       {!list ? <LoadingState /> : list.length === 0 ? (
         <EmptyState icon={CalendarPlus} title={upcoming ? "Nessuna gara nei prossimi 7 giorni" : "Nessuna gara"} description={upcoming ? "Nessun impegno in programma da oggi a 7 giorni: rimuovi il filtro per vedere tutto il calendario." : canWrite ? "Componi prima i gironi (anche con squadre segnaposto), poi genera la bozza del calendario da «Genera calendario gironi»." : "Il calendario non è ancora stato pubblicato."} action={canWrite && !upcoming && mode !== "reports" && <button className="btn-gold" onClick={() => setP("step", "gironi")}>Vai a 1 · Gironi</button>} testId="matches-empty" />
-      ) : view === "grid" && mode !== "reports" ? <CalendarGrid list={list} slots={t.settings.slots} fields={fieldList} onPick={(m) => canWrite ? setEditM(m) : null} /> : (
+      ) : view === "referees" && mode !== "reports" ? <RefereeAssignments tid={t.id} list={list} onDone={load} canWrite={["super_admin", "director", "secretary"].includes(t.my_role) && !t.read_only} /> : view === "grid" && mode !== "reports" ? <CalendarGrid list={list} slots={t.settings.slots} fields={fieldList} onPick={(m) => canWrite ? setEditM(m) : null} /> : (
         <div className="space-y-6">
           {Object.entries(byRound).map(([round, ms]) => (
             <section key={round}>

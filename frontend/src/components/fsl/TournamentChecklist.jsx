@@ -65,7 +65,7 @@ export function AttentionList({ items, tid, canAssign = false, onChanged }) {
               <ul className="mt-1 ml-3 pl-4 border-l border-fsl-danger/30 space-y-1.5" data-testid="attention-no-referee-list">
                 {a.matches.map((m) => (
                   <li key={m.id} className="flex items-center gap-2">
-                    <Link to={a.to.replace(/\/partite$/, `/partite/${m.id}`)} className="min-w-0 flex-1 truncate text-xs text-fsl-slate hover:text-fsl-white num" data-testid={`no-referee-match-${m.id}`}>{m.kickoff_at.slice(11, 16)} · {m.home} vs {m.away}{m.field_name ? ` · ${m.field_name}` : ""}</Link>
+                    <Link to={`${a.to.split("?")[0]}/${m.id}`} className="min-w-0 flex-1 truncate text-xs text-fsl-slate hover:text-fsl-white num" data-testid={`no-referee-match-${m.id}`}>{m.kickoff_at.slice(11, 16)} · {m.home} vs {m.away}{m.field_name ? ` · ${m.field_name}` : ""}</Link>
                     {canAssign && <RefereeSelect tid={tid} matchId={m.id} referees={referees} onAssigned={onChanged} />}
                   </li>
                 ))}

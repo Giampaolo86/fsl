@@ -79,7 +79,7 @@ async def build(t, counts: dict) -> dict:
     horizon = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()[:16]
     no_ref = [m for m in ms if m.status in ("scheduled", "confirmed") and now[:16] <= m.kickoff_at <= horizon and not m.referee_user_id]
     if no_ref:
-        attention.insert(0, {"key": "no_referee", "label": "Gare nelle prossime 24 ore senza arbitro", "count": len(no_ref), "to": f"{base}/partite", "matches": [_match_pub(m, names) for m in sorted(no_ref, key=lambda m: m.kickoff_at)[:5]]})
+        attention.insert(0, {"key": "no_referee", "label": "Gare nelle prossime 24 ore senza arbitro", "count": len(no_ref), "to": f"{base}/partite?step=calendario&view=referees&upcoming=1", "matches": [_match_pub(m, names) for m in sorted(no_ref, key=lambda m: m.kickoff_at)[:5]]})
     todos = await scoped("todos", tid).list({"done": False}, limit=500)
     overdue = [x for x in todos if x.due_date and x.due_date < now[:10]]
     if overdue:
