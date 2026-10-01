@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only QA of new delete flows for tournaments/clubs/teams. All requested scenarios PASS. (1) Super Admin on /admin: exactly 3 tournament cards present (la-serie-a-dei-bambini, torneo-degli-amici, future-cup-weekend), each with tournament-card-delete-<slug>. Clicking tournament-card-delete-future-cup-weekend opens window.prompt 'Eliminazione DEFINITIVA di «Future Cup Weekend»…'; entering wrong name 'no' → toast 'Nome non corrispondente: eliminazione annullata' and the card REMAINS. Right name was deliberately NEVER confirmed (preserving data). (2) Director on /admin: 0 tournament-card-delete-* buttons rendered (correctly hidden for non-super-admin). (3) Società flow (future-cup-weekend, tid 6a9b5b045d9e0985643d0aed): 'Nuova società' → clubs-create-button → club-name-input='QA Elimina' → club-create-submit → toast 'Società creata'; click club-delete-qa-elimina → native confirm 'Eliminare la società «QA Elimina»…' → accept → toast 'Società eliminata', row disappears. (4) La Serie A dei Bambini (tid 6a9b5b045d9e0985643d0a9f) Società: 26 club-delete-* buttons visible; attempting club-delete-academy-tuscolana returns 409 and toast 'La società ha 1 squadre iscritte: elimina prima le squadre dalla pagina Rose'; club row stays. (5) Rose flow in Future Cup Weekend: created club 'QA Rosa' + registered team via club-add-team-qa-rosa → team-competition-select (native select, first option) → team-create-submit → toast 'Squadra iscritta'. On /admin/t/<fcw>/rose, team auto-selected, clicked roster-delete-team-button → confirm 'Eliminare «QA Rosa 2016»…' → toast 'Squadra «QA Rosa 2016» eliminata'; the team disappears from roster-team-select (0 options after). (6) Rose flow in La Serie A dei Bambini: roster-team-select is a native <select>; selected 'Sporting Eur 2014' (value 6a9b5b045d9e0985643d0ab3) → roster-delete-team-button → confirm → toast 'La squadra ha 6 gare giocate o in corso: non può essere eliminata'; team remains in select. (7) Cleanup: 'QA Rosa' club (now 0 teams) deleted via club-delete-qa-rosa → toast 'Società eliminata'. Data left clean. The 3 production tournaments were never deleted.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Clubs 'Nuova squadra' dialog", "issues": ["React hydration warning: <option> cannot contain a <span> child inside team-competition-select (native <select>). Caused by Visual-Editor instrumentation wrapping option text in <span data-ve-dynamic='true'>. Non-blocker but should be addressed by excluding native <option> contents from the VE wrapper or switching to a Radix Select."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(nice-to-have) Suppress VE <span> injection inside native <option> elements (Clubs.jsx line 170) to remove the React hydration warning when opening 'Nuova squadra'.",
+    "(nice-to-have) Consider replacing window.prompt (tournament delete) and window.confirm (club/team delete) with the project's Dialog component for consistent styling and better a11y, and to allow testing without page.on('dialog')."
+  ],
+  "critical_code_review_comments": [
+    "Tournament delete guard is purely client-side (window.prompt + string compare). Backend DELETE /tournaments/{tid} should also require a confirmation payload (e.g. {confirm_name: <slug>}) to protect against direct API calls. Please verify server-side guard exists in /app/backend/app/routers/tournaments.py.",
+    "409 messages for clubs/teams are localized and clear ('… squadre iscritte', '… gare giocate o in corso'). Good UX. Ensure the backend returns a structured error code too (e.g. detail='club_has_teams') for future i18n.",
+    "Director correctly cannot see tournament-level delete buttons on /admin, matching role separation (super_admin only)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only run)", "frontend": "100% (7/7 scenarios)"},
+  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! (TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C); direttore@fsl.demo / Demo1234! (same TOTP)",
+  "seed_data_creation": "Created and then deleted the QA artifacts: club 'QA Elimina' (future-cup-weekend), club 'QA Rosa' + team 'QA Rosa 2016' (future-cup-weekend). After the run no residual QA data remains in any tournament. Production tournaments and existing clubs/teams were NOT modified. Sporting Eur 2014 and Academy Tuscolana left untouched (delete attempts refused by backend as expected).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "On /admin/t/<tid>/rose the roster-team-select is a NATIVE <select>, not a Radix popover — do NOT try to open it with .click() + [role=option]; use page.select_option('[data-testid=\"roster-team-select\"]', value=<team_id>) instead. Same for team-competition-select in Nuova squadra dialog. Super admin delete prompt is a window.prompt, club/team delete are window.confirm — all must be handled via page.on('dialog'). Director (direttore@fsl.demo) does NOT see tournament-card-delete-* buttons; only Super Admin does. Future Cup Weekend tid=6a9b5b045d9e0985643d0aed, La Serie A dei Bambini tid=6a9b5b045d9e0985643d0a9f, Torneo degli Amici is the third tournament. There are now exactly 3 tournaments in the DB.",
+  "rca of the issue": "N/A — no bug found. All three new delete flows (tournament super-admin prompt, club cascade guard, team-played-matches guard) behave as specified."
+}
