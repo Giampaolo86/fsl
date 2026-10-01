@@ -89,15 +89,15 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
       <div className="flex flex-wrap items-start gap-4 mb-4">
         <div><div className="fsl-kicker">B</div><h2 className="font-display font-extrabold uppercase text-2xl leading-none">Calendario</h2><p className="text-xs text-fsl-slate mt-1">All'italiana, sola andata, solo tra squadre dello stesso girone. Ogni partita resta modificabile (anche il giorno).</p></div>
         {canWrite && board.groups.length > 0 && (
-          <div className="ml-auto rounded-lg border border-white/10 bg-ink-950/40 p-3 space-y-2 min-w-[520px]" data-testid="cal-setup">
+          <div className="md:ml-auto rounded-lg border border-white/10 bg-ink-950/40 p-3 space-y-2 w-full md:w-auto md:min-w-[520px]" data-testid="cal-setup">
             <div className="flex items-center justify-between"><span className="text-[11px] uppercase tracking-wider text-fsl-slate">Quando si gioca</span><button type="button" className="text-xs text-fsl-gold hover:underline" onClick={addSession} data-testid="cal-add-session">+ Aggiungi sessione</button></div>
             {sessions.map((sess, i) => (
-              <div key={i} className="flex items-center gap-2" data-testid={`cal-session-${i}`}>
-                <input type="date" className="fsl-input h-9 w-40" value={sess.date} onChange={(e) => updS(i, "date", e.target.value)} data-testid={`cal-session-date-${i}`} />
-                <span className="text-xs text-fsl-slate w-20 truncate">{dayLabel(sess.date)}</span>
-                <input type="time" className="fsl-input h-9 w-28" value={sess.start_time} onChange={(e) => updS(i, "start_time", e.target.value)} data-testid={`cal-session-start-${i}`} />
+              <div key={i} className="flex flex-wrap items-center gap-2" data-testid={`cal-session-${i}`}>
+                <input type="date" className="fsl-input h-9 w-36 sm:w-40" value={sess.date} onChange={(e) => updS(i, "date", e.target.value)} data-testid={`cal-session-date-${i}`} />
+                <span className="text-xs text-fsl-slate w-20 truncate hidden sm:inline">{dayLabel(sess.date)}</span>
+                <input type="time" className="fsl-input h-9 w-24 sm:w-28" value={sess.start_time} onChange={(e) => updS(i, "start_time", e.target.value)} data-testid={`cal-session-start-${i}`} />
                 <span className="text-xs text-fsl-slate">→</span>
-                <input type="time" className="fsl-input h-9 w-28" value={sess.end_time} onChange={(e) => updS(i, "end_time", e.target.value)} data-testid={`cal-session-end-${i}`} />
+                <input type="time" className="fsl-input h-9 w-24 sm:w-28" value={sess.end_time} onChange={(e) => updS(i, "end_time", e.target.value)} data-testid={`cal-session-end-${i}`} />
                 {sessions.length > 1 && <button type="button" className="text-fsl-slate hover:text-fsl-danger" onClick={() => setSessions(sessions.filter((_, j) => j !== i))} aria-label="Rimuovi sessione" data-testid={`cal-session-remove-${i}`}><X className="h-4 w-4" /></button>}
               </div>
             ))}
@@ -105,7 +105,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
               <label className="text-xs text-fsl-slate">Campi<input type="number" min="1" max="20" className="fsl-input h-9 w-16 mt-1" value={f.fields_count} onChange={set("fields_count")} data-testid="cal-fields" /></label>
               <label className="text-xs text-fsl-slate">Durata gara (min)<input type="number" min="5" max="120" className="fsl-input h-9 w-24 mt-1" value={f.match_minutes} onChange={set("match_minutes")} data-testid="cal-duration" /></label>
               <label className="text-xs text-fsl-slate">Pausa tra gare (min)<input type="number" min="0" max="60" className="fsl-input h-9 w-24 mt-1" value={f.buffer_minutes} onChange={set("buffer_minutes")} data-testid="cal-buffer" /></label>
-              <button className="btn-gold h-9 ml-auto" disabled={busy} onClick={generate} data-testid="cal-generate-button">{board.matches.length ? "Rigenera calendario" : "Genera calendario"}</button>
+              <button className="btn-gold h-9 w-full sm:w-auto sm:ml-auto" disabled={busy} onClick={generate} data-testid="cal-generate-button">{board.matches.length ? "Rigenera calendario" : "Genera calendario"}</button>
             </div>
           </div>
         )}
@@ -117,9 +117,9 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
           <div className="flex flex-wrap items-center gap-3 text-xs text-fsl-slate">
             <span data-testid="cal-summary">{board.matches.length} partite · {days.map(dayLabel).join(" · ")}</span>
             {canWrite && <span className="inline-flex items-center gap-1 text-fsl-slate/80" data-testid="cal-drag-hint"><GripVertical className="h-3.5 w-3.5" /> {view === "grid" ? "Trascina una partita in uno slot libero (o su un'altra per scambiarle)" : "Trascina una partita su un'altra per scambiare orario e campo"}</span>}
-            <div className="ml-auto flex items-center gap-2">
+            <div className="sm:ml-auto flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <div className="inline-flex rounded-md border border-white/15 overflow-hidden" role="tablist" data-testid="cal-view-toggle">
-                <button type="button" role="tab" aria-selected={view === "grid"} onClick={() => setView("grid")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "grid" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-grid"><LayoutGrid className="h-3.5 w-3.5" /> Griglia ora × campo</button>
+                <button type="button" role="tab" aria-selected={view === "grid"} onClick={() => setView("grid")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "grid" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-grid"><LayoutGrid className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Griglia ora × campo</span><span className="sm:hidden">Griglia</span></button>
                 <button type="button" role="tab" aria-selected={view === "list"} onClick={() => setView("list")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "list" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-list"><List className="h-3.5 w-3.5" /> Per girone</button>
               </div>
               <button className="btn-ghost h-9" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button>

@@ -63,7 +63,37 @@ export default function Competitions() {
       {data.length === 0 ? (
         <EmptyState icon={Trophy} title="Nessuna competizione" description="Crea la prima competizione con il pulsante in alto oppure imposta gironi e squadre dal Calendario." />
       ) : (
-        <div className="fsl-card overflow-x-auto">
+        <>
+        <div className="md:hidden space-y-3" data-testid="competitions-cards">
+          {data.map((c) => (
+            <div key={c.id} className="fsl-card p-4 space-y-3" data-testid={`competition-card-${c.code}`}>
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1"><div className="font-display font-extrabold uppercase text-base leading-tight">{c.name}</div><div className="text-xs text-fsl-slate mt-0.5">{c.category} · {c.series} · {FORMULA[c.format]}</div></div>
+                {canWrite && <button type="button" className="text-fsl-slate/60 hover:text-fsl-danger shrink-0" onClick={() => remove(c)} aria-label={`Elimina ${c.name}`} data-testid={`competition-card-delete-${c.code}`}><Trash2 className="h-4 w-4" /></button>}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-md bg-ink-950/60 border border-white/10 py-2"><div className="num font-display font-extrabold text-lg leading-none">{c.kind === "knockout" ? c.finals?.qualifiers || 0 : <>{c.teams_registered}<span className="text-fsl-slate text-sm">/{c.teams_count}</span></>}</div><div className="text-[9px] uppercase tracking-wider text-fsl-slate mt-1">{c.kind === "knockout" ? "Qualificate" : "Squadre"}</div></div>
+                <div className="rounded-md bg-ink-950/60 border border-white/10 py-2"><div className="num font-display font-extrabold text-lg leading-none">{c.kind === "knockout" ? "—" : c.rounds}</div><div className="text-[9px] uppercase tracking-wider text-fsl-slate mt-1">Giornate</div></div>
+                <div className="rounded-md bg-ink-950/60 border border-white/10 py-2"><div className={`font-display font-extrabold text-sm leading-none pt-1 ${c.status === "closed" ? "text-fsl-success" : "text-fsl-gold"}`}>{c.status === "closed" ? "Chiusa" : "Aperta"}</div><div className="text-[9px] uppercase tracking-wider text-fsl-slate mt-1">Stagione</div></div>
+              </div>
+              <div className="space-y-2">
+                {!(c.kind === "knockout" && c.finals?.mode === "cross_groups") && <label className="block text-[10px] uppercase tracking-wider text-fsl-slate">Tipo<select className="fsl-input h-10 mt-1 w-full" value={c.kind} disabled={!canWrite} onChange={(e) => patch(c, { kind: e.target.value })} data-testid={`competition-card-kind-${c.code}`}>{Object.entries(KIND).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>}
+                {c.kind !== "league" && (c.finals?.mode === "cross_groups" ? (
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-fsl-slate">Prime <select className="fsl-input h-10 w-16" value={c.finals.qualifiers_per_group || 0} disabled={!canWrite} onChange={(e) => patch(c, { finals: { qualifiers_per_group: Number(e.target.value) } })} data-testid={`competition-card-qpg-${c.code}`}>{[0, 1, 2, 4].map((n) => <option key={n} value={n}>{n || "—"}</option>)}</select> di ogni girone <label className="inline-flex items-center gap-1"><input type="checkbox" checked={!!c.finals.third_place} disabled={!canWrite} onChange={(e) => patch(c, { finals: { third_place: e.target.checked } })} /> 3°/4°</label></div>
+                ) : (
+                  <label className="block text-[10px] uppercase tracking-wider text-fsl-slate">Qualificate alla fase finale<select className="fsl-input h-10 mt-1 w-full" value={c.finals?.qualifiers || 0} disabled={!canWrite} onChange={(e) => patch(c, { finals: { qualifiers: Number(e.target.value), mode: "knockout" } })} data-testid={`competition-card-qualifiers-${c.code}`}>{[0, 2, 4, 8].map((n) => <option key={n} value={n}>{n || "—"} squadre</option>)}</select></label>
+                ))}
+              </div>
+              {canWrite && (
+                <div className="flex flex-wrap gap-2">
+                  {c.kind !== "league" && (c.finals?.mode === "cross_groups" || c.finals?.qualifiers > 0) && <button className="btn-primary h-10 px-3 text-xs flex-1" onClick={() => setFinalsFor(c)} data-testid={`competition-card-finals-${c.code}`}><Wand2 className="h-4 w-4" /> Fase finale</button>}
+                  {c.status !== "closed" && <button className="btn-ghost h-10 px-3 text-xs flex-1" onClick={() => close(c)} data-testid={`competition-card-close-${c.code}`}>Chiudi stagione</button>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="fsl-card overflow-x-auto hidden md:block">
           <table className="w-full table-dark" data-testid="competitions-table">
             <thead>
               <tr>
@@ -126,6 +156,7 @@ export default function Competitions() {
             </tbody>
           </table>
         </div>
+        </>
       )}
       {finalsFor && <FinalsDialog tid={t.id} competition={finalsFor} onClose={() => setFinalsFor(null)} onDone={reload} />}
       {creating && <NewCompetitionDialog tid={t.id} categories={categories} onClose={() => setCreating(false)} onDone={reload} />}
