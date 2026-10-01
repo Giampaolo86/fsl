@@ -98,7 +98,7 @@ export function BracketSection({ slug, category, title = "Fase finale", classNam
   }, [slug, category]);
   if (!data || data.length === 0) return null;
   return (
-    <section className={className} data-testid="bracket-section">
+    <section className={`${className} gold-skin`} data-testid="bracket-section">
       <div className="flex items-end justify-between gap-3 mb-4"><h2 className="font-display font-extrabold uppercase text-2xl sm:text-3xl leading-none inline-flex items-center gap-2"><Trophy className="h-6 w-6 text-fsl-gold" /> {title}</h2><span className="text-xs text-fsl-slate">Clicca una gara per il Match Center</span></div>
       <BracketList data={data} slug={slug} />
     </section>

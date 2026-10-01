@@ -142,7 +142,7 @@ export default function AdminShell() {
             <TournamentSwitcher />
           </div>
         </header>
-        <main className="flex-1 px-4 md:px-6 py-6 max-w-[1488px] w-full mx-auto">
+        <main className="flex-1 px-4 md:px-6 py-6 max-w-[1488px] w-full mx-auto gold-skin">
           <Outlet />
         </main>
       </div>

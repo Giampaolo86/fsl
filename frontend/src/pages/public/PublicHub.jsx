@@ -21,7 +21,7 @@ export function PublicTournamentsList() {
   if (error) return <div className="p-6"><ErrorState message={apiError(error)} /></div>;
   if (!list) return <LoadingState full />;
   return (
-    <section className="mx-auto max-w-[1488px] px-6 py-14" data-testid="public-tournaments-page">
+    <section className="mx-auto max-w-[1488px] px-6 py-14 gold-skin" data-testid="public-tournaments-page">
       <Kicker className="mb-3">I nostri campionati</Kicker>
       <h1 className="text-5xl sm:text-6xl font-extrabold leading-[0.9]">Tutti i tornei</h1>
       <p className="mt-4 text-fsl-slate max-w-xl">Scegli un torneo per calendario, risultati ufficiali, classifiche e schede delle società.</p>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Award, CalendarDays, Target } from "lucide-react";
+import { Award, CalendarDays, Target, TrendingUp } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { MatchCard, MatchStatusBadge, kickoffLabel } from "@/components/fsl/MatchCard";
 import { RatingsColumns } from "@/components/fsl/Ratings";
@@ -14,11 +14,12 @@ import { AwardsBoard, OutcomesList } from "@/pages/admin/Extras";
 import { PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { StandingsTable } from "@/components/fsl/StandingsTable";
 import { BracketSection } from "@/components/fsl/Bracket";
+import { StatTile } from "@/components/fsl/ProfileKit";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { usePublicTournament } from "@/hooks/usePublicTournament";
 import { api, apiError } from "@/lib/api";
 
-const Wrap = ({ children }) => <div className="mx-auto max-w-[1488px] px-6 py-10">{children}</div>;
+const Wrap = ({ children, gold = false }) => <div className={`mx-auto max-w-[1488px] px-6 py-10 ${gold ? "gold-skin" : ""}`}>{children}</div>;
 
 function useSlugData(path, params) {
   const { slug } = useParams();
@@ -39,7 +40,7 @@ export function PublicMatches() {
   if (error) return <Wrap><ErrorState message={apiError(error)} /></Wrap>;
   if (!data || !home) return <LoadingState full />;
   return (
-    <Wrap>
+    <Wrap gold>
       <PageHeader kicker={home.tournament.name} title="Partite" subtitle="Risultati ufficiali e prossime gare. Un risultato in verifica non incide sulla classifica." actions={<select className="fsl-input w-40" value={cat} onChange={(e) => setParams({ cat: e.target.value })} data-testid="public-matches-category">{home.settings.categories.map((c) => <option key={c}>{c}</option>)}</select>} />
       <BracketSection slug={slug} category={cat} className="mb-10" />
       {data.length === 0 ? <EmptyState icon={CalendarDays} title="Calendario in preparazione" description="Le gare compariranno dopo la pubblicazione del calendario." /> : Object.entries(groups).map(([round, ms]) => (
@@ -143,9 +144,9 @@ export function PublicStats() {
   if (error) return <Wrap><ErrorState message={apiError(error)} /></Wrap>;
   if (!data || !home) return <LoadingState full />;
   return (
-    <Wrap>
+    <Wrap gold>
       <PageHeader kicker={home.tournament.name} title="Statistiche" subtitle="Marcatori e numeri calcolati esclusivamente da gare ufficiali." />
-      <div className="grid grid-cols-3 gap-3 mb-8">{[[data.matches_official, "Gare ufficiali"], [data.goals, "Gol"], [data.avg_goals, "Media gol/gara"]].map(([v, l]) => <div key={l} className="fsl-card p-5"><div className="font-display font-extrabold text-4xl num">{v}</div><div className="text-[11px] uppercase tracking-wider text-fsl-slate">{l}</div></div>)}</div>
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-8 max-w-3xl" data-testid="public-stats-tiles">{[[CalendarDays, data.matches_official, "Gare ufficiali"], [Target, data.goals, "Gol"], [TrendingUp, data.avg_goals, "Media gol/gara"]].map(([Icon, v, l]) => <StatTile key={l} icon={Icon} value={v} label={l} />)}</div>
       <SectionTitle>Marcatori</SectionTitle>
       {data.top_scorers.length === 0 ? <EmptyState icon={Target} title="Nessun marcatore" description="La classifica marcatori si popola con i gol delle gare ufficiali." /> : <div className="fsl-card divide-y divide-white/[0.06]" data-testid="public-top-scorers">{data.top_scorers.map((s, i) => <div key={i} className="flex items-center gap-4 px-4 h-14"><span className="num font-display font-extrabold text-2xl text-fsl-gold w-8">{i + 1}</span><div className="flex-1">{s.player_id ? <Link to={`/tornei/${slug}/giocatori/${s.player_id}`} className="font-semibold hover:text-fsl-gold" data-testid={`scorer-player-${s.player_id}`}>{s.name}</Link> : <div className="font-semibold">{s.name}</div>}<div className="text-xs text-fsl-slate">{s.team}</div></div><span className="num font-display font-extrabold text-3xl">{s.goals}</span></div>)}</div>}
       <div className="mt-10"><SectionTitle right={<span className="text-xs text-fsl-slate inline-flex items-center gap-1"><Award className="h-4 w-4 text-fsl-gold" /> Dalle pagelle delle gare ufficiali</span>}>Premi e MVP</SectionTitle><AwardsBoard rows={data.awards} testId="public-awards" linkFor={(pid) => `/tornei/${slug}/giocatori/${pid}`} /></div>

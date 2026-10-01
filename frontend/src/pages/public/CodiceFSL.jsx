@@ -103,7 +103,7 @@ export default function CodiceFSL() {
         </div>
       </nav>
 
-      <section id="codice" className="mx-auto max-w-[1488px] px-6 py-16 lg:py-24 scroll-mt-28" data-testid="codice-principles">
+      <section id="codice" className="mx-auto max-w-[1488px] px-6 py-16 lg:py-24 scroll-mt-28 gold-skin" data-testid="codice-principles">
         <div className="grid lg:grid-cols-2 gap-8 items-end mb-14">
           <div><Kicker className="mb-3">Il Codice</Kicker><H2>Sei principi, <span className="text-fsl-gold">un solo modello</span></H2></div>
           <p className="text-fsl-white/75 text-base sm:text-lg leading-relaxed lg:pb-2">Valgono per ogni torneo FSL, dal campionato di otto mesi all'evento di un weekend: per i ragazzi, per chi li allena, per chi li accompagna e per chi organizza.</p>
@@ -111,7 +111,7 @@ export default function CodiceFSL() {
         <div className="space-y-16 lg:space-y-24">{CODICE.principles.map((p, i) => <Principle key={p.n} p={p} i={i} />)}</div>
       </section>
 
-      <section id="gioco" className="relative overflow-hidden scroll-mt-28" data-testid="codice-game">
+      <section id="gioco" className="relative overflow-hidden scroll-mt-28 gold-skin" data-testid="codice-game">
         <img src={IMG("keeper")} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
         <div className="absolute inset-0 bg-ink-950/88" />
         <div className="relative mx-auto max-w-[1488px] px-6 py-16 lg:py-24">
@@ -133,7 +133,7 @@ export default function CodiceFSL() {
         </div>
       </section>
 
-      <section id="patto" className="mx-auto max-w-[1488px] px-6 py-16 lg:py-24 scroll-mt-28" data-testid="codice-pact">
+      <section id="patto" className="mx-auto max-w-[1488px] px-6 py-16 lg:py-24 scroll-mt-28 gold-skin" data-testid="codice-pact">
         <div className="grid lg:grid-cols-2 gap-8 items-end mb-12">
           <div><Kicker className="mb-3">Un impegno condiviso</Kicker><H2>Il Patto <span className="text-fsl-gold">FSL</span></H2></div>
           <p className="text-fsl-white/75 text-base sm:text-lg leading-relaxed lg:pb-2">Cinque voci, una promessa reciproca: ognuno, con il proprio ruolo, protegge il valore della partita.</p>

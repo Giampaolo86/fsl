@@ -9,7 +9,7 @@ import { api, apiError } from "@/lib/api";
 import { FORMULA, DAYS, TIEBREAK_LABELS } from "@/lib/format";
 
 function Wrap({ children }) {
-  return <div className="mx-auto max-w-[1488px] px-6 py-10">{children}</div>;
+  return <div className="mx-auto max-w-[1488px] px-6 py-10 gold-skin">{children}</div>;
 }
 
 export function PublicClubs() {

@@ -46,7 +46,7 @@ export function HallOfFame() {
   useEffect(() => { api.get("/public/legacy").then((r) => setItems(r.data)).catch(() => setItems([])); }, []);
   if (!items) return <LoadingState full />;
   return (
-    <section className="mx-auto max-w-[1488px] px-6 py-12" data-testid="hall-of-fame">
+    <section className="mx-auto max-w-[1488px] px-6 py-12 gold-skin" data-testid="hall-of-fame">
       <Kicker className="mb-3">FSL Legacy</Kicker>
       <h1 className="text-5xl sm:text-6xl font-extrabold leading-[0.9] uppercase">Albo <span className="text-fsl-gold">d'oro</span></h1>
       <p className="mt-3 text-fsl-slate max-w-xl">Campioni, promozioni, premi individuali e classifiche finali di ogni stagione. La storia della Serie A del futuro, società per società.</p>
@@ -64,7 +64,7 @@ export function SeasonArchive() {
   if (err) return <div className="p-10"><ErrorState message={apiError(err)} /></div>;
   if (!a) return <LoadingState full />;
   return (
-    <section className="mx-auto max-w-[1200px] px-6 py-10 space-y-10" data-testid="season-archive">
+    <section className="mx-auto max-w-[1200px] px-6 py-10 space-y-10 gold-skin" data-testid="season-archive">
       <div><Link to="/albo-doro" className="inline-flex items-center gap-1 text-xs text-fsl-slate hover:text-fsl-white" data-testid="season-archive-back"><ArrowLeft className="h-3.5 w-3.5" /> Albo d'oro</Link><Kicker className="mt-4">{a.season_label}</Kicker><h1 className="mt-1 text-4xl sm:text-6xl font-extrabold uppercase leading-[0.9]">{a.tournament.name}</h1></div>
       <AwardsRow awards={a.awards} />
       {a.competitions.map((c) => (
@@ -92,7 +92,7 @@ export function ClubHistory() {
   if (!h) return <LoadingState full />;
   const c = h.club;
   return (
-    <section className="mx-auto max-w-[1100px] px-6 py-10 space-y-8" data-testid="club-history">
+    <section className="mx-auto max-w-[1100px] px-6 py-10 space-y-8 gold-skin" data-testid="club-history">
       <Link to="/albo-doro" className="inline-flex items-center gap-1 text-xs text-fsl-slate hover:text-fsl-white"><ArrowLeft className="h-3.5 w-3.5" /> Albo d'oro</Link>
       <div className="relative overflow-hidden rounded-3xl border border-white/10 p-6 sm:p-10" style={{ background: `linear-gradient(120deg, ${c.colors?.primary || "#0B57D9"} 0%, #041E32 70%)` }}>
         <div className="absolute inset-0 grain opacity-40" />

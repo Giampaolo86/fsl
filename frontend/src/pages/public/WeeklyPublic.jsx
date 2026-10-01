@@ -17,7 +17,7 @@ export function WeeklyList() {
   const shown = items.filter((i) => !comp || i.competition?.id === comp);
   const [first, ...rest] = shown;
   return (
-    <section className="mx-auto max-w-[1488px] px-6 py-12" data-testid="public-weekly">
+    <section className="mx-auto max-w-[1488px] px-6 py-12 gold-skin" data-testid="public-weekly">
       <Kicker className="mb-3">Il giornale della giornata</Kicker>
       <div className="flex flex-wrap items-end justify-between gap-4"><h1 className="text-5xl sm:text-6xl font-extrabold leading-[0.9] uppercase">FSL <span className="text-fsl-gold">Weekly</span></h1>{comps.length > 1 && <select className="fsl-input h-11 w-64" value={comp} onChange={(e) => setComp(e.target.value)} data-testid="public-weekly-filter"><option value="">Tutti i campionati</option>{comps.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</div>
       <p className="mt-3 text-fsl-slate max-w-xl">Risultati, classifica, MVP, Top 11 e anteprima del turno: ogni giornata raccontata dai dati ufficiali e approvata dal Direttore.</p>
