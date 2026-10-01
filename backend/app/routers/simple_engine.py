@@ -80,7 +80,7 @@ async def _board(tid: str, cat: str) -> dict:
         "matches": group_ms,
         "finals": finals_ms,
         "finals_competition_id": ko.id if ko else None,
-        "calendar": {"fields_count": s.fields_count, "start_time": s.day_start, "end_time": s.day_end, "match_minutes": s.match_duration_min, "buffer_minutes": s.buffer_min, "date": group_ms[0]["kickoff_at"][:10] if group_ms else None, "sessions": s.calendar_sessions or []},
+        "calendar": {"fields_count": s.fields_count, "start_time": s.day_start, "end_time": s.day_end, "match_minutes": s.match_duration_min, "buffer_minutes": s.buffer_min, "date": group_ms[0]["kickoff_at"][:10] if group_ms else None, "sessions": s.calendar_sessions or [], "breaks": s.calendar_breaks or []},
         "played": sum(1 for m in group_ms if m["played"]),
         "finals_played": sum(1 for m in finals_ms if m["played"]),
     }
@@ -561,3 +561,24 @@ async def move_match(tournament_id: str, body: MoveMatchIn, user: CurrentUser = 
     await repo.update(m.id, {"kickoff_at": body.kickoff_at, "field_id": f.id, "field_name": f.name}, user.id)
     await audit.record(user, "simple.move_match", "match", m.id, t.id, after={"to": body.kickoff_at, "field": f.name, "swapped_with": other.id if other else None})
     return {"swapped": bool(other), **await _board(tournament_id, m.category)}
+
+
+class BreakIn(BaseModel):
+    date: str
+    start_time: str
+    end_time: str
+    label: str = Field(default="Pausa", max_length=80)
+
+
+class BreaksIn(BaseModel):
+    category: str | None = None
+    breaks: list[BreakIn]
+
+
+@router.put("/breaks")
+async def save_breaks(tournament_id: str, body: BreaksIn, user: CurrentUser = Depends(get_current_user)):
+    """Pause (tecnica, pranzo…) mostrate nella griglia e nel PDF."""
+    await _ctx(tournament_id, user, writable=True)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    await settings_repo.update(s.id, {"calendar_breaks": [b.model_dump() for b in sorted(body.breaks, key=lambda b: (b.date, b.start_time))]}, user.id)
+    return await _board(tournament_id, await _category(tournament_id, body.category))

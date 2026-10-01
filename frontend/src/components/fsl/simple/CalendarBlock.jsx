@@ -53,7 +53,7 @@ export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, t
 const WEEKDAYS = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
 const dayLabel = (d) => (d ? `${WEEKDAYS[new Date(d + "T12:00").getDay()]} ${fmtDate(d)}` : "");
 
-export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, onMove }) {
+export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, onMove, onBreaks, onQuickTeam }) {
   const c = board.calendar;
   const [view, setView] = useState("grid");
   const today = new Date().toISOString().slice(0, 10);
@@ -125,7 +125,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
               <button className="btn-ghost h-9" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button>
             </div>
           </div>
-          {view === "grid" && <TimeGrid board={board} canWrite={canWrite} onMove={onMove} onEdit={onEdit} />}
+          {view === "grid" && <TimeGrid board={board} canWrite={canWrite} onMove={onMove} onEdit={onEdit} onBreaks={onBreaks} onQuickTeam={onQuickTeam} />}
           {view === "list" && board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
         </div>
       )}

@@ -111,6 +111,7 @@ class TournamentSettings(BaseDocument):
     third_place: bool = False
     hospitality: list[dict] = []
     calendar_sessions: list[dict] = []
+    calendar_breaks: list[dict] = []
     rules_text: str = ""
     skip_holidays: bool = False
     fees: dict = {"registration": 0, "currency": "EUR", "video_price": 0.99, "photo_price": 0.49, "digital_price": 2.49, "card_price": 3.99, "card_special_price": 4.99, "push_price": 3.99}

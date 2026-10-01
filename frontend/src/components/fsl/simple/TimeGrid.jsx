@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { GripVertical, Pencil } from "lucide-react";
+import { Coffee, GripVertical, Pencil, X } from "lucide-react";
 import { fmtDate } from "@/lib/format";
 
 const WEEKDAYS = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
@@ -12,11 +12,38 @@ function slotTimes(sessions, day, step, duration) {
   return out;
 }
 
-export function TimeGrid({ board, canWrite, onMove, onEdit }) {
+function TeamBox({ m, side, teams, canWrite, onQuickTeam }) {
+  const [open, setOpen] = useState(false);
+  const id = m[`${side}_team_id`];
+  const name = m[side];
+  if (open) {
+    return (
+      <select autoFocus className="fsl-input h-8 w-full text-xs py-0 px-1" value={id} onBlur={() => setOpen(false)} onChange={(e) => { setOpen(false); if (e.target.value !== id) onQuickTeam(m.id, side, e.target.value); }} aria-label={side === "home" ? "Squadra casa" : "Squadra ospite"} data-testid={`grid-team-select-${side}-${m.id}`}>
+        {teams.map((t) => <option key={t.id} value={t.id}>{t.name}{t.series && t.series !== "Fase finale" ? ` · ${t.series}` : ""}</option>)}
+      </select>
+    );
+  }
+  return (
+    <button type="button" disabled={!canWrite || m.played} onClick={() => setOpen(true)} title="Tocca per cambiare squadra" className={`w-full text-left rounded px-2 py-1 text-xs font-semibold truncate border ${side === "home" ? "border-white/15 bg-ink-950/50" : "border-white/10 bg-ink-950/30"} ${canWrite && !m.played ? "hover:border-fsl-gold hover:text-fsl-gold" : ""}`} data-testid={`grid-team-${side}-${m.id}`}>
+      <span className="text-[9px] uppercase tracking-wider text-fsl-slate mr-1">{side === "home" ? "C" : "O"}</span>{name}
+    </button>
+  );
+}
+
+export function TimeGrid({ board, canWrite, onMove, onEdit, onBreaks, onQuickTeam }) {
   const [over, setOver] = useState(null);
   const [extra, setExtra] = useState({});
   const [newTime, setNewTime] = useState({});
+  const [newBreak, setNewBreak] = useState({});
   const c = board.calendar;
+  const breaks = c.breaks || [];
+  const addBreak = (day) => {
+    const b = newBreak[day] || {};
+    if (!b.start_time || !b.end_time) return;
+    onBreaks([...breaks, { date: day, start_time: b.start_time, end_time: b.end_time, label: b.label || "Pausa" }]);
+    setNewBreak({ ...newBreak, [day]: {} });
+  };
+  const removeBreak = (b) => onBreaks(breaks.filter((x) => !(x.date === b.date && x.start_time === b.start_time && x.label === b.label)));
   const step = (c.match_minutes || 25) + (c.buffer_minutes ?? 10);
   const all = useMemo(() => [...board.matches, ...board.finals], [board]);
   const fields = board.fields.slice(0, Math.max(c.fields_count || 1, 1));
@@ -36,20 +63,31 @@ export function TimeGrid({ board, canWrite, onMove, onEdit }) {
   if (!fields.length) return <p className="text-sm text-fsl-slate">Nessun campo configurato.</p>;
   return (
     <div className="space-y-6" data-testid="time-grid">
-      {days.map((day) => {
+      {[...new Set([...days, ...breaks.map((b) => b.date)])].sort().map((day) => {
         const times = slotTimes(c.sessions || [], day, step, c.match_minutes || 25);
         all.filter((m) => m.kickoff_at.startsWith(day)).forEach((m) => times.add(m.kickoff_at.slice(11, 16)));
         (extra[day] || []).forEach((t) => times.add(t));
-        const rows = [...times].sort();
+        const rows = [...[...times].map((t) => ({ kind: "slot", t })), ...breaks.filter((b) => b.date === day).map((b) => ({ kind: "break", t: b.start_time, b }))].sort((a, z) => a.t.localeCompare(z.t));
         return (
           <div key={day} className="rounded-lg border border-white/10 overflow-hidden" data-testid={`grid-day-${day}`}>
             <div className="px-4 h-11 flex items-center gap-3 bg-ink-950/60 border-b border-white/10"><span className="font-display font-extrabold uppercase text-fsl-gold">{WEEKDAYS[new Date(day + "T12:00").getDay()]} {fmtDate(day)}</span><span className="text-xs text-fsl-slate">{all.filter((m) => m.kickoff_at.startsWith(day)).length} partite</span>
-              {canWrite && <form className="ml-auto flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); const t = newTime[day]; if (t) { setExtra({ ...extra, [day]: [...(extra[day] || []), t] }); setNewTime({ ...newTime, [day]: "" }); } }} data-testid={`grid-add-row-${day}`}><input type="time" className="fsl-input h-8 w-28 text-xs py-0" value={newTime[day] || ""} onChange={(e) => setNewTime({ ...newTime, [day]: e.target.value })} aria-label="Nuovo orario" data-testid={`grid-add-time-${day}`} /><button type="submit" className="btn-ghost h-8 px-2 text-xs" data-testid={`grid-add-time-button-${day}`}>+ Orario</button></form>}</div>
+              {canWrite && <form className="ml-auto flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); const t = newTime[day]; if (t) { setExtra({ ...extra, [day]: [...(extra[day] || []), t] }); setNewTime({ ...newTime, [day]: "" }); } }} data-testid={`grid-add-row-${day}`}><input type="time" className="fsl-input h-8 w-28 text-xs py-0" value={newTime[day] || ""} onChange={(e) => setNewTime({ ...newTime, [day]: e.target.value })} aria-label="Nuovo orario" data-testid={`grid-add-time-${day}`} /><button type="submit" className="btn-ghost h-8 px-2 text-xs" data-testid={`grid-add-time-button-${day}`}>+ Orario</button></form>}
+              {canWrite && <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); addBreak(day); }} data-testid={`grid-add-break-${day}`}><input className="fsl-input h-8 w-32 text-xs py-0" placeholder="Pausa pranzo" value={newBreak[day]?.label || ""} onChange={(e) => setNewBreak({ ...newBreak, [day]: { ...newBreak[day], label: e.target.value } })} aria-label="Nome pausa" data-testid={`grid-break-label-${day}`} /><input type="time" className="fsl-input h-8 w-24 text-xs py-0" value={newBreak[day]?.start_time || ""} onChange={(e) => setNewBreak({ ...newBreak, [day]: { ...newBreak[day], start_time: e.target.value } })} aria-label="Inizio pausa" data-testid={`grid-break-start-${day}`} /><input type="time" className="fsl-input h-8 w-24 text-xs py-0" value={newBreak[day]?.end_time || ""} onChange={(e) => setNewBreak({ ...newBreak, [day]: { ...newBreak[day], end_time: e.target.value } })} aria-label="Fine pausa" data-testid={`grid-break-end-${day}`} /><button type="submit" className="btn-ghost h-8 px-2 text-xs" data-testid={`grid-break-add-button-${day}`}><Coffee className="h-3.5 w-3.5" /> Pausa</button></form>}</div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm table-fixed">
                 <thead className="text-[11px] uppercase tracking-wider text-fsl-slate"><tr><th className="w-24 text-left px-3 py-2">Ora</th>{fields.map((f) => <th key={f.id} className="text-left px-2 py-2">{f.name}</th>)}</tr></thead>
                 <tbody className="divide-y divide-white/[0.06]">
-                  {rows.map((t) => {
+                  {rows.map(({ kind, t, b }) => {
+                    if (kind === "break") {
+                      return (
+                        <tr key={`b-${t}-${b.label}`} className="bg-fsl-gold/[0.07]" data-testid={`grid-break-${day}-${t}`}>
+                          <td className="px-3 py-2 num font-semibold text-fsl-slate align-top">{b.start_time}<span className="block text-[10px] font-normal">– {b.end_time}</span></td>
+                          <td colSpan={fields.length} className="px-3 py-2">
+                            <div className="flex items-center gap-3 text-sm"><Coffee className="h-4 w-4 text-fsl-gold" /><span className="font-semibold uppercase tracking-wide">{b.label}</span><span className="text-xs text-fsl-slate">{toMin(b.end_time) - toMin(b.start_time)} minuti</span>{canWrite && <button type="button" onClick={() => removeBreak(b)} className="ml-auto text-fsl-slate hover:text-fsl-danger" aria-label="Rimuovi pausa" data-testid={`grid-break-remove-${day}-${t}`}><X className="h-4 w-4" /></button>}</div>
+                          </td>
+                        </tr>
+                      );
+                    }
                     const kickoff = `${day}T${t}`;
                     return (
                       <tr key={t}>
@@ -63,14 +101,17 @@ export function TimeGrid({ board, canWrite, onMove, onEdit }) {
                               {m ? (
                                 <div draggable={canWrite && !m.played} onDragStart={(e) => { e.dataTransfer.setData("text/fsl-match", m.id); e.dataTransfer.effectAllowed = "move"; }} className={`group rounded-md border px-2 py-1.5 flex items-center gap-2 ${m.stage === "finals" ? "border-fsl-gold/60 bg-fsl-gold/10" : "border-white/15 bg-navy-800/80"} ${isOver ? "ring-2 ring-fsl-gold" : ""} ${canWrite && !m.played ? "cursor-grab active:cursor-grabbing" : ""}`} data-testid={`grid-match-${m.id}`}>
                                   {canWrite && !m.played && <GripVertical className="h-3.5 w-3.5 text-fsl-slate/60 shrink-0" />}
-                                  <div className="min-w-0 flex-1">
-                                    <div className="truncate text-sm"><span className="font-semibold">{m.home}</span> <span className="text-fsl-slate">vs</span> <span className="font-semibold">{m.away}</span></div>
+                                  <div className="min-w-0 flex-1 space-y-1">
+                                    <div className="grid grid-cols-2 gap-1">
+                                      <TeamBox m={m} side="home" teams={board.teams} canWrite={canWrite} onQuickTeam={onQuickTeam} />
+                                      <TeamBox m={m} side="away" teams={board.teams} canWrite={canWrite} onQuickTeam={onQuickTeam} />
+                                    </div>
                                     <div className="text-[10px] uppercase tracking-wider text-fsl-gold/90 truncate">{m.stage === "finals" ? m.round_name : m.series}{m.played ? ` · ${m.score?.home}-${m.score?.away}` : ""}</div>
                                   </div>
                                   {canWrite && !m.played && <button type="button" onClick={() => onEdit(m)} className="opacity-0 group-hover:opacity-100 text-fsl-slate hover:text-fsl-gold" aria-label="Modifica" data-testid={`grid-edit-${m.id}`}><Pencil className="h-3.5 w-3.5" /></button>}
                                 </div>
                               ) : (
-                                <div className={`h-[46px] rounded-md border border-dashed ${isOver ? "border-fsl-gold bg-fsl-gold/10" : "border-white/10"} flex items-center justify-center text-[10px] uppercase tracking-wider text-fsl-slate/50`}>{canWrite ? "libero" : ""}</div>
+                                <div className={`h-[58px] rounded-md border border-dashed ${isOver ? "border-fsl-gold bg-fsl-gold/10" : "border-white/10"} flex items-center justify-center text-[10px] uppercase tracking-wider text-fsl-slate/50`}>{canWrite ? "libero" : ""}</div>
                               )}
                             </td>
                           );
