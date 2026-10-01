@@ -40,7 +40,6 @@ export function PostEditor({ tournamentId, post, clubMode, clubs, matches, onClo
     }
     setProgress(null);
   };
-  const toggleClub = (id) => set("club_ids", form.club_ids.includes(id) ? form.club_ids.filter((x) => x !== id) : [...form.club_ids, id]);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -66,7 +65,7 @@ export function PostEditor({ tournamentId, post, clubMode, clubs, matches, onClo
           </div>
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
-          <div><div className="fsl-label mb-1">Società collegate</div>{clubMode ? <p className="text-xs text-fsl-slate">Il contenuto è collegato alla tua società.</p> : <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto" data-testid="post-clubs">{clubs.map((c) => <button key={c.id} onClick={() => toggleClub(c.id)} className={`h-7 px-2 rounded-full text-[11px] border ${form.club_ids.includes(c.id) ? "bg-fsl-gold text-ink-950 border-fsl-gold" : "border-white/20 text-fsl-slate"}`}>{c.short_name || c.name}</button>)}</div>}</div>
+          <div><div className="fsl-label mb-1">Società collegate <span className="text-fsl-slate normal-case">(il contenuto compare nella loro home)</span></div>{clubMode ? <p className="text-xs text-fsl-slate">Il contenuto è collegato alla tua società.</p> : <PlayerTagPicker players={clubs.map((c) => ({ id: c.id, label: c.name, team: c.city || c.short_name || "" }))} value={form.club_ids} onChange={(ids) => set("club_ids", ids)} placeholder="Scrivi il nome della società…" ariaLabel="Cerca società" emptyHint="Nessuna società nel torneo." testId="post-clubs" />}</div>
           <div className="sm:col-span-2" data-testid="post-players"><div className="fsl-label mb-1 flex items-center justify-between"><span>Giocatori taggati <span className="text-fsl-slate normal-case">(il contenuto compare nella loro scheda)</span></span><span className="num text-fsl-gold">{(form.player_ids || []).length}</span></div>
             <PlayerTagPicker players={players.filter((p) => (form.player_ids || []).includes(p.id) || ((!form.club_ids.length || form.club_ids.includes(p.club_id)) && (!matchTeams || matchTeams.includes(p.team_id))))} value={form.player_ids || []} onChange={(ids) => set("player_ids", ids)} rosterLink={clubMode ? "/societa/rose" : `/admin/t/${tournamentId}/rose`} testId="post-players-picker" /></div>
           <div><div className="fsl-label mb-1">Partita collegata</div><select className="fsl-input h-9" value={form.match_id} onChange={(e) => set("match_id", e.target.value)} data-testid="post-match"><option value="">— nessuna —</option>{matches.map((m) => <option key={m.id} value={m.id}>{m.round_name} · {m.home.club?.short_name} - {m.away.club?.short_name}{m.score.home != null ? ` ${m.score.home}-${m.score.away}` : ""}</option>)}</select></div>

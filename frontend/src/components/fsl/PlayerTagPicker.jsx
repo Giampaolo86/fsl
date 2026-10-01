@@ -4,7 +4,7 @@ import { Search, X } from "lucide-react";
 
 const norm = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-export function PlayerTagPicker({ players, value, onChange, placeholder = "Scrivi un nome, un numero di maglia o una squadra…", emptyHint, rosterLink, testId = "player-tag-picker", compact = false }) {
+export function PlayerTagPicker({ players, value, onChange, placeholder = "Scrivi un nome, un numero di maglia o una squadra…", emptyHint, rosterLink, testId = "player-tag-picker", compact = false, ariaLabel = "Cerca giocatore" }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
@@ -43,7 +43,7 @@ export function PlayerTagPicker({ players, value, onChange, placeholder = "Scriv
             <button type="button" onClick={(e) => { e.stopPropagation(); remove(p.id); }} className="h-5 w-5 inline-flex items-center justify-center rounded-full hover:bg-ink-950/20" aria-label={`Rimuovi ${p.label}`} data-testid={`${testId}-remove-${p.id}`}><X className="h-3 w-3" /></button>
           </span>
         ))}
-        <span className="inline-flex items-center gap-1 flex-1 min-w-[160px]"><Search className="h-3.5 w-3.5 text-fsl-slate shrink-0" /><input className="bg-transparent outline-none flex-1 min-w-0 text-sm py-1" placeholder={selected.length ? "Aggiungi un altro…" : placeholder} value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={onKey} aria-label="Cerca giocatore" data-testid={`${testId}-input`} /></span>
+        <span className="inline-flex items-center gap-1 flex-1 min-w-[160px]"><Search className="h-3.5 w-3.5 text-fsl-slate shrink-0" /><input className="bg-transparent outline-none flex-1 min-w-0 text-sm py-1" placeholder={selected.length ? "Aggiungi un altro…" : placeholder} value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={onKey} aria-label={ariaLabel} data-testid={`${testId}-input`} /></span>
       </div>
       {open && results.length > 0 && (
         <ul className="absolute z-30 mt-1 left-0 right-0 max-h-64 overflow-y-auto fsl-scroll rounded-md border border-white/15 bg-navy-800 shadow-xl py-1" role="listbox" data-testid={`${testId}-results`}>
@@ -54,7 +54,7 @@ export function PlayerTagPicker({ players, value, onChange, placeholder = "Scriv
           ))}
         </ul>
       )}
-      {open && q && results.length === 0 && <div className="absolute z-30 mt-1 left-0 right-0 rounded-md border border-white/15 bg-navy-800 shadow-xl px-3 py-2 text-xs text-fsl-slate" data-testid={`${testId}-no-results`}>Nessun giocatore trovato per «{q}».</div>}
+      {open && q && results.length === 0 && <div className="absolute z-30 mt-1 left-0 right-0 rounded-md border border-white/15 bg-navy-800 shadow-xl px-3 py-2 text-xs text-fsl-slate" data-testid={`${testId}-no-results`}>Nessun risultato per «{q}».</div>}
     </div>
   );
 }
