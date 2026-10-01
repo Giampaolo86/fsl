@@ -4,6 +4,7 @@ from ..models.domain import (
     ClubDocument,
     Notification,
     PaidMedia,
+    HospitalityBooking,
     Purchase,
     RosterImport,
     Competition,
@@ -53,6 +54,7 @@ SCOPED = {
     "paid_media": ("paid_media", PaidMedia),
     "purchases": ("purchases", Purchase),
     "roster_imports": ("roster_imports", RosterImport),
+    "hospitality_bookings": ("hospitality_bookings", HospitalityBooking),
 }
 
 

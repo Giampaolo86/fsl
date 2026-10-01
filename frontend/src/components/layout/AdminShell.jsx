@@ -28,7 +28,7 @@ const TOURNAMENT_NAV = (id) => [
   { to: `/admin/t/${id}/weekly`, label: "FSL Weekly · Top 11", icon: Newspaper, match: ["weekly", "top11"] },
   { to: `/admin/t/${id}/studio`, label: "Social Studio", icon: Palette },
   { to: `/admin/t/${id}/legacy`, label: "Albo d'oro", icon: Archive },
-  { to: `/admin/t/${id}/pagamenti`, label: "Pagamenti e vendite", icon: CreditCard, match: ["pagamenti", "vendite"] },
+  { to: `/admin/t/${id}/pagamenti`, label: "Pagamenti e vendite", icon: CreditCard, match: ["pagamenti", "vendite", "negozio", "ospitalita"] },
   { to: `/admin/t/${id}/comunicazioni`, label: "Contatti", icon: Phone },
   { to: `/admin/t/${id}/ticket`, label: "Ticket", icon: Ticket },
   { to: `/admin/t/${id}/media`, label: "Blog e interviste", icon: Image },

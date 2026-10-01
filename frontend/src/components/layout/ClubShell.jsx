@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { CalendarDays, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, LogOut, Newspaper, Shield, Users, ShieldCheck } from "lucide-react";
+import { BedDouble, CalendarDays, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, LogOut, Newspaper, Shield, Users, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { OfflineBanner } from "@/components/fsl/States";
@@ -13,6 +13,7 @@ const CLUB_NAV = [
   ["Calendario", "/societa/calendario", CalendarDays],
   ["Segnalazioni", "/societa/segnalazioni", Flag],
   ["Pagamenti", "/societa/pagamenti", CreditCard],
+  ["Ospitalità", "/societa/ospitalita", BedDouble],
   ["Blog", "/societa/blog", Newspaper],
   ["Profilo", "/societa/profilo", Shield],
 ];

@@ -109,6 +109,7 @@ class TournamentSettings(BaseDocument):
     groups_count: int = 1
     qualifiers_per_group: int = 2
     third_place: bool = False
+    hospitality: list[dict] = []
     skip_holidays: bool = False
     fees: dict = {"registration": 0, "currency": "EUR", "video_price": 0.99, "photo_price": 0.49, "digital_price": 2.49, "card_price": 3.99, "card_special_price": 4.99, "push_price": 3.99}
     required_documents: list[str] = []
@@ -384,6 +385,24 @@ class Purchase(BaseDocument):
     buyer_user_id: Optional[str] = None
     voucher_code: Optional[str] = None
     redeemed_at: Optional[datetime] = None
+
+
+class HospitalityBooking(BaseDocument):
+    tournament_id: str
+    code: str = ""
+    item_key: str
+    item_label: str = ""
+    qty: int = 1
+    unit_price: float = 0
+    booker_type: Literal["club", "fan", "guest"] = "guest"
+    club_id: Optional[str] = None
+    club_name: str = ""
+    user_id: Optional[str] = None
+    name: str = ""
+    email: str = ""
+    phone: str = ""
+    note: str = ""
+    status: Literal["requested", "confirmed", "cancelled"] = "requested"
 
 
 class RosterImport(BaseDocument):

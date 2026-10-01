@@ -8,6 +8,7 @@ import { useTournaments } from "@/context/TournamentContext";
 import { api, apiError } from "@/lib/api";
 import { DAYS, FORMULA, TIEBREAK_LABELS, fmtNum } from "@/lib/format";
 import { GroupsPlanner, planGroups } from "@/components/fsl/GroupsPlanner";
+import { HospitalityEditor } from "@/components/fsl/HospitalityEditor";
 
 function Field({ label, children, hint }) {
   return (
@@ -79,6 +80,7 @@ export default function Settings() {
           required_documents: s.required_documents,
           notification_channels: s.notification_channels,
           sponsors: s.sponsors || [],
+          hospitality: s.hospitality || [],
         },
       });
       toast.success("Impostazioni salvate");
@@ -242,6 +244,11 @@ export default function Settings() {
               ); })}
             </div>
           </div>}
+        </section>
+
+        <section className="fsl-card p-6" data-testid="settings-hospitality">
+          <SectionTitle>Ospitalità e logistica</SectionTitle>
+          <HospitalityEditor items={s.hospitality} onChange={(v) => upd("hospitality", v)} />
         </section>
 
         <section className="fsl-card p-6" data-testid="settings-sponsors">

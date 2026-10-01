@@ -36,6 +36,7 @@ import BlogManager from "@/pages/admin/Blog";
 import Documents from "@/pages/club/Documents";
 import { PaymentCancel, PaymentSuccess, Sales } from "@/pages/Payments";
 import Shop from "@/pages/admin/Shop";
+import Hospitality from "@/pages/admin/Hospitality";
 import Receipt from "@/pages/Receipt";
 import Register, { AuthCallback } from "@/pages/Register";
 import { ForgotPassword, ResetPassword } from "@/pages/PasswordReset";
@@ -76,7 +77,7 @@ function AdminWeeklyHub({ children }) {
 
 function AdminMoneyHub({ children }) {
   const { tournamentId } = useParams();
-  return <TabbedSection testId="money-hub-tabs" tabs={[{ to: `/admin/t/${tournamentId}/pagamenti`, label: "Pagamenti" }, { to: `/admin/t/${tournamentId}/vendite`, label: "Vendite" }, { to: `/admin/t/${tournamentId}/negozio`, label: "Negozio" }]}>{children}</TabbedSection>;
+  return <TabbedSection testId="money-hub-tabs" tabs={[{ to: `/admin/t/${tournamentId}/pagamenti`, label: "Pagamenti" }, { to: `/admin/t/${tournamentId}/vendite`, label: "Vendite" }, { to: `/admin/t/${tournamentId}/negozio`, label: "Negozio" }, { to: `/admin/t/${tournamentId}/ospitalita`, label: "Ospitalità" }]}>{children}</TabbedSection>;
 }
 
 function PublicWeeklyHub({ children }) {
@@ -152,6 +153,7 @@ function AppRoutes() {
                 <Route path="documenti" element={<Documents />} />
                 <Route path="vendite" element={<AdminMoneyHub><Sales /></AdminMoneyHub>} />
                 <Route path="negozio" element={<AdminMoneyHub><Shop /></AdminMoneyHub>} />
+                <Route path="ospitalita" element={<AdminMoneyHub><Hospitality /></AdminMoneyHub>} />
                 <Route path="comunicazioni" element={<ModulePlaceholder module="comunicazioni" />} />
               </Route>
 
@@ -164,6 +166,7 @@ function AppRoutes() {
                 <Route path="partite/:matchId" element={<ClubMatch />} />
                 <Route path="segnalazioni" element={<ClubReports />} />
                 <Route path="pagamenti" element={<Payments clubMode />} />
+                <Route path="ospitalita" element={<Hospitality clubMode />} />
                 <Route path="blog" element={<BlogManager clubMode />} />
                 <Route path="documenti" element={<Documents clubMode />} />
                 <Route path="profilo" element={<ClubHomeEditor />} />

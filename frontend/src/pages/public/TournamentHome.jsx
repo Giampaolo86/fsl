@@ -6,6 +6,7 @@ import { FavButton } from "@/components/fsl/FavButton";
 import { FeaturedNews, HomeHeading, InterviewsBlock, ShopShowcase } from "@/components/fsl/HomeSections";
 import { MatchCard } from "@/components/fsl/MatchCard";
 import { BracketSection } from "@/components/fsl/Bracket";
+import { HospitalitySection } from "@/components/fsl/Hospitality";
 import { ShopStrip } from "@/components/fsl/ShopStrip";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { usePublicTournament } from "@/hooks/usePublicTournament";
@@ -73,6 +74,7 @@ export default function TournamentHome() {
       </section>
 
       <BracketSection slug={slug} category={category} className="mx-auto max-w-[1488px] px-6 mt-16" />
+      <HospitalitySection slug={slug} className="mx-auto max-w-[1488px] px-6 mt-16" />
 
       <section className="mx-auto max-w-[1488px] px-6 mt-16" data-testid="home-upcoming-section">
         <HomeHeading icon={CalendarDays} kicker={`Categoria ${category}`} title="Prossime partite" right={<Link to={`/tornei/${slug}/partite?cat=${category}`} className="btn-ghost" data-testid="home-calendar-link">Calendario completo <ArrowRight className="h-4 w-4" /></Link>} />
