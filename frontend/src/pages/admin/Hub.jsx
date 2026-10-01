@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Archive, Grid3X3, Plus, Search, Trophy, Users, Volleyball } from "lucide-react";
 import { KpiTile, PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { TournamentCard } from "@/components/fsl/TournamentCard";
+import { PurgeTestDataDialog } from "@/components/fsl/PurgeTestDataDialog";
 import { EmptyState, LoadingState } from "@/components/fsl/States";
 import { useTournaments } from "@/context/TournamentContext";
 import { useAuth } from "@/context/AuthContext";
@@ -50,9 +51,12 @@ export default function Hub() {
             <p className="mt-2 text-fsl-slate max-w-lg">Gestisci tutti i tuoi tornei da un'unica piattaforma: ogni torneo ha configurazione, dati e regole indipendenti.</p>
           </div>
           {canWrite && (
-            <Link to="/admin/tornei/nuovo" className="btn-gold" data-testid="hub-create-tournament-button">
-              <Plus className="h-4 w-4" aria-hidden="true" /> Crea nuovo torneo
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              {user.is_super_admin && <PurgeTestDataDialog tournaments={tournaments} onDone={refresh} />}
+              <Link to="/admin/tornei/nuovo" className="btn-gold" data-testid="hub-create-tournament-button">
+                <Plus className="h-4 w-4" aria-hidden="true" /> Crea nuovo torneo
+              </Link>
+            </div>
           )}
         </div>
       </section>
