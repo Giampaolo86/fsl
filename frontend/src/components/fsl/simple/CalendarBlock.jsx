@@ -1,20 +1,37 @@
 import { useState } from "react";
-import { FileDown, Pencil, X } from "lucide-react";
+import { FileDown, GripVertical, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 
-export function MatchTable({ rows, onEdit, canWrite, showGroup = true, testId }) {
+export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, testId }) {
+  const [over, setOver] = useState(null);
   if (!rows.length) return null;
+  const draggable = canWrite && !!onSwap;
+  const drop = (e, target) => {
+    e.preventDefault(); setOver(null);
+    const src = e.dataTransfer.getData("text/fsl-match");
+    if (src && src !== target.id && !target.played) onSwap(src, target.id);
+  };
   return (
     <div className="overflow-x-auto rounded-lg border border-white/10" data-testid={testId}>
       <table className="w-full text-sm">
         <thead className="text-[11px] uppercase tracking-wider text-fsl-slate bg-ink-950/60">
-          <tr><th className="text-left px-3 py-2">Data</th><th className="text-left px-2 py-2">Ora</th><th className="text-left px-2 py-2">Campo</th>{showGroup && <th className="text-left px-2 py-2">Girone</th>}<th className="text-left px-2 py-2">Squadra casa</th><th className="text-left px-2 py-2">Squadra ospite</th><th className="px-2 py-2 text-right">{canWrite ? "Modifica" : "Esito"}</th></tr>
+          <tr>{draggable && <th className="w-6" aria-label="Trascina" />}<th className="text-left px-3 py-2">Data</th><th className="text-left px-2 py-2">Ora</th><th className="text-left px-2 py-2">Campo</th>{showGroup && <th className="text-left px-2 py-2">Girone</th>}<th className="text-left px-2 py-2">Squadra casa</th><th className="text-left px-2 py-2">Squadra ospite</th><th className="px-2 py-2 text-right">{canWrite ? "Modifica" : "Esito"}</th></tr>
         </thead>
         <tbody className="divide-y divide-white/[0.06]">
           {rows.map((m) => (
-            <tr key={m.id} className={m.played ? "opacity-70" : ""} data-testid={`simple-match-${m.id}`}>
+            <tr
+              key={m.id}
+              draggable={draggable && !m.played}
+              onDragStart={(e) => { e.dataTransfer.setData("text/fsl-match", m.id); e.dataTransfer.effectAllowed = "move"; }}
+              onDragOver={(e) => { if (draggable && !m.played) { e.preventDefault(); setOver(m.id); } }}
+              onDragLeave={() => setOver((o) => (o === m.id ? null : o))}
+              onDrop={(e) => drop(e, m)}
+              className={`${m.played ? "opacity-70" : draggable ? "cursor-grab active:cursor-grabbing" : ""} ${over === m.id ? "bg-fsl-gold/15 outline outline-1 outline-fsl-gold" : ""} transition-colors`}
+              data-testid={`simple-match-${m.id}`}
+            >
+              {draggable && <td className="pl-2 text-fsl-slate/50" aria-hidden="true">{!m.played && <GripVertical className="h-4 w-4" />}</td>}
               <td className="px-3 py-2 text-xs text-fsl-slate whitespace-nowrap">{fmtDate(m.kickoff_at)}</td>
               <td className="px-2 py-2 num font-semibold">{m.kickoff_at.slice(11, 16)}</td>
               <td className="px-2 py-2 text-fsl-slate whitespace-nowrap">{m.field_name || "—"}</td>
@@ -35,7 +52,7 @@ export function MatchTable({ rows, onEdit, canWrite, showGroup = true, testId })
 const WEEKDAYS = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
 const dayLabel = (d) => (d ? `${WEEKDAYS[new Date(d + "T12:00").getDay()]} ${fmtDate(d)}` : "");
 
-export function CalendarBlock({ tid, board, reload, canWrite, onEdit }) {
+export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap }) {
   const c = board.calendar;
   const today = new Date().toISOString().slice(0, 10);
   const [sessions, setSessions] = useState(c.sessions?.length ? c.sessions : [{ date: c.date || today, start_time: c.start_time || "15:00", end_time: c.end_time || "19:00" }]);
@@ -95,8 +112,8 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit }) {
         <p className="text-sm text-fsl-slate" data-testid="cal-empty">{board.groups.length ? "Indica quando si gioca (es. sabato 15:00→19:00 e domenica 08:30→12:30), campi e durata, poi premi «Genera calendario»." : "Crea prima i gironi."}</p>
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-fsl-slate"><span data-testid="cal-summary">{board.matches.length} partite · {days.map(dayLabel).join(" · ")}</span><button className="btn-ghost h-9 ml-auto" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button></div>
-          {board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
+          <div className="flex flex-wrap items-center gap-3 text-xs text-fsl-slate"><span data-testid="cal-summary">{board.matches.length} partite · {days.map(dayLabel).join(" · ")}</span>{canWrite && <span className="inline-flex items-center gap-1 text-fsl-slate/80" data-testid="cal-drag-hint"><GripVertical className="h-3.5 w-3.5" /> Trascina una partita su un'altra per scambiare orario e campo</span>}<button className="btn-ghost h-9 ml-auto" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button></div>
+          {board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
         </div>
       )}
     </section>

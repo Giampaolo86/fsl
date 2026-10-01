@@ -7,6 +7,7 @@ import { CalendarBlock } from "@/components/fsl/simple/CalendarBlock";
 import { FinalsBlock } from "@/components/fsl/simple/FinalsBlock";
 import { SimpleMatchEdit } from "@/components/fsl/SimpleMatchEdit";
 import { useTournamentDetail } from "@/hooks/useTournamentData";
+import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 
 export default function SimpleEngine() {
@@ -22,6 +23,10 @@ export default function SimpleEngine() {
     api.get(`/tournaments/${tid}/simple/board`, { params: category ? { category } : {} }).then((r) => { setBoard(r.data); setError(null); }).catch(setError);
   }, [tid, category]);
   useEffect(load, [load]);
+
+  const swap = async (a, b) => {
+    try { const { data } = await api.post(`/tournaments/${tid}/simple/matches/swap`, { a, b }); setBoard(data); toast.success("Orario e campo scambiati"); } catch (e) { toast.error(apiError(e)); }
+  };
 
   if (error) return <ErrorState message={apiError(error)} onRetry={load} />;
   if (!board || !t) return <LoadingState label="Caricamento gironi…" />;
@@ -41,8 +46,8 @@ export default function SimpleEngine() {
         )}
       />
       <GroupsBlock tid={tid} board={board} reload={load} canWrite={canWrite} />
-      <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} />
-      <FinalsBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} />
+      <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} />
+      <FinalsBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} />
       {editM && <SimpleMatchEdit tid={tid} m={editM} teams={board.teams} fields={board.fields} onClose={() => setEditM(null)} onDone={load} />}
     </div>
   );

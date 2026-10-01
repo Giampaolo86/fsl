@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { MatchTable } from "./CalendarBlock";
 
-export function FinalsBlock({ tid, board, reload, canWrite, onEdit }) {
+export function FinalsBlock({ tid, board, reload, canWrite, onEdit, onSwap }) {
   const lastGroupDay = board.matches.length ? board.matches[board.matches.length - 1].kickoff_at.slice(0, 10) : new Date().toISOString().slice(0, 10);
   const [f, setF] = useState({ teams: 4, date: board.finals[0]?.kickoff_at.slice(0, 10) || lastGroupDay, start_time: board.finals[0]?.kickoff_at.slice(11, 16) || "15:00", third_place: false });
   const [busy, setBusy] = useState(false);
@@ -45,7 +45,7 @@ export function FinalsBlock({ tid, board, reload, canWrite, onEdit }) {
       ) : (
         <div className="space-y-3">
           {canWrite && <div className="flex flex-wrap items-center gap-3"><button className="btn-ghost h-10" disabled={busy} onClick={() => fill(false)} data-testid="finals-fill-button"><Users className="h-4 w-4" /> Inserisci le qualificate</button><span className="text-xs text-fsl-slate">Prende 1ª/2ª dalle classifiche e vincenti/perdenti dai risultati ufficiali. Puoi sempre correggere con Modifica.</span></div>}
-          <MatchTable rows={board.finals} onEdit={onEdit} canWrite={canWrite} testId="finals-table" />
+          <MatchTable rows={board.finals} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} testId="finals-table" />
         </div>
       )}
     </section>

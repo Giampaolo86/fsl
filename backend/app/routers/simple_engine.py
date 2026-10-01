@@ -511,3 +511,24 @@ async def delete_group(tournament_id: str, competition_id: str, user: CurrentUse
     await comps_repo.soft_delete(g.id, user.id)
     await audit.record(user, "simple.group_delete", "competition", g.id, t.id, before={"series": g.series, "matches": len(ms)})
     return await _board(tournament_id, g.category)
+
+
+class SwapIn(BaseModel):
+    a: str
+    b: str
+
+
+@router.post("/matches/swap")
+async def swap_matches(tournament_id: str, body: SwapIn, user: CurrentUser = Depends(get_current_user)):
+    """Scambia data/ora e campo tra due gare (drag & drop in tabella)."""
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    repo = scoped("matches", tournament_id)
+    a, b = await repo.get(body.a), await repo.get(body.b)
+    if not a or not b or a.id == b.id:
+        raise not_found("Gara")
+    if a.status in PLAYED or b.status in PLAYED:
+        raise conflict("Una delle due gare è già stata giocata: non si può spostare")
+    await repo.update(a.id, {"kickoff_at": b.kickoff_at, "field_id": b.field_id, "field_name": b.field_name}, user.id)
+    await repo.update(b.id, {"kickoff_at": a.kickoff_at, "field_id": a.field_id, "field_name": a.field_name}, user.id)
+    await audit.record(user, "simple.swap", "match", a.id, t.id, after={"with": b.id, "a_to": b.kickoff_at, "b_to": a.kickoff_at})
+    return await _board(tournament_id, a.category)
