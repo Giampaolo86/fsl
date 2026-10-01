@@ -110,6 +110,7 @@ class TournamentSettings(BaseDocument):
     qualifiers_per_group: int = 2
     third_place: bool = False
     hospitality: list[dict] = []
+    hospitality_visibility: str = "clubs"
     calendar_sessions: list[dict] = []
     calendar_breaks: list[dict] = []
     calendar_slots: dict = {}

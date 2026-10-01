@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { StatusBadge } from "@/components/fsl/StatusBadge";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
-import { HubAccess, HubCodice, HubHero, HubMedia, HubMission, HubStats, HubTournaments, Kicker } from "@/components/fsl/HomeHub";
+import { HubAccess, HubPlatform, HubJoin, HubCodice, HubHero, HubMedia, HubMission, HubStats, HubTournaments, Kicker } from "@/components/fsl/HomeHub";
 import { api, apiError } from "@/lib/api";
 import { fmtPeriod } from "@/lib/format";
 
@@ -58,7 +58,9 @@ export default function PublicHub() {
       <HubCodice />
       <HubTournaments list={list} />
       <HubStats list={list} main={main} />
+      <HubPlatform />
       <HubMedia main={main} />
+      <HubJoin />
       <HubAccess />
     </div>
   );

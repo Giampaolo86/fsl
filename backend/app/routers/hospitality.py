@@ -70,11 +70,24 @@ class StatusIn(BaseModel):
     status: str
 
 
+async def _visible_to(t, request: Request) -> bool:
+    """«clubs» = solo società (loggate) e staff; «all» = anche genitori e pubblico."""
+    from .public import _staff
+
+    s = await settings_repo.find_one({"tournament_id": t.id})
+    if (s.hospitality_visibility if s else "clubs") == "all":
+        return True
+    user = await _staff(request)
+    return bool(user and user.role_in(t.id) in {"club_manager", "super_admin", "director", "secretary"})
+
+
 @public_router.get("")
-async def public_items(slug: str):
+async def public_items(slug: str, request: Request):
     t = await tournaments.find_one({"slug": slug})
     if not t:
         raise not_found("Torneo")
+    if not await _visible_to(t, request):
+        return []
     return [i for i in await _items(t.id) if i["enabled"]]
 
 
@@ -87,6 +100,8 @@ async def public_book(slug: str, body: BookingIn, request: Request):
         raise not_found("Torneo")
     if not body.items:
         raise bad_request("Seleziona almeno un servizio")
+    if not await _visible_to(t, request):
+        raise bad_request("Le prenotazioni di ospitalità sono riservate alle società: accedi all'Area Società")
     user = await _staff(request)
     club = None
     booker = "guest"

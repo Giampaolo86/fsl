@@ -57,7 +57,7 @@ export default function TournamentHome() {
           <p className="mt-4 text-fsl-white/90 text-base md:text-lg num">{fmtNum(summary.teams_capacity)} squadre. {s.categories.length} categorie. Una sola ambizione.</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to={`/tornei/${slug}/squadre`} className="btn-gold" data-testid="public-hero-cta-teams">Scopri le squadre <ArrowRight className="h-4 w-4" /></Link>
-            <Link to={`/tornei/${slug}/regolamento`} className="btn-ghost" data-testid="public-hero-cta-rules">Formula e regolamento</Link>
+            <Link to="/codice-fsl" className="btn-ghost" data-testid="public-hero-cta-rules">Codice FSL</Link>
           </div>
         </div>
       </section>

@@ -104,11 +104,9 @@ export function HubTournaments({ list }) {
               <div className="relative h-[300px] overflow-hidden"><img src={IMG(CAT_IMGS[i % CAT_IMGS.length])} alt="" className="absolute inset-0 h-full w-full object-cover scale-[1.75] origin-[50%_42%] group-hover:scale-[1.82] transition-transform duration-700" style={{ objectPosition: "50% 42%" }} /><span className="absolute left-4 top-4 h-7 px-2.5 rounded-full bg-ink-950/70 backdrop-blur border border-white/20 text-[11px] font-semibold text-fsl-white/90 inline-flex items-center max-w-[85%] truncate">{c.t.name}</span><div className="absolute inset-0 bg-gradient-to-t from-navy-800 via-navy-800/55 to-transparent" />
                 <div className="absolute left-5 right-5 bottom-4">{c.cat ? <><div className="font-display uppercase font-bold text-fsl-white text-sm tracking-wide">Categoria</div><div className="font-display font-extrabold text-6xl leading-none text-fsl-white num">{c.cat}</div></> : <div className="font-display font-extrabold text-4xl leading-none text-fsl-white">{c.t.name}</div>}
                   <div className="mt-2 font-display uppercase font-bold text-fsl-gold text-lg leading-none">{c.t.series?.length ? seriesLabel(c.t.series) : c.t.payoff || c.t.name}</div></div></div>
-              <div className="p-5 pt-3 space-y-2 text-sm text-fsl-white/85">
-                <div className="flex items-center gap-2.5"><Users className="h-4 w-4 text-fsl-gold shrink-0" /><span className="num">{c.teams} squadre</span></div>
-                <div className="flex items-center gap-2.5"><Grid3X3 className="h-4 w-4 text-fsl-gold shrink-0" /><span className="num">{c.t.fields_count} campi</span></div>
-                <div className="flex items-center gap-2.5"><CalendarDays className="h-4 w-4 text-fsl-gold shrink-0" /><span className="num uppercase">{fmtPeriod(c.t.start_date, c.t.end_date)}</span></div>
-                <span className="mt-3 btn-ghost w-full h-11 uppercase font-display tracking-wide border-fsl-gold/50 text-fsl-gold group-hover:bg-fsl-gold group-hover:text-ink-950 group-hover:border-fsl-gold">Scopri torneo <ArrowRight className="h-4 w-4" /></span>
+              <div className="p-5 pt-3 flex items-center justify-between gap-3 text-sm text-fsl-white/85">
+                <span className="text-xs text-fsl-slate truncate">{c.cat ? `Nati nel ${c.cat}` : c.t.payoff || "Scopri formula e squadre"}</span>
+                <span className="btn-ghost h-10 px-4 uppercase font-display tracking-wide border-fsl-gold/50 text-fsl-gold group-hover:bg-fsl-gold group-hover:text-ink-950 group-hover:border-fsl-gold shrink-0">Scopri <ArrowRight className="h-4 w-4" /></span>
               </div>
             </Link>
           ))}
@@ -163,6 +161,43 @@ export function HubAccess() {
           <Link to="/login?area=societa" className="btn-gold h-12 px-6 uppercase font-display tracking-wide shadow-[0_10px_30px_-10px_rgba(244,174,43,0.8)]" data-testid="access-club"><Users className="h-4 w-4" /> Login società</Link>
           <Link to="/login?area=arbitri" className="btn-ghost h-12 px-6 uppercase font-display tracking-wide border-white/40 hover:border-fsl-gold" data-testid="access-referee"><Flag className="h-4 w-4" /> Login arbitri</Link>
           <Link to="/login?area=staff" className="btn-ghost h-12 px-6 uppercase font-display tracking-wide border-white/40 hover:border-fsl-gold" data-testid="access-staff"><Settings className="h-4 w-4" /> Login staff</Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function HubPlatform() {
+  return (
+    <section className="mx-auto max-w-[1488px] px-6 py-10 lg:py-16" data-testid="hub-platform">
+      <div className="grid lg:grid-cols-[1fr_1.2fr] gap-10 items-center">
+        <div>
+          <Kicker className="mb-3">La nostra piattaforma</Kicker>
+          <h2 className="!text-5xl sm:!text-6xl lg:!text-7xl font-extrabold leading-[0.9]">Tutto in un'unica <span className="text-fsl-gold">casa digitale</span></h2>
+          <p className="mt-5 text-fsl-white/80 max-w-xl">FSL non è solo un torneo: calendari, risultati live, classifiche, schede società e giocatori, foto e video. Tutto in un posto solo, su computer e smartphone.</p>
+          <div className="mt-6 flex flex-wrap gap-2">{["Calendari e risultati live", "Classifiche ufficiali", "Schede società e giocatori", "Foto, video e highlights"].map((t) => <span key={t} className="h-9 px-3.5 inline-flex items-center rounded-full border border-white/15 bg-white/5 text-xs font-semibold">{t}</span>)}</div>
+        </div>
+        <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-elev animate-rise"><img src={IMG("devices")} alt="FSL su laptop e smartphone" className="w-full h-auto object-cover" loading="lazy" /><div className="absolute inset-0 bg-gradient-to-t from-navy-900/60 via-transparent to-transparent" /></div>
+      </div>
+    </section>
+  );
+}
+
+export function HubJoin() {
+  return (
+    <section className="mx-auto max-w-[1488px] px-6 pb-12" data-testid="hub-join">
+      <div className="relative overflow-hidden rounded-2xl border border-fsl-gold/30 min-h-[320px] flex items-center">
+        <img src={IMG("ball")} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+        <div className="absolute inset-0 bg-gradient-to-r from-ink-950/95 via-ink-950/80 to-ink-950/30" />
+        <div className="relative px-6 sm:px-12 py-12 max-w-2xl">
+          <Kicker className="mb-3">Entra nel progetto</Kicker>
+          <h2 className="!text-4xl sm:!text-5xl lg:!text-6xl font-extrabold leading-[0.9]">Porta la tua società <span className="text-fsl-gold">in FSL</span></h2>
+          <p className="mt-4 text-fsl-white/85">Un progetto che unisce organizzazione, immagine e opportunità di crescita per società, atleti e famiglie.</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link to="/richiedi-accesso" className="btn-gold h-12 px-6 uppercase font-display tracking-wide" data-testid="hub-join-request">Entra nella community <ArrowRight className="h-4 w-4" /></Link>
+            <Link to="/codice-fsl" className="btn-ghost h-12 px-5 uppercase font-display tracking-wide" data-testid="hub-join-codice">Scopri FSL</Link>
+            <Link to="/tornei" className="btn-ghost h-12 px-5 uppercase font-display tracking-wide" data-testid="hub-join-tournaments"><Trophy className="h-4 w-4" /> Tornei attivi</Link>
+          </div>
         </div>
       </div>
     </section>

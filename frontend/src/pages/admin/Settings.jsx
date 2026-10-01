@@ -88,6 +88,7 @@ export default function Settings() {
           notification_channels: s.notification_channels,
           sponsors: s.sponsors || [],
           hospitality: s.hospitality || [],
+          hospitality_visibility: s.hospitality_visibility || "clubs",
           rules_text: s.rules_text || "",
         },
       });
@@ -271,6 +272,17 @@ export default function Settings() {
 
         <section className="fsl-card p-6" data-testid="settings-hospitality">
           <SectionTitle>Ospitalità e logistica</SectionTitle>
+          <div className="mb-5 rounded-lg border border-white/10 bg-ink-950/40 p-4" data-testid="settings-hospitality-visibility">
+            <div className="fsl-label mb-2">Chi vede prezzi e servizi e può richiedere la prenotazione</div>
+            <div className="grid sm:grid-cols-2 gap-2">
+              {[["clubs", "Solo società", "Pernotto, pasti, trasporti e quote compaiono solo nell'Area Società: la società prenota per atleti e genitori e tu ricevi la richiesta in Control Room."], ["all", "Società e genitori", "La sezione «Pernotto, pasti e trasporti» è visibile anche sul sito pubblico del torneo e i genitori possono richiedere direttamente."]].map(([v, l, d]) => (
+                <label key={v} className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${(s.hospitality_visibility || "clubs") === v ? "border-fsl-gold bg-fsl-gold/10" : "border-white/10 hover:border-white/25"}`}>
+                  <input type="radio" name="hospitality_visibility" className="mt-1" checked={(s.hospitality_visibility || "clubs") === v} onChange={() => upd("hospitality_visibility", v)} data-testid={`settings-hospitality-visibility-${v}`} />
+                  <span><span className="block font-semibold text-sm">{l}</span><span className="block text-xs text-fsl-slate mt-0.5">{d}</span></span>
+                </label>
+              ))}
+            </div>
+          </div>
           <HospitalityEditor items={s.hospitality} onChange={(v) => upd("hospitality", v)} />
         </section>
 

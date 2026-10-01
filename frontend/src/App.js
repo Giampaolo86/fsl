@@ -202,7 +202,7 @@ function AppRoutes() {
                 <Route path="giocatori/:playerId/capsule" element={<TimeCapsule />} />
                 <Route path="prodotti/:token" element={<DigitalProduct />} />
                 <Route path="classifiche" element={<PublicStandingsLive />} />
-                <Route path="regolamento" element={<PublicRules />} />
+                <Route path="regolamento" element={<Navigate to="/codice-fsl" replace />} />
                 <Route path="partite" element={<PublicMatches />} />
                 <Route path="partite/:matchId" element={<PublicMatchCenter />} />
                 <Route path="statistiche" element={<PublicStats />} />
