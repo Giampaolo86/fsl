@@ -1,9 +1,12 @@
+import { useState } from "react";
+
 export function ClubCrest({ club, size = 48, className = "" }) {
+  const [broken, setBroken] = useState(false);
   const primary = club?.colors?.primary || "#0B57D9";
   const secondary = club?.colors?.secondary || "#F4AE2B";
   const initials = (club?.short_name || club?.name || "?").slice(0, 3).toUpperCase();
-  if (club?.crest_url && !club?.crest_is_placeholder) {
-    return <img src={club.crest_url} alt={`Stemma ${club.name}`} width={size} height={size} className={`object-contain ${className}`} />;
+  if (club?.crest_url && !club?.crest_is_placeholder && !broken) {
+    return <img src={club.crest_url} alt={`Stemma ${club.name}`} width={size} height={size} onError={() => setBroken(true)} className={`object-contain ${className}`} />;
   }
   return (
     <svg

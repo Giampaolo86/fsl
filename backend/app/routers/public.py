@@ -240,6 +240,22 @@ async def public_matches(slug: str, category: Optional[str] = None, competition_
     return await _public_matches(t.id, ms)
 
 
+@router.get("/tournaments/{slug}/schedule")
+async def public_schedule(slug: str, request: Request):
+    """Campi, sessioni e pause per la griglia pubblica ora × campo."""
+    t = await _published(slug, request)
+    s = await settings_repo.find_one({"tournament_id": t.id})
+    fields = await scoped("fields", t.id).list({"active": True}, sort=[("code", 1)])
+    return {
+        "fields": [{"id": f.id, "name": f.name} for f in fields][: max(s.fields_count or len(fields), 1)] if s else [],
+        "fields_count": s.fields_count if s else len(fields),
+        "sessions": (s.calendar_sessions if s else None) or [],
+        "breaks": (s.calendar_breaks if s else None) or [],
+        "match_minutes": s.match_duration_min if s else 25,
+        "buffer_minutes": s.buffer_min if s else 10,
+    }
+
+
 @router.get("/tournaments/{slug}/matches/{match_id}")
 async def public_match(slug: str, match_id: str):
     t = await _published(slug)

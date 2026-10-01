@@ -1,118 +1,107 @@
 {
-  "theme": {
-    "colors": {
-      "background": "#03131F",
-      "surface": "#041E32",
-      "surface_elevated": "#072B47",
-      "primary": "#0B57D9",
-      "accent": "#F4AE2B",
-      "text_primary": "#F5F7FA",
-      "text_secondary": "#A8BACB"
-    },
-    "fonts": {
-      "display": "Barlow Condensed",
-      "body": "Inter"
-    },
-    "tokens": {
-      "cards": "fsl-card, fsl-card-gold",
-      "typography": "fsl-kicker, fsl-section-title, num",
-      "buttons": "btn-gold, btn-ghost, btn-primary",
-      "effects": "grain, hero-overlay"
-    }
+  "theme_strategy": {
+    "concept": "The Tactical Broadcast (Serie A Premium)",
+    "description": "A high-end sports broadcast aesthetic. Avoid flat, generic 'admin panel' cards. Every match is an event. We achieve this through deep ink/navy backgrounds, sharp edges with subtle gold/colored accents, striking Barlow Condensed scores, and pronounced PNG crests with drop shadows.",
+    "mode": "dark"
   },
   "typography": {
-    "h1_hero": "text-5xl md:text-6xl lg:text-7xl uppercase font-extrabold font-barlow tracking-tighter text-[#F5F7FA]",
-    "h2_section": "text-3xl md:text-4xl uppercase font-bold font-barlow tracking-tight text-[#F5F7FA] fsl-section-title",
-    "h3_card": "text-xl md:text-2xl uppercase font-bold font-barlow text-[#F5F7FA]",
-    "kicker": "text-sm md:text-base text-[#F4AE2B] font-barlow tracking-[0.2em] uppercase fsl-kicker",
-    "body": "text-sm md:text-base font-inter text-[#A8BACB] leading-relaxed",
-    "numbers": "text-2xl md:text-3xl font-extrabold font-barlow text-[#F5F7FA] num"
+    "headings_and_scores": {
+      "font": "Barlow Condensed",
+      "classes": "font-barlow-condensed tracking-tighter uppercase",
+      "weights": "font-bold to font-black",
+      "usage": "Match scores, time, status badges (LIVE, FT), matchday headers."
+    },
+    "body_and_names": {
+      "font": "Inter",
+      "classes": "font-inter tracking-tight",
+      "weights": "font-medium to font-semibold",
+      "usage": "Team names, referee details, pitch locations, metadata."
+    }
   },
-  "layouts": {
-    "blueprint": [
-      {
-        "section": "Hero",
-        "order": 1,
-        "grid_structure": "flex flex-col relative min-h-[60vh] md:min-h-[70vh] justify-end pb-12",
-        "instructions": "Cover image with hero-overlay. Main H1 title, Category selector, and Follow button stacked. At the bottom, overlap the numbers strip.",
-        "micro_interactions": "Parallax effect on background image if possible, staggered fade-in up for text."
-      },
-      {
-        "section": "Numbers Strip",
-        "order": 2,
-        "grid_structure": "grid grid-cols-2 md:grid-cols-4 gap-4 -mt-8 relative z-10 mx-4 md:mx-8",
-        "instructions": "Use fsl-card style with backdrop-blur. Each stat has a small label (text-xs text-[#A8BACB] uppercase) and a large number (num).",
-        "micro_interactions": "Hover slight translateY (-translate-y-1)."
-      },
-      {
-        "section": "Prossime Partite",
-        "order": 3,
-        "grid_structure": "flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible",
-        "instructions": "Horizontal scroll on mobile, grid on desktop. Match cards using fsl-card.",
-        "micro_interactions": "Card hover scale-102 transition."
-      },
-      {
-        "section": "Blog & News (Featured + Secondary)",
-        "order": 4,
-        "grid_structure": "grid grid-cols-1 lg:grid-cols-12 gap-6",
-        "instructions": "Make it bold and editorial. The Featured article spans lg:col-span-8 (asymmetric split), with a large cover image, oversized kicker, title, excerpt, and CTA. Secondary posts span lg:col-span-4 as a vertical stack (flex flex-col gap-4) with thumbnail on the left and title on the right.",
-        "micro_interactions": "group-hover:scale-105 on the featured image wrapper. The image must have overflow-hidden. Text remains static."
-      },
-      {
-        "section": "Interviste",
-        "order": 5,
-        "grid_structure": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
-        "instructions": "Darker cards (bg-[#03131F]) inside a slightly elevated section wrapper. Thick gold left border (border-l-4 border-[#F4AE2B]). Quote style layout with interviewee chip.",
-        "micro_interactions": "Hover border width expands or glow effect on the gold rail."
-      },
-      {
-        "section": "Foto e Video in Vendita",
-        "order": 6,
-        "grid_structure": "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6",
-        "instructions": "Strong section header accompanied by 'Video 0,99 € · Foto 0,49 €' in gold (text-[#F4AE2B] font-barlow tracking-wider). ShopItemCard: Blurred image (backdrop-blur-sm) to simulate a locked preview, lock icon absolute center. kind badge (Foto/Video) absolute top-left. Bottom area contains title and a btn-gold.",
-        "micro_interactions": "group-hover:blur-none transition-all duration-300 on the image preview. Button subtle bounce."
-      },
-      {
-        "section": "Risultati, Classifica, Marcatori",
-        "order": 7,
-        "grid_structure": "grid grid-cols-1 lg:grid-cols-3 gap-6",
-        "instructions": "Dense Dashboard Grid style. Left: Last Results (stack). Center: Mini Classifica (dense table layout, text-sm). Right: Top Scorers (list with avatars and gold fsl-kicker numbers).",
-        "micro_interactions": "Row hover effects (bg-white/5) on table and lists."
-      },
-      {
-        "section": "Clubs Grid",
-        "order": 8,
-        "grid_structure": "grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4",
-        "instructions": "Simple grid of club crests. Minimal UI to close the page.",
-        "micro_interactions": "opacity-70 hover:opacity-100 transition-opacity."
+  "colors": {
+    "backgrounds": {
+      "primary": "bg-ink-950",
+      "secondary": "bg-navy-800",
+      "gradient_card": "bg-gradient-to-br from-navy-800 to-ink-950"
+    },
+    "text": {
+      "primary": "text-white",
+      "muted": "text-fsl-slate",
+      "accent": "text-fsl-gold"
+    },
+    "states": {
+      "live": "text-fsl-danger bg-fsl-danger/10 border-fsl-danger/20",
+      "official": "text-fsl-slate bg-white/5",
+      "conflict": "border-fsl-danger ring-1 ring-fsl-danger/50 shadow-[0_0_12px_rgba(239,68,68,0.3)]",
+      "final_stage": "text-fsl-gold bg-fsl-gold/10 border border-fsl-gold/30"
+    },
+    "team_colors": {
+      "usage": "Use the team's primary color as a 4px accent line (e.g., left border of the tile) or a subtle 10% opacity radial gradient behind the team crest."
+    }
+  },
+  "visual_enhancers": {
+    "crests": "Must use drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] to pop against the dark backgrounds. If no crest, use a minimalist SVG placeholder with a white/20 fill.",
+    "borders": "1px solid borders. Default: border-white/10. Hover: border-fsl-gold/40.",
+    "glassmorphism": "Used sparingly for dropdowns/menus, not for the main tiles to maintain high contrast data legibility."
+  },
+  "components": [
+    {
+      "name": "MatchTileGrid",
+      "context": "Public 'Partite' Grid & Control Room",
+      "dimensions": "w-[300px] h-[70px]",
+      "description": "Ultra-compact broadcast tile. Teams stacked vertically on the left, score/time massive on the right.",
+      "layout_classes": "relative flex items-stretch bg-ink-950 border border-white/10 rounded-md overflow-hidden group hover:border-fsl-gold/40 transition-colors shadow-md",
+      "structure": [
+        "1. Dynamic Color Bar: `w-1.5 h-full` using Home Team's primary color.",
+        "2. Team Info Column (Left 75%): `flex flex-col justify-center space-y-1 p-2`. Two rows, each with `flex items-center space-x-2`. Crest (`w-4 h-4 object-contain drop-shadow`) + Team Name (`font-inter text-sm text-white font-semibold truncate`).",
+        "3. Score/Status Column (Right 25%): `flex flex-col items-end justify-center p-2 border-l border-white/5 bg-white/[0.02]`. Score (`text-2xl font-barlow-condensed font-black text-white leading-none`). Status (`text-[10px] font-bold uppercase` - red pulsing for LIVE, fsl-slate for FT).",
+        "4. Final Stage Indicator: If final stage, absolute top-right tiny gold ribbon or gold border-top."
+      ],
+      "admin_variants": {
+        "conflict": "Add absolute inset-0 pointer-events-none class `border-2 border-fsl-danger shadow-[inset_0_0_8px_rgba(239,68,68,0.4)]`",
+        "drag_drop": "On hover, reveal a drag handle (6 dots, text-white/50) at the absolute left (over the color bar) and cursor-grab.",
+        "quick_edit": "Team rows get `hover:bg-white/10 cursor-pointer` and a 12px pencil icon fades in on hover."
       }
-    ]
+    },
+    {
+      "name": "MatchCardList",
+      "context": "Match Center, 'Prossime partite', Club Home",
+      "description": "Luxurious, expanded broadcast graphics. Symmetrical split or wide landscape layout.",
+      "layout_classes": "fsl-card gold-skin relative w-full flex flex-col bg-gradient-to-br from-navy-800 to-ink-950 border border-white/10 rounded-lg overflow-hidden group hover:shadow-[0_8px_30px_-10px_rgba(212,175,55,0.15)] transition-all",
+      "structure": [
+        "1. Kicker/Header: `flex justify-between items-center px-4 py-2 bg-black/20 border-b border-white/5`. Left: Competition Name (`font-barlow-condensed text-sm font-bold text-fsl-gold tracking-widest`). Right: Match Status Badge.",
+        "2. Main Body: `flex items-center justify-between p-5`. Left & Right sides: `flex flex-col items-center w-1/3 space-y-2`. Crests are large (`w-10 h-10 drop-shadow-lg`). Team Names (`font-inter text-base font-bold text-white text-center`).",
+        "3. Center Score: `w-1/3 flex flex-col items-center justify-center`. Massive Result (`text-5xl font-barlow-condensed font-black text-white tabular-nums tracking-tighter`). Or vs/time if unplayed.",
+        "4. Footer: `flex items-center justify-between px-4 py-2.5 bg-black/40 text-xs font-inter text-fsl-slate`. Left: Date & Time. Right: Pitch & Referee."
+      ]
+    }
+  ],
+  "motion": {
+    "hover_card": "hover:scale-[1.01] hover:-translate-y-0.5 transition-transform duration-300 ease-out",
+    "live_pulse": "animate-pulse (opacity 1 to 0.5) applied to the red dot or LIVE text.",
+    "drag_state": "opacity-50 scale-95 ring-2 ring-fsl-gold (when dragged in admin)"
   },
-  "micro_interactions": {
-    "hover_card": "transition-transform duration-300 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-black/20",
-    "hover_image_zoom": "overflow-hidden group, internal img has transition-transform duration-500 group-hover:scale-105",
-    "focus_states": "focus:outline-none focus:ring-2 focus:ring-[#F4AE2B] focus:ring-offset-2 focus:ring-offset-[#03131F]"
-  },
-  "image_urls": {
-    "featured_match": "https://images.unsplash.com/photo-1626248801379-51a0748a5f96?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHwxfHx5b3V0aCUyMGZvb3RiYWxsJTIwbWF0Y2glMjBhY3Rpb258ZW58MHx8fHwxNzg5NTYzNDk3fDA&ixlib=rb-4.1.0&q=85",
-    "interview_portrait": "https://images.unsplash.com/photo-1516224498413-84ecf3a1e7fd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzN8MHwxfHNlYXJjaHwxfHxzcG9ydHMlMjBpbnRlcnZpZXclMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODk1NjM1MDF8MA&ixlib=rb-4.1.0&q=85",
-    "shop_photographer": "https://images.pexels.com/photos/31847342/pexels-photo-31847342.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+  "accessibility": {
+    "contrast": "Ensure team color accent bars do not bleed into white text. Use text-shadow if placing text over team color blocks.",
+    "testing": "All interactive elements, match tiles, and edit buttons MUST include 'data-testid' attributes (e.g., data-testid='match-tile-juve-milan', data-testid='admin-edit-home-team').",
+    "focus": "focus-visible:ring-2 focus-visible:ring-fsl-gold focus-visible:outline-none"
   },
   "instructions_to_main_agent": [
-    "You are redesigning TournamentHome.jsx inside /app/frontend/src/pages/public/.",
-    "Do NOT introduce new colors. STRICTLY use the defined dark navy, gold, and primary blue palette.",
-    "Do NOT introduce new fonts. STRICTLY use Barlow Condensed and Inter.",
-    "Use standard HTML+Tailwind for complex editorial layouts to allow for high customization rather than relying on strict rigid UI components.",
-    "Ensure 'Interviste' uses a bold quote-style with a thick gold left border.",
-    "Ensure 'Vetrina Foto/Video in vendita' correctly visualizes locked digital products with a blurred preview image until hovered.",
-    "Apply the class 'fsl-card' for general surfacing, and 'btn-gold' / 'btn-primary' for CTAs as predefined in the problem statement.",
-    "Add 'data-testid' to all interactive elements."
+    "1. Read the blueprint above to construct the `.fsl-card` and MatchTile components in React (using Javascript).",
+    "2. Strict Typography: Use Barlow Condensed ONLY for numbers, scores, and uppercase headers (kickers, matchdays). Use Inter for team names, metadata, and body.",
+    "3. Apply Broadcast aesthetic: Keep backgrounds dark (`navy-800`/`ink-950`). Do NOT use plain flat white/gray cards.",
+    "4. Implement the grid tile as a row-based layout (teams left, score right) to fit the 300x70px constraint elegantly.",
+    "5. For the Control Room grid, implement the `admin_variants` precisely (conflict states, drag handles, hover to edit).",
+    "6. Make sure you apply drop-shadow to crest PNGs so they do not look flat.",
+    "7. Include `data-testid` on all tiles and buttons.",
+    "8. Utilize the provided Tailwind colors: fsl-gold, fsl-slate, navy-800, ink-950, fsl-success, fsl-warning, fsl-danger."
   ],
   "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
-    "You tend to converge toward generic outputs. Avoid this: make creative, distinctive frontends that surprise and delight.",
-    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
-    "NEVER use generic placeholder text if you can use contextual wording.",
-    "DO NOT use transparent backgrounds under text that rests over images. Always use hero-overlay or bg-black/50.",
-    "Ensure interactive elements have explicit hover/focus state overrides."
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Do not use dark colors as gradients. Keep dark colors solid or use extremely subtle gradients (like 950 to 900).",
+    "Create depth through layered design elements with z-index hierarchy and subtle 1px borders.",
+    "Never use generic centered layouts for complex data; left-align data unless symmetry is intentionally designed (like the MatchCardList body).",
+    "Every interaction needs micro-animations - hover states, transitions. Static = dead.",
+    "Always include data-testid for all interactive and key informational elements."
   ]
 }

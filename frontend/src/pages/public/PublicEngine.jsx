@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Award, CalendarDays, Target, TrendingUp, Trophy } from "lucide-react";
+import { Award, CalendarDays, LayoutGrid, List, Target, TrendingUp, Trophy } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
+import { PublicTimeGrid } from "@/components/fsl/PublicTimeGrid";
 import { MatchCard, MatchStatusBadge, kickoffLabel } from "@/components/fsl/MatchCard";
 import { RatingsColumns } from "@/components/fsl/Ratings";
 import { PlayerCardDialog } from "@/components/fsl/PlayerCard";
@@ -35,15 +36,19 @@ export function PublicMatches() {
   const { data: home } = usePublicTournament();
   const [params, setParams] = useSearchParams();
   const cat = params.get("cat") || home?.settings?.categories?.[0] || "";
+  const view = params.get("vista") || "griglia";
+  const setP = (patch) => setParams({ cat, vista: view, ...patch });
   const { slug, data, error } = useSlugData("/matches", cat ? { category: cat } : {});
+  const { data: schedule } = useSlugData("/schedule");
   const groups = useMemo(() => { const g = {}; (data || []).forEach((m) => { const k = m.stage === "finals" ? `Fase finale · ${m.round_name}` : m.round_name; (g[k] = g[k] || []).push(m); }); return g; }, [data]);
   if (error) return <Wrap><ErrorState message={apiError(error)} /></Wrap>;
-  if (!data || !home) return <LoadingState full />;
+  if (!data || !home || !schedule) return <LoadingState full />;
+  const showGrid = view === "griglia" && schedule.fields.length > 0;
   return (
     <Wrap gold>
-      <PageHeader kicker={home.tournament.name} title="Partite" subtitle="Risultati ufficiali e prossime gare. Un risultato in verifica non incide sulla classifica." actions={<select className="fsl-input w-40" value={cat} onChange={(e) => setParams({ cat: e.target.value })} data-testid="public-matches-category">{home.settings.categories.map((c) => <option key={c}>{c}</option>)}</select>} />
+      <PageHeader kicker={home.tournament.name} title="Partite" subtitle="Programma per giornata, orario e campo. Un risultato in verifica non incide sulla classifica." actions={<div className="flex items-center gap-2"><div className="inline-flex rounded-full border border-white/15 bg-ink-950/60 p-0.5" role="tablist" data-testid="public-matches-view"><button type="button" role="tab" aria-selected={view === "griglia"} onClick={() => setP({ vista: "griglia" })} className={`inline-flex items-center gap-1 rounded-full px-3 h-8 text-xs font-semibold uppercase tracking-wider ${view === "griglia" ? "bg-fsl-gold text-ink-950" : "text-fsl-slate hover:text-white"}`} data-testid="public-matches-view-grid"><LayoutGrid className="h-3.5 w-3.5" /> Griglia</button><button type="button" role="tab" aria-selected={view === "elenco"} onClick={() => setP({ vista: "elenco" })} className={`inline-flex items-center gap-1 rounded-full px-3 h-8 text-xs font-semibold uppercase tracking-wider ${view === "elenco" ? "bg-fsl-gold text-ink-950" : "text-fsl-slate hover:text-white"}`} data-testid="public-matches-view-list"><List className="h-3.5 w-3.5" /> Elenco</button></div><select className="fsl-input w-40" value={cat} onChange={(e) => setP({ cat: e.target.value })} data-testid="public-matches-category">{home.settings.categories.map((c) => <option key={c}>{c}</option>)}</select></div>} />
       <BracketSection slug={slug} category={cat} className="mb-10" />
-      {data.length === 0 ? <EmptyState icon={CalendarDays} title="Calendario in preparazione" description="Le gare compariranno dopo la pubblicazione del calendario." /> : Object.entries(groups).map(([round, ms]) => (
+      {data.length === 0 ? <EmptyState icon={CalendarDays} title="Calendario in preparazione" description="Le gare compariranno dopo la pubblicazione del calendario." /> : showGrid ? <PublicTimeGrid schedule={schedule} matches={data} slug={slug} /> : Object.entries(groups).map(([round, ms]) => (
         <section key={round} className="mb-8"><SectionTitle right={<span className="text-xs text-fsl-slate num">{kickoffLabel(ms[0].kickoff_at).split(" · ")[0]}</span>}>{round}</SectionTitle><div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="public-matches-grid">{ms.map((m) => <MatchCard key={m.id} m={m} to={`/tornei/${slug}/partite/${m.id}`} />)}</div></section>
       ))}
     </Wrap>

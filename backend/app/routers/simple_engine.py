@@ -50,7 +50,7 @@ async def _knockout(tid: str, cat: str, create=False, actor=None):
 
 def _team_pub(tm, clubs):
     c = clubs.get(tm.club_id) if tm.club_id else None
-    return {**tm.public(), "crest_url": c.crest_url if c and not c.crest_is_placeholder else None, "club_name": c.name if c else None}
+    return {**tm.public(), "crest_url": c.crest_url if c and not c.crest_is_placeholder else None, "club_name": c.name if c else None, "colors": c.colors if c else None}
 
 
 async def _board(tid: str, cat: str) -> dict:
@@ -494,13 +494,18 @@ async def delete_team(tournament_id: str, team_id: str, user: CurrentUser = Depe
 async def delete_group(tournament_id: str, competition_id: str, user: CurrentUser = Depends(get_current_user)):
     """Elimina un girone: via i segnaposto e le gare non giocate; le squadre reali restano fuori girone."""
     t, _ = await _ctx(tournament_id, user, writable=True)
-    comps_repo, teams_repo, matches_repo = scoped("competitions", tournament_id), scoped("teams", tournament_id), scoped("matches", tournament_id)
-    g = await comps_repo.get(competition_id)
+    g = await scoped("competitions", tournament_id).get(competition_id)
     if not g:
         raise not_found("Girone")
+    await _remove_competition(t, g, user)
+    return await _board(tournament_id, g.category)
+
+
+async def _remove_competition(t, g: Competition, user) -> None:
+    comps_repo, teams_repo, matches_repo = scoped("competitions", t.id), scoped("teams", t.id), scoped("matches", t.id)
     ms = await matches_repo.list({"competition_id": g.id, "status": {"$ne": "cancelled"}}, limit=5000)
     if any(m.status in PLAYED for m in ms):
-        raise conflict(f"{g.series} ha gare già giocate: non può essere eliminato")
+        raise conflict(f"{g.name} ha gare già giocate: non può essere eliminata. Elimina o riapri prima le singole gare.")
     for m in ms:
         await matches_repo.soft_delete(m.id, user.id)
     for tm in await teams_repo.list({"competition_id": g.id}, limit=2000):
@@ -510,7 +515,51 @@ async def delete_group(tournament_id: str, competition_id: str, user: CurrentUse
             await teams_repo.soft_delete(tm.id, user.id)
     await comps_repo.soft_delete(g.id, user.id)
     await audit.record(user, "simple.group_delete", "competition", g.id, t.id, before={"series": g.series, "matches": len(ms)})
-    return await _board(tournament_id, g.category)
+
+
+comp_router = APIRouter(prefix="/tournaments/{tournament_id}/competitions", tags=["competitions"])
+
+
+class CompetitionIn(BaseModel):
+    category: str = Field(min_length=1, max_length=40)
+    series: str = Field(min_length=1, max_length=60)
+    kind: str = "league"
+    format: str = "single_round_robin"
+    teams_count: int = Field(default=4, ge=0, le=40)
+
+
+@comp_router.post("", status_code=201)
+async def create_competition(tournament_id: str, body: CompetitionIn, user: CurrentUser = Depends(get_current_user)):
+    """Nuova competizione (girone / fase finale) creata a mano dalla pagina Competizioni."""
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    repo = scoped("competitions", tournament_id)
+    cat, ser = body.category.strip(), body.series.strip()
+    if body.kind == "knockout":
+        if await _knockout(tournament_id, cat):
+            raise conflict(f"La categoria {cat} ha già una fase finale")
+        c = await _knockout(tournament_id, cat, create=True, actor=user)
+    else:
+        code = svc.competition_code(cat, ser)
+        if await repo.find_one({"code": code}):
+            raise conflict(f"Esiste già «{cat} · {ser}»")
+        double = body.format == "double_round_robin"
+        c = await repo.insert(Competition(tournament_id=tournament_id, code=code, name=f"{cat} · {ser}", category=cat, series=ser, kind=body.kind, format="double_round_robin" if double else "single_round_robin", teams_count=body.teams_count, rounds=svc._rounds(body.teams_count, double) if body.teams_count else 0, points=s.points, tiebreakers=s.tiebreakers), user.id)
+    cats = list(s.categories or [])
+    if cat not in cats:
+        await settings_repo.update(s.id, {"categories": cats + [cat]}, user.id)
+    await audit.record(user, "competition.create", "competition", c.id, t.id, after={"category": cat, "series": ser, "kind": body.kind})
+    return c.public()
+
+
+@comp_router.delete("/{competition_id}")
+async def delete_competition(tournament_id: str, competition_id: str, user: CurrentUser = Depends(get_current_user)):
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    g = await scoped("competitions", tournament_id).get(competition_id)
+    if not g:
+        raise not_found("Competizione")
+    await _remove_competition(t, g, user)
+    return {"deleted": True}
 
 
 class SwapIn(BaseModel):

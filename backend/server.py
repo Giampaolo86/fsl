@@ -50,7 +50,7 @@ async def seed_purge(user: CurrentUser = Depends(require_roles())):
     return {"ok": True}
 
 
-for r in (auth.router, tournaments.router, structure.router, matches.router, extras.router, users.router, public.router, me.router, posts.router, posts.media_router, posts.public_router, club_extras.router, club_extras.pay_router, club_extras.public_router, roster_imports.router, fans.router, registration.router, products.router, top11.router, weekly.router, legacy.router, studio.router, push.router, stripe_catalog.router, shop.router, hospitality.router, hospitality.public_router, groups.router, monetization.router, todos.router, simple_engine.router):
+for r in (auth.router, tournaments.router, structure.router, matches.router, extras.router, users.router, public.router, me.router, posts.router, posts.media_router, posts.public_router, club_extras.router, club_extras.pay_router, club_extras.public_router, roster_imports.router, fans.router, registration.router, products.router, top11.router, weekly.router, legacy.router, studio.router, push.router, stripe_catalog.router, shop.router, hospitality.router, hospitality.public_router, groups.router, monetization.router, todos.router, simple_engine.router, simple_engine.comp_router):
     api.include_router(r)
 app.include_router(api)
 

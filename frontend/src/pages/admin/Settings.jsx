@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { Image as ImageIcon, Save } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
 import { useTournamentDetail } from "@/hooks/useTournamentData";
 import { useTournaments } from "@/context/TournamentContext";
 import { api, apiError } from "@/lib/api";
+import { mediaUrl, uploadMedia } from "@/lib/upload";
 import { DAYS, FORMULA, TIEBREAK_LABELS, fmtNum } from "@/lib/format";
 import { GroupsPlanner, planGroups } from "@/components/fsl/GroupsPlanner";
 import { HospitalityEditor } from "@/components/fsl/HospitalityEditor";
@@ -26,10 +27,16 @@ export default function Settings() {
   const [form, setForm] = useState(null);
   const [s, setS] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [coverBusy, setCoverBusy] = useState(0);
+  const uploadCover = async (file) => {
+    if (!file) return;
+    setCoverBusy(1);
+    try { const m = await uploadMedia(data.id, file, (p) => setCoverBusy(Math.max(1, p))); setForm((f) => ({ ...f, cover_url: m.url })); toast.success("Copertina caricata: ricorda di salvare"); } catch (e) { toast.error(apiError(e)); } finally { setCoverBusy(0); }
+  };
 
   useEffect(() => {
     if (data) {
-      setForm({ name: data.name, payoff: data.payoff, description: data.description, season_label: data.season_label, start_date: data.start_date || "", end_date: data.end_date || "", primary: data.visual.primary, secondary: data.visual.secondary });
+      setForm({ name: data.name, payoff: data.payoff, description: data.description, season_label: data.season_label, start_date: data.start_date || "", end_date: data.end_date || "", primary: data.visual.primary, secondary: data.visual.secondary, cover_url: data.visual.cover_url || "" });
       setS(data.settings);
     }
   }, [data]);
@@ -52,7 +59,7 @@ export default function Settings() {
         season_label: form.season_label,
         start_date: form.start_date || null,
         end_date: form.end_date || null,
-        visual: { primary: form.primary, secondary: form.secondary },
+        visual: { primary: form.primary, secondary: form.secondary, cover_url: form.cover_url || null },
         settings: {
           categories: s.categories,
           series: s.series,
@@ -130,6 +137,15 @@ export default function Settings() {
               <Field label="Colore secondario"><input type="color" className="fsl-input p-1" value={form.secondary} onChange={setF("secondary")} data-testid="settings-secondary-color" /></Field>
             </div>
             <Field label="Descrizione"><textarea className="fsl-input h-20 py-2" value={form.description} onChange={setF("description")} data-testid="settings-description-input" /></Field>
+            <Field label="Immagine di copertina" hint="Usata nell'hero della home del torneo e nelle card pubbliche (consigliato 1600×900, JPG/PNG).">
+              <div className="flex items-start gap-3">
+                <div className="relative h-20 w-36 shrink-0 overflow-hidden rounded-md border border-white/10 bg-ink-950" data-testid="settings-cover-preview">{form.cover_url ? <img src={mediaUrl(form.cover_url)} alt="Copertina torneo" className="h-full w-full object-cover" /> : <span className="absolute inset-0 flex items-center justify-center text-[10px] uppercase tracking-wider text-fsl-slate/60">Nessuna</span>}</div>
+                <div className="flex flex-col gap-2">
+                  <label className="btn-ghost h-9 cursor-pointer"><ImageIcon className="h-4 w-4" /> {coverBusy ? `Carico… ${coverBusy}%` : "Carica immagine"}<input type="file" accept="image/*" className="sr-only" disabled={!!coverBusy} onChange={(e) => uploadCover(e.target.files?.[0])} data-testid="settings-cover-input" /></label>
+                  {form.cover_url && <button type="button" className="text-xs text-fsl-slate hover:text-fsl-danger text-left" onClick={() => setForm({ ...form, cover_url: "" })} data-testid="settings-cover-remove">Rimuovi copertina</button>}
+                </div>
+              </div>
+            </Field>
           </div>
         </section>
 
