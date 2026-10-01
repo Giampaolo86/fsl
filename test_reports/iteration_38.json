@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend-only testing of Monetizzazione tab for La Serie A dei Bambini (/admin/t/6a9b5b045d9e0985643d0a9f/monetizzazione) as Direttore. All required functionality works end-to-end: Stripe TEST MODE banner, product table with 7 standard rows + custom, Sincronizza Stripe (toast '12 prodotti sincronizzati', price_id shown), create product (TEST UI FSL 1,99€ synced w/ price_1ULhZGLbananVr50svMPuXt0), price change (new Stripe Price price_1ULhZNLbananVr509ysHvMya), deactivation (row shows 'Non attivo'), copy from Torneo degli Amici, orders table (37 rows). Regression pages /negozio, /vendite and public /tornei/la-serie-a-dei-bambini render correctly.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Monetizzazione header actions", "issues": ["'Sincronizza Stripe' and '+ Nuovo prodotto' buttons sit over the Catalogo description text at 1920 width — minor layout overlap on wider screens"]},
+      {"screen": "Public tornei page", "issues": ["Native browser select used for 'Stagione' / anno categoria instead of shadcn select"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Monetization.jsx test IDs are comprehensive and selectors are stable; good use of data-testid.",
+    "Catalog contains stale TEST_voucher_prod / TEST_file_prod custom products from previous iterations — consider cleanup script or TEST_ prefix purge for seed hygiene (not blocking)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "seed_data_creation": "Created custom product 'TEST UI FSL' (currently 'Non attivo' at 2,49€) in La Serie A dei Bambini monetization catalog. Also copy operation ran against 'Torneo degli Amici'.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 7 standard products + several TEST_* leftover customs are present. Login requires clicking login-area-staff card first, then email/pwd, then TOTP (input placeholder='123456' + 'Conferma' button). Sync toast disappears quickly — rely on sync_status column in the row (shows 'sincronizzato' + price_… under it)."
+}
