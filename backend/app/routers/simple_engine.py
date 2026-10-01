@@ -532,3 +532,32 @@ async def swap_matches(tournament_id: str, body: SwapIn, user: CurrentUser = Dep
     await repo.update(b.id, {"kickoff_at": a.kickoff_at, "field_id": a.field_id, "field_name": a.field_name}, user.id)
     await audit.record(user, "simple.swap", "match", a.id, t.id, after={"with": b.id, "a_to": b.kickoff_at, "b_to": a.kickoff_at})
     return await _board(tournament_id, a.category)
+
+
+class MoveMatchIn(BaseModel):
+    match_id: str
+    kickoff_at: str
+    field_id: str
+
+
+@router.post("/matches/move")
+async def move_match(tournament_id: str, body: MoveMatchIn, user: CurrentUser = Depends(get_current_user)):
+    """Sposta una gara in uno slot (ora+campo). Se lo slot è occupato da un'altra gara, le due si scambiano."""
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    repo = scoped("matches", tournament_id)
+    m = await repo.get(body.match_id)
+    if not m:
+        raise not_found("Gara")
+    if m.status in PLAYED:
+        raise conflict("La gara è già stata giocata: non si può spostare")
+    f = await scoped("fields", tournament_id).get(body.field_id)
+    if not f:
+        raise not_found("Campo")
+    other = next((x for x in await repo.list({"kickoff_at": body.kickoff_at, "field_id": body.field_id, "status": {"$ne": "cancelled"}}, limit=5) if x.id != m.id), None)
+    if other and other.status in PLAYED:
+        raise conflict("Lo slot è occupato da una gara già giocata")
+    if other:
+        await repo.update(other.id, {"kickoff_at": m.kickoff_at, "field_id": m.field_id, "field_name": m.field_name}, user.id)
+    await repo.update(m.id, {"kickoff_at": body.kickoff_at, "field_id": f.id, "field_name": f.name}, user.id)
+    await audit.record(user, "simple.move_match", "match", m.id, t.id, after={"to": body.kickoff_at, "field": f.name, "swapped_with": other.id if other else None})
+    return {"swapped": bool(other), **await _board(tournament_id, m.category)}

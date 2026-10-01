@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { FileDown, GripVertical, Pencil, X } from "lucide-react";
+import { FileDown, GripVertical, LayoutGrid, List, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
+import { TimeGrid } from "./TimeGrid";
 
 export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, testId }) {
   const [over, setOver] = useState(null);
@@ -52,8 +53,9 @@ export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, t
 const WEEKDAYS = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
 const dayLabel = (d) => (d ? `${WEEKDAYS[new Date(d + "T12:00").getDay()]} ${fmtDate(d)}` : "");
 
-export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap }) {
+export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, onMove }) {
   const c = board.calendar;
+  const [view, setView] = useState("grid");
   const today = new Date().toISOString().slice(0, 10);
   const [sessions, setSessions] = useState(c.sessions?.length ? c.sessions : [{ date: c.date || today, start_time: c.start_time || "15:00", end_time: c.end_time || "19:00" }]);
   const [f, setF] = useState({ fields_count: c.fields_count || 2, match_minutes: c.match_minutes || 25, buffer_minutes: c.buffer_minutes ?? 10 });
@@ -112,8 +114,19 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap }) 
         <p className="text-sm text-fsl-slate" data-testid="cal-empty">{board.groups.length ? "Indica quando si gioca (es. sabato 15:00→19:00 e domenica 08:30→12:30), campi e durata, poi premi «Genera calendario»." : "Crea prima i gironi."}</p>
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-fsl-slate"><span data-testid="cal-summary">{board.matches.length} partite · {days.map(dayLabel).join(" · ")}</span>{canWrite && <span className="inline-flex items-center gap-1 text-fsl-slate/80" data-testid="cal-drag-hint"><GripVertical className="h-3.5 w-3.5" /> Trascina una partita su un'altra per scambiare orario e campo</span>}<button className="btn-ghost h-9 ml-auto" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button></div>
-          {board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
+          <div className="flex flex-wrap items-center gap-3 text-xs text-fsl-slate">
+            <span data-testid="cal-summary">{board.matches.length} partite · {days.map(dayLabel).join(" · ")}</span>
+            {canWrite && <span className="inline-flex items-center gap-1 text-fsl-slate/80" data-testid="cal-drag-hint"><GripVertical className="h-3.5 w-3.5" /> {view === "grid" ? "Trascina una partita in uno slot libero (o su un'altra per scambiarle)" : "Trascina una partita su un'altra per scambiare orario e campo"}</span>}
+            <div className="ml-auto flex items-center gap-2">
+              <div className="inline-flex rounded-md border border-white/15 overflow-hidden" role="tablist" data-testid="cal-view-toggle">
+                <button type="button" role="tab" aria-selected={view === "grid"} onClick={() => setView("grid")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "grid" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-grid"><LayoutGrid className="h-3.5 w-3.5" /> Griglia ora × campo</button>
+                <button type="button" role="tab" aria-selected={view === "list"} onClick={() => setView("list")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "list" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-list"><List className="h-3.5 w-3.5" /> Per girone</button>
+              </div>
+              <button className="btn-ghost h-9" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button>
+            </div>
+          </div>
+          {view === "grid" && <TimeGrid board={board} canWrite={canWrite} onMove={onMove} onEdit={onEdit} />}
+          {view === "list" && board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
         </div>
       )}
     </section>

@@ -28,6 +28,10 @@ export default function SimpleEngine() {
     try { const { data } = await api.post(`/tournaments/${tid}/simple/matches/swap`, { a, b }); setBoard(data); toast.success("Orario e campo scambiati"); } catch (e) { toast.error(apiError(e)); }
   };
 
+  const move = async (matchId, kickoff, fieldId) => {
+    try { const { data } = await api.post(`/tournaments/${tid}/simple/matches/move`, { match_id: matchId, kickoff_at: kickoff, field_id: fieldId }); setBoard(data); toast.success(data.swapped ? "Partite scambiate" : "Partita spostata"); } catch (e) { toast.error(apiError(e)); }
+  };
+
   if (error) return <ErrorState message={apiError(error)} onRetry={load} />;
   if (!board || !t) return <LoadingState label="Caricamento gironi…" />;
   const canWrite = ["super_admin", "director", "secretary"].includes(t.my_role) && !t.read_only;
@@ -46,7 +50,7 @@ export default function SimpleEngine() {
         )}
       />
       <GroupsBlock tid={tid} board={board} reload={load} canWrite={canWrite} />
-      <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} />
+      <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} onMove={move} />
       <FinalsBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} />
       {editM && <SimpleMatchEdit tid={tid} m={editM} teams={board.teams} fields={board.fields} onClose={() => setEditM(null)} onDone={load} />}
     </div>
