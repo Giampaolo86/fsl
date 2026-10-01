@@ -1,0 +1,19 @@
+{
+  "summary": "FSL Simple Engine (Gironi, Calendario, Fase Finale) – full backend + frontend testing. Backend 9/9 pytest green: setup gironi (4x4=16 placeholder), shuffle (dimensioni invariate 4,4,4,4), calendar single-round-robin con 24 partite senza cross-group / team overlap / field clash, move team con rigenerazione automatica del calendario a partire da 2026-11-07, rinomina (name + placeholder=false con riflesso in board), edit match (orario + campo con force fallback), finals 8 (count=8: 4 QF + 2 SF + 3°/4° + Finale, placeholder «Nª Girone X» e «Vincente QF…»), finals 4 che sostituisce correttamente (2 SF + 3°/4° + Finale), referee → 403 su POST /simple/groups. Frontend su /admin/t/{tid}/calendario: tutti e 3 i blocchi (block-groups/block-calendar/block-finals) visibili, creazione 2x3=6 squadre OK, rename inline «Roma Nord» → visibile nella card e nelle tabelle calendario (vedi screenshot: 11:11 Roma Nord vs Squadra 3), move team via select OK, generazione calendario produce 2 tabelle (una per girone), simple-match-edit con edit-time 11:11 → aggiornamento riflesso in UI, finals-table con 9 righe (header + 8 partite), sidebar-nav «gironi e calendario» presente, /partite ancora funzionante con matches-referees-button.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iteration40.py", "/app/test_reports/pytest/iteration40.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "simple_engine.py riga 340 fallback pairing per gironi dispari: usa list comprehension con for-else in list builder, poco leggibile ma funzionante (coperto solo con per_group=0 che è un caso raro).",
+    "In generate_finals, se body.teams non è multiplo del numero di gironi, tutte le squadre finali diventano placeholder «Qualificata N» (perdendo l'informazione sui gironi). Potenziale enhancement: supportare qualifier con posizione mista."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration40.py"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (tutti i flussi testati OK)"},
+  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! (TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C); arbitro@fsl.demo / Demo1234!",
+  "seed_data_creation": "Creati e poi eliminati tornei TEST_QA_SIMPLE_* e TEST_QA_UI_* al termine dei test. Nessun torneo di test residuo.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Modulo Gironi/Calendario/Finali semplificato stabile. Endpoints: POST /api/tournaments/{tid}/simple/groups, /simple/groups/shuffle, /simple/calendar, /simple/finals, /simple/teams/{id}/move; PATCH /groups/teams/{id} per rinomina (riflesso automatico nelle partite tramite _board che usa teams.name live), PATCH /groups/matches/{id} per modifica. Pagina admin: /admin/t/{tid}/calendario con data-testid block-groups/calendar/finals, cal-table-{nome-girone}, simple-edit-{id}, finals-table.",
+  "rca of the issue": "Nessun bug rilevato – implementazione corretta e completa."
+}
