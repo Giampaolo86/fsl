@@ -374,11 +374,34 @@ class PaidMedia(BaseDocument):
     sold: int = 0
 
 
+class TournamentProduct(BaseDocument):
+    tournament_id: str
+    key: str
+    name: str
+    description: str = ""
+    product_type: str = "custom"
+    amount_cents: int = 0
+    currency: str = "eur"
+    active: bool = True
+    sort_order: int = 0
+    image_url: Optional[str] = None
+    stripe_product_id: Optional[str] = None
+    stripe_price_id: Optional[str] = None
+    price_history: list[dict] = []
+    sync_status: Literal["pending", "synced", "error"] = "pending"
+    sync_error: str = ""
+    last_sync_at: Optional[str] = None
+    metadata: dict = {}
+
+
 class Purchase(BaseDocument):
     tournament_id: str
     item_id: str
     session_id: str
     lookup_key: str
+    product_key: str = ""
+    product_name_snapshot: str = ""
+    stripe_price_id: Optional[str] = None
     amount: float
     currency: str = "eur"
     status: str = "initiated"

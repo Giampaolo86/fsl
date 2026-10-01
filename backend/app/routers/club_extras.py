@@ -511,26 +511,41 @@ async def checkout(body: CheckoutIn, request: Request):
     ids = list(dict.fromkeys([*( [body.item_id] if body.item_id else []), *body.item_ids]))
     if not ids or len(ids) > 20:
         raise bad_request("Seleziona da 1 a 20 contenuti")
+    from ..services import catalog
+
     buyer = await optional_user(request)
-    items: list[tuple[PaidMedia, int]] = []
+    items: list[tuple[PaidMedia, int, object]] = []
     for item_id in ids:
         it = await _find_item(item_id)
         if not it or not it.active:
             raise not_found("Contenuto")
         if it.stock is not None and it.sold >= it.stock:
             raise conflict(f"«{it.title}» è esaurito")
-        unit_amount = await pricing.price_cents(it.tournament_id, it.kind) if it.kind in pricing.PRICE_KEYS else it.price_cents
+        prod = await catalog.product_for_item(it)
+        if prod and not prod.active:
+            raise conflict(f"«{it.title}» non è più in vendita")
+        if prod:
+            unit_amount = prod.amount_cents
+        else:
+            unit_amount = await pricing.price_cents(it.tournament_id, it.kind) if it.kind in pricing.PRICE_KEYS else it.price_cents
         if unit_amount <= 0:
             raise conflict("Prezzo non configurato")
         if unit_amount != it.price_cents:
             await Repository("paid_media", PaidMedia).col.update_one({"_id": __import__("bson").ObjectId(it.id)}, {"$set": {"price_cents": unit_amount}})
-        items.append((it, unit_amount))
-    if len({it.tournament_id for it, _ in items}) > 1:
+        items.append((it, unit_amount, prod))
+    if len({it.tournament_id for it, _, _ in items}) > 1:
         raise bad_request("Puoi pagare in un unico ordine solo contenuti dello stesso torneo")
     currency = items[0][0].currency or "eur"
-    lines = [{"price_data": {"currency": currency, "unit_amount": cents, "product_data": {"name": it.title, "tax_code": pricing.TAX_CODE}}, "quantity": 1} for it, cents in items]
     first = items[0][0]
-    kwargs = dict(line_items=lines, mode="payment", success_url=f"{body.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}", cancel_url=f"{body.origin_url}/payment/cancel", metadata={"item_ids": ",".join(it.id for it, _ in items)[:480], "tournament_id": first.tournament_id})
+    t = await tournaments.get(first.tournament_id)
+    lines = []
+    for it, cents, prod in items:
+        if prod and prod.sync_status == "synced" and prod.stripe_price_id and next((h for h in prod.price_history if h.get("to") is None), {}).get("amount_cents") == cents:
+            lines.append({"price": prod.stripe_price_id, "quantity": 1})
+        else:
+            lines.append({"price_data": {"currency": currency, "unit_amount": cents, "product_data": {"name": it.title, "tax_code": pricing.TAX_CODE}}, "quantity": 1})
+    meta = {"item_ids": ",".join(it.id for it, _, _ in items)[:480], "tournament_id": first.tournament_id, "tournament_name": (t.name if t else "")[:100], "product_ids": ",".join(p.id for _, _, p in items if p)[:480], "product_names": " | ".join(it.title for it, _, _ in items)[:480], "user_id": buyer.id if buyer else "", "user_email": (buyer.email if buyer else "")[:100]}
+    kwargs = dict(line_items=lines, mode="payment", success_url=f"{body.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}", cancel_url=f"{body.origin_url}/payment/cancel", metadata=meta, payment_intent_data={"metadata": meta})
     try:
         session = stripe.checkout.Session.create(**kwargs, managed_payments={"enabled": True})
     except stripe.error.InvalidRequestError as e:
@@ -539,9 +554,9 @@ async def checkout(body: CheckoutIn, request: Request):
             session = stripe.checkout.Session.create(**kwargs, automatic_tax={"enabled": True}, billing_address_collection="required")
         else:
             raise
-    for it, cents in items:
-        await scoped("purchases", it.tournament_id).insert(Purchase(tournament_id=it.tournament_id, item_id=it.id, session_id=session.id, lookup_key=it.lookup_key, amount=cents / 100, currency=currency, download_token=secrets.token_urlsafe(24), buyer_user_id=buyer.id if buyer else None, buyer_email=buyer.email if buyer else None))
-    return {"checkout_url": session.url, "session_id": session.id, "count": len(items), "total": sum(c for _, c in items) / 100}
+    for it, cents, prod in items:
+        await scoped("purchases", it.tournament_id).insert(Purchase(tournament_id=it.tournament_id, item_id=it.id, session_id=session.id, lookup_key=it.lookup_key, product_key=prod.key if prod else it.kind, product_name_snapshot=it.title, stripe_price_id=prod.stripe_price_id if prod else None, amount=cents / 100, currency=currency, download_token=secrets.token_urlsafe(24), buyer_user_id=buyer.id if buyer else None, buyer_email=buyer.email if buyer else None))
+    return {"checkout_url": session.url, "session_id": session.id, "count": len(items), "total": sum(c for _, c, _ in items) / 100}
 
 
 async def _mark_paid(p: Purchase, pi=None, email=None):
@@ -621,6 +636,8 @@ async def stripe_webhook(request: Request):
             await _mark_paid(p, obj.get("payment_intent"), (obj.get("customer_details") or {}).get("email"))
         elif t in ("checkout.session.async_payment_failed", "checkout.session.expired"):
             await repo.update(p.id, {"status": "failed" if "failed" in t else "expired", "payment_status": "failed" if "failed" in t else "expired"})
+    if t == "payment_intent.payment_failed" and obj.get("id"):
+        await repo.col.update_many({"stripe_payment_intent_id": obj.get("id"), "payment_status": {"$ne": "paid"}}, {"$set": {"status": "failed", "payment_status": "failed", "updated_at": datetime.now(timezone.utc)}})
     if t == "charge.refunded":
         await repo.col.update_many({"stripe_payment_intent_id": obj.get("payment_intent")}, {"$set": {"status": "refunded", "payment_status": "refunded", "updated_at": datetime.now(timezone.utc)}})
     return {"status": "ok"}
