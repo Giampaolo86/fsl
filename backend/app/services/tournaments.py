@@ -64,9 +64,14 @@ TEMPLATES = {
         "description": "Torneo concentrato in 2-3 giorni con gironi e fase finale.",
         "settings": {
             "categories": ["2016"],
-            "series": ["Gironi"],
-            "teams_per_series": 8,
-            "fields_count": 1,
+            "series": ["Girone A", "Girone B"],
+            "teams_per_series": 4,
+            "teams_total": 8,
+            "groups_count": 2,
+            "qualifiers_per_group": 2,
+            "third_place": False,
+            "max_matches_per_team_per_weekend": 6,
+            "fields_count": 2,
             "match_days": ["fri", "sat", "sun"],
             "day_start": "09:00",
             "day_end": "18:00",
@@ -109,25 +114,60 @@ def competition_code(category: str, series: str) -> str:
     return slugify(f"{category}-{series}")
 
 
+def finals_code(category: str) -> str:
+    return slugify(f"{category}-fase-finale")
+
+
+def is_groups(s: TournamentSettings) -> bool:
+    return s.formula == "groups_knockout" and s.teams_total > 0
+
+
+def suggest_groups(total: int) -> int:
+    return max(1, round(total / 4))
+
+
+def group_sizes(s: TournamentSettings) -> list[int]:
+    if not is_groups(s):
+        return [s.teams_per_series] * len(s.series)
+    g = max(1, s.groups_count)
+    base, extra = divmod(s.teams_total, g)
+    return [base + (1 if i < extra else 0) for i in range(g)]
+
+
+def apply_structure(s: TournamentSettings) -> TournamentSettings:
+    if is_groups(s):
+        s.groups_count = max(1, s.groups_count)
+        s.series = [f"Girone {chr(65 + i)}" for i in range(s.groups_count)]
+        s.teams_per_series = max(group_sizes(s))
+    return s
+
+
+def _rounds(n: int, double: bool) -> int:
+    r = n - 1 if n % 2 == 0 else n
+    return r * 2 if double else r
+
+
 def compute_summary(s: TournamentSettings) -> dict:
-    n = s.teams_per_series
-    comps = len(s.categories) * len(s.series)
-    if s.formula == "double_round_robin":
-        matches_per_comp = n * (n - 1)
-        rounds = 2 * (n - 1) if n % 2 == 0 else 2 * n
-    elif s.formula == "groups_knockout":
-        matches_per_comp = n * 2
-        rounds = 3
-    else:
-        matches_per_comp = n * (n - 1) // 2
-        rounds = n - 1 if n % 2 == 0 else n
+    double = s.formula == "double_round_robin"
+    sizes = group_sizes(s)
+    per_cat = sum(n * (n - 1) // (1 if double else 2) for n in sizes if n > 1)
+    rounds = max([_rounds(n, double) for n in sizes if n > 1] or [0])
+    finals_matches = 0
+    if is_groups(s):
+        q = s.qualifiers_per_group * s.groups_count
+        finals_matches = (q - 1 + (1 if s.third_place else 0)) if q >= 2 else 0
+    cats = len(s.categories)
+    comps = cats * len(s.series)
     per_day = s.fields_count * len(s.slots)
     per_weekend = per_day * max(1, len(s.match_days))
-    total = matches_per_comp * comps
+    total = (per_cat + finals_matches) * cats
     return {
         "competitions": comps,
-        "teams_capacity": comps * n,
-        "matches_per_competition": matches_per_comp,
+        "teams_capacity": cats * sum(sizes),
+        "matches_per_competition": per_cat // max(1, len(s.series)),
+        "group_matches": per_cat * cats,
+        "finals_matches": finals_matches * cats,
+        "group_sizes": sizes,
         "rounds": rounds,
         "matches_total": total,
         "matches_per_day": per_day,
@@ -150,34 +190,34 @@ async def sync_competitions(t: Tournament, s: TournamentSettings, actor):
     repo = scoped("competitions", t.id)
     existing = {c.code: c for c in await repo.list()}
     wanted = set()
+    sizes = group_sizes(s)
+    groups = is_groups(s)
+    uid = actor.id if actor else None
     for cat in s.categories:
-        for ser in s.series:
+        for idx, ser in enumerate(s.series):
             code = competition_code(cat, ser)
             wanted.add(code)
-            summary_rounds = s.teams_per_series - 1 if s.teams_per_series % 2 == 0 else s.teams_per_series
+            n = sizes[idx] if idx < len(sizes) else s.teams_per_series
+            summary_rounds = _rounds(n, s.formula == "double_round_robin")
+            data = {"teams_count": n, "rounds": summary_rounds, "points": s.points, "tiebreakers": s.tiebreakers, "zones": s.playoff_rules.get(ser, {})}
+            if groups:
+                data["zones"] = {"qualificate": [1, s.qualifiers_per_group]}
             if code in existing:
-                await repo.update(existing[code].id, {"teams_count": s.teams_per_series, "rounds": summary_rounds, "points": s.points, "tiebreakers": s.tiebreakers, "zones": s.playoff_rules.get(ser, {})}, actor.id if actor else None)
+                await repo.update(existing[code].id, data, uid)
             else:
-                await repo.insert(
-                    Competition(
-                        tournament_id=t.id,
-                        code=code,
-                        name=f"Campionato {cat} · {ser}",
-                        category=cat,
-                        series=ser,
-                        format=s.formula,
-                        teams_count=s.teams_per_series,
-                        rounds=summary_rounds,
-                        points=s.points,
-                        tiebreakers=s.tiebreakers,
-                        zones=s.playoff_rules.get(ser, {}),
-                    ),
-                    actor.id if actor else None,
-                )
+                await repo.insert(Competition(tournament_id=t.id, code=code, name=f"{'Girone' if groups else 'Campionato'} {cat} · {ser}" if not groups else f"{cat} · {ser}", category=cat, series=ser, format=s.formula, **data), uid)
+        if groups:
+            code = finals_code(cat)
+            wanted.add(code)
+            finals = {"mode": "cross_groups", "qualifiers": s.qualifiers_per_group * s.groups_count, "qualifiers_per_group": s.qualifiers_per_group, "third_place": s.third_place}
+            if code in existing:
+                await repo.update(existing[code].id, {"finals": {**existing[code].finals, **finals}, "points": s.points, "tiebreakers": s.tiebreakers}, uid)
+            else:
+                await repo.insert(Competition(tournament_id=t.id, code=code, name=f"{cat} · Fase finale", category=cat, series="Fase finale", format=s.formula, kind="knockout", finals=finals, points=s.points, tiebreakers=s.tiebreakers), uid)
     for code, c in existing.items():
         if code not in wanted:
             teams = scoped("teams", t.id)
-            if await teams.count({"competition_id": c.id}) == 0:
+            if await teams.count({"competition_id": c.id}) == 0 and await scoped("matches", t.id).count({"competition_id": c.id}) == 0:
                 await repo.soft_delete(c.id, actor.id if actor else None)
 
 
@@ -231,6 +271,7 @@ async def create_tournament(payload: dict, actor, mode: str = "scratch") -> Tour
     t = await tournaments.insert(t, actor.id if actor else None)
     s = TournamentSettings(tournament_id=t.id, **settings_data)
     s.slots = compute_slots(s.day_start, s.day_end, s.match_duration_min, s.buffer_min, s.break_start, s.break_end)
+    apply_structure(s)
     await settings_repo.insert(s, actor.id if actor else None)
     await sync_competitions(t, s, actor)
     await ensure_fields(t, s, actor)
@@ -252,6 +293,11 @@ async def update_settings(t: Tournament, patch: dict, actor) -> TournamentSettin
     before = s.model_dump(include=set(patch.keys()))
     merged = s.model_copy(update=patch)
     merged.slots = compute_slots(merged.day_start, merged.day_end, merged.match_duration_min, merged.buffer_min, merged.break_start, merged.break_end)
+    apply_structure(merged)
+    if is_groups(merged):
+        q = merged.qualifiers_per_group * merged.groups_count
+        if q < 2 or q & (q - 1):
+            raise bad_request(f"Fase finale a {q} squadre non supportata: le qualificate totali devono essere 2, 4, 8 o 16 (cambia gironi o qualificate per girone)")
     if merged.teams_per_series < 2:
         raise bad_request("Servono almeno 2 squadre per serie")
     if merged.fields_count < 1:

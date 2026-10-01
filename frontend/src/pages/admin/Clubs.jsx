@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink, KeyRound, Pencil, Plus, Shield, Users } from "lucide-react";
 import { InviteDialog } from "@/components/fsl/ClubOnboarding";
+import { ClubRegistryPicker } from "@/components/fsl/ClubRegistryPicker";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { ProfileReviews } from "@/components/fsl/ProfileReviews";
@@ -19,6 +20,7 @@ export default function Clubs() {
   const { user } = useAuth();
   const [open, setOpen] = useState(null);
   const [form, setForm] = useState({ name: "", city: "", motto: "", primary: "#0B57D9", secondary: "#F4AE2B" });
+  const [source, setSource] = useState(null);
   const [teamForm, setTeamForm] = useState({ competition_id: "" });
   const [busy, setBusy] = useState(false);
 
@@ -29,9 +31,10 @@ export default function Clubs() {
   const createClub = async () => {
     setBusy(true);
     try {
-      await api.post(`/tournaments/${t.id}/clubs`, { name: form.name, city: form.city, motto: form.motto, colors: { primary: form.primary, secondary: form.secondary } });
-      toast.success("Società creata");
+      await api.post(`/tournaments/${t.id}/clubs`, { name: form.name, city: form.city, motto: form.motto, colors: source ? null : { primary: form.primary, secondary: form.secondary }, source_club_id: source?.id || null });
+      toast.success(source ? "Società collegata all'anagrafica FSL e aggiunta al torneo" : "Società creata");
       setOpen(null);
+      setSource(null);
       setForm({ name: "", city: "", motto: "", primary: "#0B57D9", secondary: "#F4AE2B" });
       clubs.reload();
     } catch (e) {
@@ -71,7 +74,7 @@ export default function Clubs() {
         }
       />
       <ProfileReviews tid={t.id} onDone={clubs.reload} />
-      {!t.published && <p className="mb-4 text-xs text-fsl-warning" data-testid="clubs-unpublished-note">Il torneo non è ancora pubblicato: le homepage pubbliche delle società saranno raggiungibili dopo la pubblicazione.</p>}
+      {!t.published && <p className="mb-4 text-xs text-fsl-warning" data-testid="clubs-unpublished-note">Il torneo non è ancora pubblicato: le homepage delle società sono visibili in anteprima solo allo staff loggato.</p>}
       {clubs.data.length === 0 ? (
         <EmptyState icon={Shield} title="Nessuna società" description="Aggiungi le società invitate dall'organizzazione per iniziare a comporre le serie." action={canWrite && <button className="btn-gold" onClick={() => setOpen("new")}>Nuova società</button>} />
       ) : (
@@ -108,6 +111,9 @@ export default function Clubs() {
                       <Link to={`/tornei/${t.slug}/squadre/${c.slug}`} target="_blank" rel="noreferrer" className="btn-ghost h-9" data-testid={`club-homepage-${c.slug}`}>
                         <ExternalLink className="h-4 w-4" aria-hidden="true" /> Apri
                       </Link>
+                      <Link to={`/club/${c.org_club_id || c.slug}`} target="_blank" rel="noreferrer" className="btn-ghost h-9" title="Scheda società: tutti i tornei, i gruppi e le rose" data-testid={`club-entity-${c.slug}`}>
+                        <Shield className="h-4 w-4" aria-hidden="true" /> Scheda
+                      </Link>
                     </div>
                   </td>
                   {canWrite && (
@@ -129,18 +135,19 @@ export default function Clubs() {
         <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl" data-testid="club-create-dialog" aria-describedby={undefined}>
           <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Nuova società</DialogTitle></DialogHeader>
           <div className="grid gap-3">
-            <label><span className="fsl-label">Nome *</span><input className="fsl-input mt-1" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="club-name-input" /></label>
+            <label><span className="fsl-label">Nome *</span><input className="fsl-input mt-1" value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); if (source) setSource(null); }} placeholder="Inizia a scrivere: se la società esiste già in FSL te la proponiamo" data-testid="club-name-input" /></label>
+            <ClubRegistryPicker tid={t.id} query={form.name} selected={source} onSelect={(it) => { setSource(it); if (it) setForm((f) => ({ ...f, name: it.name, city: it.city || f.city, motto: it.motto || f.motto, primary: it.colors?.primary || f.primary, secondary: it.colors?.secondary || f.secondary })); }} />
             <label><span className="fsl-label">Città</span><input className="fsl-input mt-1" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} data-testid="club-city-input" /></label>
             <label><span className="fsl-label">Motto</span><input className="fsl-input mt-1" value={form.motto} onChange={(e) => setForm({ ...form, motto: e.target.value })} data-testid="club-motto-input" /></label>
             <div className="grid grid-cols-2 gap-3">
               <label><span className="fsl-label">Colore primario</span><input type="color" className="fsl-input mt-1 p-1" value={form.primary} onChange={(e) => setForm({ ...form, primary: e.target.value })} /></label>
               <label><span className="fsl-label">Colore secondario</span><input type="color" className="fsl-input mt-1 p-1" value={form.secondary} onChange={(e) => setForm({ ...form, secondary: e.target.value })} /></label>
             </div>
-            <div className="flex items-center gap-3 text-xs text-fsl-slate"><ClubCrest club={{ name: form.name || "Nuova", colors: { primary: form.primary, secondary: form.secondary } }} size={40} /> Anteprima stemma segnaposto</div>
+            <div className="flex items-center gap-3 text-xs text-fsl-slate"><ClubCrest club={source ? source : { name: form.name || "Nuova", colors: { primary: form.primary, secondary: form.secondary } }} size={40} /> {source ? "Stemma importato dall'anagrafica FSL" : "Anteprima stemma segnaposto"}</div>
           </div>
           <DialogFooter>
             <button className="btn-ghost" onClick={() => setOpen(null)}>Annulla</button>
-            <button className="btn-primary" disabled={busy || form.name.trim().length < 2} onClick={createClub} data-testid="club-create-submit">Crea società</button>
+            <button className="btn-primary" disabled={busy || form.name.trim().length < 2} onClick={createClub} data-testid="club-create-submit">{source ? "Aggiungi al torneo" : "Crea società"}</button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -151,7 +158,7 @@ export default function Clubs() {
           <label>
             <span className="fsl-label">Competizione</span>
             <select className="fsl-input mt-1" value={teamForm.competition_id} onChange={(e) => setTeamForm({ competition_id: e.target.value })} data-testid="team-competition-select">
-              {(comps.data || []).map((c) => (
+              {(comps.data || []).filter((c) => c.kind !== "knockout").map((c) => (
                 <option key={c.id} value={c.id}>{c.name} ({c.teams_registered}/{c.teams_count})</option>
               ))}
             </select>

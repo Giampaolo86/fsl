@@ -155,7 +155,7 @@ export default function PublicClubHome() {
               </div>
             ))}
           </div>
-          {d.other_tournaments.length > 0 && <div className="mt-3 flex flex-wrap gap-2 text-xs">{d.other_tournaments.map((o) => <Link key={o.slug} to={`/tornei/${o.slug}/squadre/${clubSlug}`} className="h-8 px-3 rounded-full border border-fsl-gold/40 text-fsl-gold inline-flex items-center gap-1 hover:bg-fsl-gold/10"><Trophy className="h-3.5 w-3.5" /> Rosa {o.name} · {o.season}</Link>)}</div>}
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">{d.other_tournaments.map((o) => <Link key={o.slug} to={`/tornei/${o.slug}/squadre/${clubSlug}`} className="h-8 px-3 rounded-full border border-fsl-gold/40 text-fsl-gold inline-flex items-center gap-1 hover:bg-fsl-gold/10"><Trophy className="h-3.5 w-3.5" /> Rosa {o.name} · {o.season}</Link>)}{c.org_club_id && <Link to={`/club/${c.org_club_id}`} className="h-8 px-3 rounded-full border border-white/20 text-white inline-flex items-center gap-1 hover:bg-white/10" data-testid="club-home-entity-link"><Shield className="h-3.5 w-3.5" /> Scheda società: tutti i tornei e i gruppi</Link>}</div>
         </section>
 
         <section data-testid="club-home-gallery">

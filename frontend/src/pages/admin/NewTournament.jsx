@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/fsl/Primitives";
 import { useTournaments } from "@/context/TournamentContext";
 import { api, apiError } from "@/lib/api";
 import { DAYS, FORMULA } from "@/lib/format";
+import { GroupsPlanner, planGroups } from "@/components/fsl/GroupsPlanner";
 
 const MODES = [
   { key: "scratch", title: "Parti da zero", desc: "Configura manualmente tutti i parametri", Icon: PencilLine },
@@ -25,6 +26,11 @@ const DEFAULT_SETTINGS = {
   buffer_min: 10,
   formula: "single_round_robin",
   points: { win: 3, draw: 1, loss: 0 },
+  teams_total: 8,
+  groups_count: 2,
+  qualifiers_per_group: 2,
+  third_place: false,
+  max_matches_per_team_per_weekend: 1,
 };
 
 function Field({ label, children, hint }) {
@@ -87,14 +93,21 @@ export default function NewTournament() {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const setS = (k, v) => setSettings((s) => ({ ...s, [k]: v }));
 
+  const groups = settings.formula === "groups_knockout";
   const summary = useMemo(() => {
+    const cats = settings.categories?.length || 0;
+    if (groups) {
+      const g = planGroups(settings);
+      return { comps: cats * (g.groups + 1), teams: cats * g.total, matches: cats * (g.groupMatches + g.finalsMatches), rounds: g.rounds, plan: g };
+    }
     const n = Number(settings.teams_per_series) || 0;
-    const comps = (settings.categories?.length || 0) * (settings.series?.length || 0);
+    const comps = cats * (settings.series?.length || 0);
     const mpc = settings.formula === "double_round_robin" ? n * (n - 1) : n > 1 ? (n * (n - 1)) / 2 : 0;
     return { comps, teams: comps * n, matches: comps * mpc, rounds: n % 2 === 0 ? n - 1 : n };
-  }, [settings]);
+  }, [settings, groups]);
+  const setFormula = (f) => setSettings((s) => ({ ...s, formula: f, max_matches_per_team_per_weekend: f === "groups_knockout" || f === "weekend_event" ? 6 : 1 }));
 
-  const canNext = step === 0 ? !!mode && (mode !== "template" || templateKey) && (mode !== "duplicate" || sourceId) : step === 1 ? form.name.trim().length > 1 : true;
+  const canNext = step === 0 ? !!mode && (mode !== "template" || templateKey) && (mode !== "duplicate" || sourceId) : step === 1 ? form.name.trim().length > 1 : step === 2 && groups ? !summary.plan?.error : true;
 
   const submit = async () => {
     setBusy(true);
@@ -107,7 +120,7 @@ export default function NewTournament() {
         template_key: mode === "template" ? templateKey : null,
         source_id: mode === "duplicate" ? sourceId : null,
         copy_clubs: copyClubs,
-        settings: { ...settings, teams_per_series: Number(settings.teams_per_series), fields_count: Number(settings.fields_count), match_duration_min: Number(settings.match_duration_min), buffer_min: Number(settings.buffer_min) },
+        settings: { ...settings, teams_per_series: Number(settings.teams_per_series), fields_count: Number(settings.fields_count), match_duration_min: Number(settings.match_duration_min), buffer_min: Number(settings.buffer_min), teams_total: groups ? Number(settings.teams_total) : 0, groups_count: Number(settings.groups_count) || 1, qualifiers_per_group: Number(settings.qualifiers_per_group) || 2, max_matches_per_team_per_weekend: Number(settings.max_matches_per_team_per_weekend) || 1 },
       });
       await refresh();
       setCurrentId(data.id);
@@ -219,15 +232,30 @@ export default function NewTournament() {
 
         {step === 2 && (
           <div className="grid md:grid-cols-2 gap-4">
+            <Field label="Formula" hint={groups ? "Gironi all'italiana + semifinali/finale incrociate tra i gironi" : "Un campionato per ogni categoria × serie"}>
+              <select className="fsl-input" value={settings.formula} onChange={(e) => setFormula(e.target.value)} data-testid="new-tournament-formula-select">
+                {Object.entries(FORMULA).map(([k, l]) => (
+                  <option key={k} value={k}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="Categorie (anni di nascita)" hint="Separa con virgola. Es. 2014, 2015, 2016, 2017">
               <ListInput value={settings.categories} onChange={(v) => setS("categories", v)} placeholder="2014, 2015" testId="new-tournament-categories-input" />
             </Field>
-            <Field label="Serie / gironi per categoria" hint="Es. Serie A, Serie B oppure Girone unico">
-              <ListInput value={settings.series} onChange={(v) => setS("series", v)} placeholder="Serie A, Serie B" testId="new-tournament-series-input" />
-            </Field>
-            <Field label="Squadre per serie">
-              <input type="number" min="2" className="fsl-input" value={settings.teams_per_series} onChange={(e) => setS("teams_per_series", e.target.value)} data-testid="new-tournament-teams-input" />
-            </Field>
+            {groups ? (
+              <div className="md:col-span-2"><GroupsPlanner settings={settings} setS={setS} testPrefix="new-tournament" /></div>
+            ) : (
+              <>
+                <Field label="Serie / gironi per categoria" hint="Nomi separati da virgola. Es. Serie A, Serie B oppure Girone unico">
+                  <ListInput value={settings.series} onChange={(v) => setS("series", v)} placeholder="Serie A, Serie B" testId="new-tournament-series-input" />
+                </Field>
+                <Field label="Squadre per serie">
+                  <input type="number" min="2" className="fsl-input" value={settings.teams_per_series} onChange={(e) => setS("teams_per_series", e.target.value)} data-testid="new-tournament-teams-input" />
+                </Field>
+              </>
+            )}
             <Field label="Numero campi">
               <input type="number" min="1" className="fsl-input" value={settings.fields_count} onChange={(e) => setS("fields_count", e.target.value)} data-testid="new-tournament-fields-input" />
             </Field>
@@ -261,14 +289,8 @@ export default function NewTournament() {
             <Field label="Cambio campo / prepartita (min)">
               <input type="number" min="0" className="fsl-input" value={settings.buffer_min} onChange={(e) => setS("buffer_min", e.target.value)} data-testid="new-tournament-buffer-input" />
             </Field>
-            <Field label="Formula">
-              <select className="fsl-input" value={settings.formula} onChange={(e) => setS("formula", e.target.value)} data-testid="new-tournament-formula-select">
-                {Object.entries(FORMULA).map(([k, l]) => (
-                  <option key={k} value={k}>
-                    {l}
-                  </option>
-                ))}
-              </select>
+            <Field label="Max gare per squadra a weekend" hint={groups ? "Torneo concentrato: più gare al giorno, con almeno uno slot di riposo tra una e l'altra" : "Campionato lungo: di norma 1 gara a weekend"}>
+              <input type="number" min="1" className="fsl-input" value={settings.max_matches_per_team_per_weekend} onChange={(e) => setS("max_matches_per_team_per_weekend", e.target.value)} data-testid="new-tournament-maxweekend-input" />
             </Field>
             <Field label="Punteggi (V / N / P)">
               <div className="grid grid-cols-3 gap-2">
@@ -291,8 +313,8 @@ export default function NewTournament() {
               {[
                 [summary.comps, "Campionati"],
                 [summary.teams, "Squadre previste"],
-                [summary.matches, "Gare regular season"],
-                [summary.rounds, "Giornate"],
+                [summary.matches, groups ? "Gare totali" : "Gare regular season"],
+                [summary.rounds, groups ? "Giornate gironi" : "Giornate"],
               ].map(([v, l]) => (
                 <div key={l} className="rounded-md bg-ink-950/50 border border-white/10 p-3">
                   <div className="font-display font-extrabold text-3xl num">{v}</div>
@@ -302,7 +324,11 @@ export default function NewTournament() {
             </div>
             <ul className="text-sm text-fsl-slate space-y-1">
               <li>Modalità: <span className="text-fsl-white">{MODES.find((m) => m.key === mode)?.title}</span></li>
-              <li>Categorie: <span className="text-fsl-white">{settings.categories.join(", ")}</span> · Serie: <span className="text-fsl-white">{settings.series.join(", ")}</span></li>
+              {groups ? (
+                <li data-testid="new-tournament-summary-groups">Categorie: <span className="text-fsl-white">{settings.categories.join(", ")}</span> · <span className="text-fsl-white">{summary.plan.text}</span></li>
+              ) : (
+                <li>Categorie: <span className="text-fsl-white">{settings.categories.join(", ")}</span> · Serie: <span className="text-fsl-white">{settings.series.join(", ")}</span></li>
+              )}
               <li>Campi: <span className="text-fsl-white num">{settings.fields_count}</span> · Giorni: <span className="text-fsl-white">{settings.match_days.map((d) => DAYS[d]).join(", ")}</span> {settings.day_start}–{settings.day_end}</li>
               <li>Gara {settings.match_duration_min}' + {settings.buffer_min}' cambio campo · {FORMULA[settings.formula]}</li>
             </ul>

@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 from urllib.parse import quote_plus
 
@@ -7,7 +8,8 @@ from pydantic import BaseModel
 from ..core.deps import WRITE_ROLES, CurrentUser, get_current_user, require_tournament
 from ..core.errors import bad_request, conflict, not_found
 from ..models.domain import Club, Field_, Team, Venue
-from ..repositories.registry import scoped
+from ..core.db import db
+from ..repositories.registry import scoped, tournaments
 from ..services import audit
 from ..services.tournaments import slugify
 
@@ -23,7 +25,7 @@ class ClubIn(BaseModel):
     description: str = ""
     colors: Optional[dict] = None
     founded_year: Optional[int] = None
-
+    source_club_id: Optional[str] = None
 
 class TeamIn(BaseModel):
     club_id: str
@@ -97,16 +99,65 @@ async def clubs(tournament_id: str, user: CurrentUser = Depends(get_current_user
     return out
 
 
+COPY_FIELDS = ("short_name", "city", "motto", "description", "colors", "crest_url", "crest_is_placeholder", "cover_url", "contacts", "founded_year", "profile", "org_club_id")
+
+
+@router.get("/clubs/registry")
+async def clubs_registry(tournament_id: str, q: str = "", user: CurrentUser = Depends(get_current_user)):
+    """Anagrafica unica: società censite negli altri tornei (una voce per org_club_id, la più recente)."""
+    await require_tournament(tournament_id, user, roles=STRUCTURE_ROLES)
+    from ..services.legacy import org_key
+
+    tmap = {t.id: t for t in await tournaments.list(limit=500)}
+    here = {c.org_club_id or org_key(c.name) for c in await scoped("clubs", tournament_id).list()}
+    f = {"tournament_id": {"$ne": tournament_id}, "deleted_at": None}
+    if q.strip():
+        f["name"] = {"$regex": re.escape(q.strip()), "$options": "i"}
+    seen, out = set(), []
+    async for d in db.clubs.find(f).sort([("created_at", -1)]).limit(400):
+        key = d.get("org_club_id") or org_key(d.get("name", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        t = tmap.get(d["tournament_id"])
+        out.append({"id": str(d["_id"]), "org_club_id": key, "name": d.get("name"), "city": d.get("city", ""), "motto": d.get("motto", ""), "colors": d.get("colors"), "crest_url": None if d.get("crest_is_placeholder", True) else d.get("crest_url"), "tournament_id": d["tournament_id"], "tournament_name": t.name if t else "", "season_label": t.season_label if t else "", "already_here": key in here})
+    return out[:40]
+
+
 @router.post("/clubs", status_code=201)
 async def create_club(tournament_id: str, body: ClubIn, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user, roles=STRUCTURE_ROLES, writable=True)
+    from ..services.legacy import org_key
+
     repo = scoped("clubs", tournament_id)
+    source = None
+    if body.source_club_id:
+        src_doc = await db.clubs.find_one({"_id": __import__("bson").ObjectId(body.source_club_id), "deleted_at": None})
+        if not src_doc:
+            raise not_found("Società di origine")
+        source = Club.from_mongo(src_doc)
+        if not body.name.strip():
+            body.name = source.name
     slug = slugify(body.name)
     if await repo.find_one({"slug": slug}):
         raise conflict("Esiste già una società con questo nome nel torneo")
-    club = Club(tournament_id=tournament_id, slug=slug, short_name=body.short_name or body.name[:3].upper(), **body.model_dump(exclude={"short_name", "colors"}), colors=body.colors or {"primary": "#0B57D9", "secondary": "#F4AE2B"})
+    data = body.model_dump(exclude={"short_name", "colors", "source_club_id"})
+    club = Club(tournament_id=tournament_id, slug=slug, short_name=body.short_name or body.name[:3].upper(), **data, colors=body.colors or {"primary": "#0B57D9", "secondary": "#F4AE2B"}, org_club_id=org_key(body.name))
+    if source:
+        for k in COPY_FIELDS:
+            v = getattr(source, k)
+            if k in ("city", "motto", "description") and getattr(club, k):
+                continue
+            setattr(club, k, v)
+        club.org_club_id = source.org_club_id or org_key(source.name)
+        if source.venue_id:
+            src_venue = await scoped("venues", source.tournament_id).get(source.venue_id)
+            if src_venue:
+                venues = scoped("venues", tournament_id)
+                v = await venues.find_one({"name": src_venue.name}) or await venues.insert(Venue(**{**src_venue.model_dump(exclude={"id", "tournament_id", "created_at", "updated_at", "created_by", "updated_by", "deleted_at"}), "tournament_id": tournament_id}), user.id)
+                club.venue_id = v.id
     club = await repo.insert(club, user.id)
-    await audit.record(user, "club.create", "club", club.id, tournament_id, after={"name": club.name})
+    await audit.record(user, "club.create", "club", club.id, tournament_id, after={"name": club.name, "source_club_id": body.source_club_id})
     return club.public()
 
 

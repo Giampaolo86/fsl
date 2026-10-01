@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Trophy, Wand2 } from "lucide-react";
+import { FinalsDialog } from "@/components/fsl/FinalsDialog";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
@@ -6,16 +8,16 @@ import { useScoped, useTournamentDetail } from "@/hooks/useTournamentData";
 import { api, apiError } from "@/lib/api";
 import { FORMULA, TIEBREAK_LABELS } from "@/lib/format";
 
-const KIND = { league: "Girone", knockout: "Eliminazione diretta", league_knockout: "Girone + fase finale" };
+const KIND = { league: "Girone", knockout: "Fase finale (incroci tra gironi)", league_knockout: "Girone + fase finale" };
 
 export default function Competitions() {
   const { data, error, loading, reload } = useScoped("competitions");
   const { data: t } = useTournamentDetail();
+  const [finalsFor, setFinalsFor] = useState(null);
   if (loading || !t) return <LoadingState />;
   if (error) return <ErrorState message={apiError(error)} onRetry={reload} />;
   const canWrite = ["super_admin", "director"].includes(t.my_role) && !t.read_only;
   const patch = async (c, body) => { try { await api.patch(`/tournaments/${t.id}/competitions/${c.id}`, body); reload(); } catch (e) { toast.error(apiError(e)); } };
-  const finals = async (c) => { try { const { data: r } = await api.post(`/tournaments/${t.id}/competitions/${c.id}/finals/generate`); toast.success(`${r.round_name}: ${r.count} gare create`); } catch (e) { toast.error(apiError(e)); } };
   const close = async (c) => { if (!window.confirm(`Chiudere la stagione di ${c.name}? Verranno registrati campione, promosse e retrocesse.`)) return; try { const { data: o } = await api.post(`/tournaments/${t.id}/competitions/${c.id}/close`); toast.success(`Stagione chiusa · Campione: ${o.champion?.name}`); reload(); } catch (e) { toast.error(apiError(e)); } };
   return (
     <div>
@@ -48,16 +50,20 @@ export default function Competitions() {
                   <td>{c.series}</td>
                   <td className="text-fsl-slate">{FORMULA[c.format]}</td>
                   <td className="num text-right">
-                    <span className={c.teams_registered === c.teams_count ? "text-fsl-success" : ""}>{c.teams_registered}</span>
-                    <span className="text-fsl-slate">/{c.teams_count}</span>
+                    {c.kind === "knockout" ? <span className="text-xs text-fsl-slate">{c.finals?.qualifiers || 0} qualificate</span> : <><span className={c.teams_registered === c.teams_count ? "text-fsl-success" : ""}>{c.teams_registered}</span><span className="text-fsl-slate">/{c.teams_count}</span></>}
                   </td>
-                  <td className="num text-right">{c.rounds}</td>
-                  <td>{canWrite ? <select className="fsl-input h-9 w-44" value={c.kind} onChange={(e) => patch(c, { kind: e.target.value })} data-testid={`competition-kind-${c.code}`}>{Object.entries(KIND).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select> : <span className="text-xs">{KIND[c.kind]}</span>}</td>
+                  <td className="num text-right">{c.kind === "knockout" ? "—" : c.rounds}</td>
+                  <td>{c.kind === "knockout" && c.finals?.mode === "cross_groups" ? <span className="text-xs">{KIND.knockout}</span> : canWrite ? <select className="fsl-input h-9 w-44" value={c.kind} onChange={(e) => patch(c, { kind: e.target.value })} data-testid={`competition-kind-${c.code}`}>{Object.entries(KIND).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select> : <span className="text-xs">{KIND[c.kind]}</span>}</td>
                   <td>
-                    {c.kind === "league" ? <span className="text-xs text-fsl-slate">—</span> : (
+                    {c.kind === "league" ? <span className="text-xs text-fsl-slate">—</span> : c.finals?.mode === "cross_groups" ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-fsl-slate whitespace-nowrap">Prime {c.finals.qualifiers_per_group} di ogni girone{c.finals.third_place ? " · 3°/4°" : ""}</span>
+                        {canWrite && <button className="btn-primary h-9 px-3 text-xs" onClick={() => setFinalsFor(c)} data-testid={`competition-finals-${c.code}`}><Wand2 className="h-4 w-4" /> Fase finale</button>}
+                      </div>
+                    ) : (
                       <div className="flex items-center gap-1">
                         <select className="fsl-input h-9 w-24" value={c.finals?.qualifiers || 0} disabled={!canWrite} onChange={(e) => patch(c, { finals: { qualifiers: Number(e.target.value), mode: "knockout" } })} data-testid={`competition-qualifiers-${c.code}`}>{[0, 2, 4, 8].map((n) => <option key={n} value={n}>{n || "—"} sq.</option>)}</select>
-                        {canWrite && c.finals?.qualifiers > 0 && <button className="btn-ghost h-9 px-2" onClick={() => finals(c)} title="Genera / avanza fase finale" data-testid={`competition-finals-${c.code}`}><Wand2 className="h-4 w-4" /></button>}
+                        {canWrite && c.finals?.qualifiers > 0 && <button className="btn-ghost h-9 px-2" onClick={() => setFinalsFor(c)} title="Genera / avanza fase finale (accoppiamenti modificabili)" data-testid={`competition-finals-${c.code}`}><Wand2 className="h-4 w-4" /></button>}
                       </div>
                     )}
                   </td>
@@ -78,6 +84,7 @@ export default function Competitions() {
           </table>
         </div>
       )}
+      {finalsFor && <FinalsDialog tid={t.id} competition={finalsFor} onClose={() => setFinalsFor(null)} onDone={reload} />}
     </div>
   );
 }

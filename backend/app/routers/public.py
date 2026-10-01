@@ -2,9 +2,13 @@ import zlib
 from collections import defaultdict
 from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
+from ..core.deps import load_current_user
+from ..core.db import db
 from ..core.errors import not_found
+from ..core.security import decode_token
+from ..models.domain import Club
 from ..repositories.registry import scoped, settings_repo, tournaments
 from ..services import engine
 from ..services.tournaments import compute_summary
@@ -52,9 +56,28 @@ def _pname(p) -> str:
     return p.public_name or f"{p.first_name} {p.last_name[:1]}."
 
 
-async def _published(slug: str):
-    t = await tournaments.find_one({"slug": slug, "published": True})
-    if not t:
+async def _staff(request: Optional[Request]):
+    """Staff loggato (token opzionale): può vedere in anteprima anche i tornei in bozza."""
+    if request is None:
+        return None
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:] if auth.startswith("Bearer ") else request.cookies.get("access_token")
+    if not token:
+        return None
+    try:
+        payload = decode_token(token, expected_type="access")
+        return await load_current_user(payload["sub"])
+    except Exception:
+        return None
+
+
+def _can_preview(user, t) -> bool:
+    return bool(user and (user.is_super_admin or user.role in ("super_admin", "director") or user.role_in(t.id)))
+
+
+async def _published(slug: str, request: Optional[Request] = None):
+    t = await tournaments.find_one({"slug": slug})
+    if not t or (not t.published and not _can_preview(await _staff(request), t)):
         raise not_found("Torneo")
     return t
 
@@ -131,8 +154,8 @@ async def list_public():
 
 
 @router.get("/tournaments/{slug}")
-async def tournament_home(slug: str, category: Optional[str] = None):
-    t = await _published(slug)
+async def tournament_home(slug: str, request: Request, category: Optional[str] = None):
+    t = await _published(slug, request)
     s = await settings_repo.find_one({"tournament_id": t.id})
     comps = await scoped("competitions", t.id).list(sort=[("category", 1), ("series", 1)])
     clubs = await scoped("clubs", t.id).list(sort=[("name", 1)])
@@ -150,11 +173,11 @@ async def tournament_home(slug: str, category: Optional[str] = None):
     recent = sorted([m for m in all_matches if m.status in FINAL and (not cat or m.category == cat)], key=lambda m: m.kickoff_at, reverse=True)[:6]
     mini = []
     for c in comps:
-        if c.category == cat:
+        if c.category == cat and c.kind != "knockout":
             mini.append({"competition": c.public(), "rows": (await engine.compute_standings(t.id, c))[:6]})
     return {
         "tournament": t.public(),
-        "settings": {k: getattr(s, k) for k in ("categories", "series", "teams_per_series", "fields_count", "formula", "points", "tiebreakers", "playoff_rules", "match_duration_min", "buffer_min", "slots", "match_days", "promoted_per_category", "relegated_per_category")},
+        "settings": {k: getattr(s, k) for k in ("categories", "series", "teams_per_series", "teams_total", "groups_count", "qualifiers_per_group", "third_place", "fields_count", "formula", "points", "tiebreakers", "playoff_rules", "match_duration_min", "buffer_min", "slots", "match_days", "promoted_per_category", "relegated_per_category")},
         "summary": compute_summary(s),
         "competitions": comp_out,
         "clubs": [_public_club(c) for c in clubs],
@@ -267,11 +290,47 @@ async def public_player(slug: str, player_id: str):
     return await player_card(t.id, p, public=True)
 
 
+@router.get("/clubs/{org_club_id}")
+async def club_entity(org_club_id: str, request: Request):
+    """Scheda società trasversale ai tornei: anagrafica, gruppi censiti, tornei e rose."""
+    from ..services import legacy as legacy_svc
+
+    user = await _staff(request)
+    docs = await db.clubs.find({"org_club_id": org_club_id, "deleted_at": None}).sort([("created_at", -1)]).to_list(100)
+    if not docs:
+        raise not_found("Società")
+    tmap = {t.id: t for t in await tournaments.list(limit=500)}
+    parts, club = [], None
+    for d in docs:
+        t = tmap.get(d["tournament_id"])
+        if not t or (not t.published and not _can_preview(user, t)):
+            continue
+        c = Club.from_mongo(d)
+        club = club or c
+        comps = {x.id: x for x in await scoped("competitions", t.id).list()}
+        teams = await scoped("teams", t.id).list({"club_id": c.id}, sort=[("category", 1)])
+        players = await scoped("players", t.id).list({"club_id": c.id, "status": {"$ne": "inactive"}}, sort=[("shirt_number", 1)], limit=1000)
+        groups = []
+        for tm in teams:
+            comp = comps.get(tm.competition_id)
+            pos, rows = None, []
+            if comp:
+                rows = await engine.compute_standings(t.id, comp)
+                pos = next((i + 1 for i, r in enumerate(rows) if r["team_id"] == tm.id), None)
+            ps = [p for p in players if p.team_id == tm.id]
+            vis = lambda p: p.profile_visibility == "public" and p.media_consent  # noqa: E731
+            groups.append({"team_id": tm.id, "name": tm.name, "category": tm.category, "series": tm.series, "competition": comp.name if comp else "", "pos": pos, "total": len(rows), "players": len(ps), "roster": [{"id": p.id if vis(p) else None, "name": _pname(p) if vis(p) else "Giocatore", "shirt_number": p.shirt_number, "role": p.role, "photo_url": p.photo_url if vis(p) else None} for p in ps]})
+        parts.append({"tournament": {"id": t.id, "slug": t.slug, "name": t.name, "season_label": t.season_label, "status": t.status, "published": t.published, "start_date": t.start_date, "end_date": t.end_date}, "club_slug": c.slug, "groups": groups, "players": len(players)})
+    if not club:
+        raise not_found("Società")
+    return {"club": _public_club(club), "org_club_id": org_club_id, "participations": parts, "kpis": {"tournaments": len(parts), "teams": sum(len(p["groups"]) for p in parts), "players": sum(p["players"] for p in parts)}, "history": await legacy_svc.club_history(org_club_id)}
+
+
 @router.get("/tournaments/{slug}/standings")
 async def public_standings(slug: str, category: Optional[str] = None):
     t = await _published(slug)
     comps = await scoped("competitions", t.id).list({"category": category} if category else {}, sort=[("category", 1), ("series", 1)])
-    return [{"competition": c.public(), "rows": await engine.compute_standings(t.id, c)} for c in comps]
+    return [{"competition": c.public(), "rows": await engine.compute_standings(t.id, c)} for c in comps if c.kind != "knockout"]
 
 
 @router.get("/tournaments/{slug}/stats")
@@ -286,8 +345,8 @@ async def public_stats(slug: str):
 
 
 @router.get("/tournaments/{slug}/clubs/{club_slug}")
-async def club_page(slug: str, club_slug: str):
-    t = await _published(slug)
+async def club_page(slug: str, club_slug: str, request: Request):
+    t = await _published(slug, request)
     club = await scoped("clubs", t.id).find_one({"slug": club_slug})
     if not club:
         raise not_found("Società")

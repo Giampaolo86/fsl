@@ -105,6 +105,10 @@ class TournamentSettings(BaseDocument):
     promoted_per_category: int = 0
     relegated_per_category: int = 0
     max_matches_per_team_per_weekend: int = 1
+    teams_total: int = 0
+    groups_count: int = 1
+    qualifiers_per_group: int = 2
+    third_place: bool = False
     skip_holidays: bool = False
     fees: dict = {"registration": 0, "currency": "EUR", "video_price": 0.99, "photo_price": 0.49, "digital_price": 2.49, "card_price": 3.99, "card_special_price": 4.99, "push_price": 3.99}
     required_documents: list[str] = []

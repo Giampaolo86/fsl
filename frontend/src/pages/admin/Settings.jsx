@@ -7,6 +7,7 @@ import { useTournamentDetail } from "@/hooks/useTournamentData";
 import { useTournaments } from "@/context/TournamentContext";
 import { api, apiError } from "@/lib/api";
 import { DAYS, FORMULA, TIEBREAK_LABELS, fmtNum } from "@/lib/format";
+import { GroupsPlanner, planGroups } from "@/components/fsl/GroupsPlanner";
 
 function Field({ label, children, hint }) {
   return (
@@ -69,6 +70,10 @@ export default function Settings() {
           promoted_per_category: Number(s.promoted_per_category),
           relegated_per_category: Number(s.relegated_per_category),
           max_matches_per_team_per_weekend: Number(s.max_matches_per_team_per_weekend),
+          teams_total: s.formula === "groups_knockout" ? Number(s.teams_total) || 0 : 0,
+          groups_count: Number(s.groups_count) || 1,
+          qualifiers_per_group: Number(s.qualifiers_per_group) || 2,
+          third_place: !!s.third_place,
           skip_holidays: s.skip_holidays,
           fees: s.fees,
           required_documents: s.required_documents,
@@ -87,6 +92,8 @@ export default function Settings() {
   };
 
   const summary = data.summary;
+  const groups = s.formula === "groups_knockout";
+  const planError = groups ? planGroups(s).error : null;
 
   return (
     <div className="space-y-8">
@@ -96,7 +103,7 @@ export default function Settings() {
         subtitle="Ogni torneo ha configurazione indipendente: categorie, serie, squadre, campi, orari, formula, punteggi, quote e documenti."
         actions={
           canWrite && (
-            <button className="btn-primary" onClick={save} disabled={busy} data-testid="settings-save-button">
+            <button className="btn-primary" onClick={save} disabled={busy || !!planError} data-testid="settings-save-button">
               <Save className="h-4 w-4" aria-hidden="true" /> {busy ? "Salvataggio…" : "Salva impostazioni"}
             </button>
           )
@@ -127,13 +134,19 @@ export default function Settings() {
           <SectionTitle>Struttura competizioni</SectionTitle>
           <div className="grid md:grid-cols-2 gap-4">
             <Field label="Categorie" hint="Anni di nascita separati da virgola"><input className="fsl-input" value={s.categories.join(", ")} onChange={(e) => upd("categories", list(e.target.value))} data-testid="settings-categories-input" /></Field>
-            <Field label="Serie / gironi"><input className="fsl-input" value={s.series.join(", ")} onChange={(e) => upd("series", list(e.target.value))} data-testid="settings-series-input" /></Field>
-            <Field label="Squadre per serie"><input type="number" min="2" className="fsl-input" value={s.teams_per_series} onChange={(e) => upd("teams_per_series", e.target.value)} data-testid="settings-teams-input" /></Field>
-            <Field label="Formula">
-              <select className="fsl-input" value={s.formula} onChange={(e) => upd("formula", e.target.value)} data-testid="settings-formula-select">
+            <Field label="Formula" hint={groups ? "Gironi + semifinali/finale incrociate: i gironi e la fase finale si creano da soli" : undefined}>
+              <select className="fsl-input" value={s.formula} onChange={(e) => setS((x) => ({ ...x, formula: e.target.value, teams_total: e.target.value === "groups_knockout" && !x.teams_total ? Number(x.teams_per_series) * Math.max(1, x.series.length) : x.teams_total, groups_count: e.target.value === "groups_knockout" && !x.teams_total ? Math.max(1, x.series.length) : x.groups_count }))} data-testid="settings-formula-select">
                 {Object.entries(FORMULA).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
               </select>
             </Field>
+            {groups ? (
+              <div className="md:col-span-2"><GroupsPlanner settings={s} setS={upd} testPrefix="settings" /></div>
+            ) : (
+              <>
+                <Field label="Serie / gironi" hint="Nomi separati da virgola"><input className="fsl-input" value={s.series.join(", ")} onChange={(e) => upd("series", list(e.target.value))} data-testid="settings-series-input" /></Field>
+                <Field label="Squadre per serie"><input type="number" min="2" className="fsl-input" value={s.teams_per_series} onChange={(e) => upd("teams_per_series", e.target.value)} data-testid="settings-teams-input" /></Field>
+              </>
+            )}
             <Field label="Promosse per categoria"><input type="number" min="0" className="fsl-input" value={s.promoted_per_category} onChange={(e) => upd("promoted_per_category", e.target.value)} data-testid="settings-promoted-input" /></Field>
             <Field label="Retrocesse per categoria"><input type="number" min="0" className="fsl-input" value={s.relegated_per_category} onChange={(e) => upd("relegated_per_category", e.target.value)} data-testid="settings-relegated-input" /></Field>
           </div>
@@ -166,7 +179,7 @@ export default function Settings() {
             <Field label="Pausa fino alle"><input type="time" className="fsl-input" value={s.break_end || ""} onChange={(e) => upd("break_end", e.target.value || null)} data-testid="settings-breakend-input" /></Field>
             <Field label="Durata gara (min)"><input type="number" min="10" className="fsl-input" value={s.match_duration_min} onChange={(e) => upd("match_duration_min", e.target.value)} data-testid="settings-duration-input" /></Field>
             <Field label="Cambio campo (min)"><input type="number" min="0" className="fsl-input" value={s.buffer_min} onChange={(e) => upd("buffer_min", e.target.value)} data-testid="settings-buffer-input" /></Field>
-            <Field label="Max gare per squadra a weekend"><input type="number" min="1" className="fsl-input" value={s.max_matches_per_team_per_weekend} onChange={(e) => upd("max_matches_per_team_per_weekend", e.target.value)} data-testid="settings-maxweekend-input" /></Field>
+            <Field label="Max gare per squadra a weekend" hint="Regola propria di questo torneo: 1 per i campionati lunghi, più gare per gli eventi concentrati (riposo di almeno uno slot tra una gara e l'altra)"><input type="number" min="1" className="fsl-input" value={s.max_matches_per_team_per_weekend} onChange={(e) => upd("max_matches_per_team_per_weekend", e.target.value)} data-testid="settings-maxweekend-input" /></Field>
             <label className="flex items-center gap-2 text-sm mt-6"><input type="checkbox" checked={s.skip_holidays} onChange={(e) => upd("skip_holidays", e.target.checked)} data-testid="settings-skip-holidays" /> Salta automaticamente i festivi</label>
           </div>
           <div className="mt-4 rounded-md bg-ink-950/50 border border-white/10 p-4">

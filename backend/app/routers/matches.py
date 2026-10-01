@@ -245,14 +245,23 @@ async def calendar_generate(tournament_id: str, body: dict = None, user: Current
     return res
 
 
+@router.get("/competitions/{competition_id}/finals/preview")
+async def finals_preview(tournament_id: str, competition_id: str, user: CurrentUser = Depends(get_current_user)):
+    t, _ = await require_tournament(tournament_id, user, roles=OPS)
+    c = await scoped("competitions", tournament_id).get(competition_id)
+    if not c:
+        raise not_found("Competizione")
+    return await engine.finals_preview(t, c)
+
+
 @router.post("/competitions/{competition_id}/finals/generate")
-async def finals_generate(tournament_id: str, competition_id: str, user: CurrentUser = Depends(get_current_user)):
+async def finals_generate(tournament_id: str, competition_id: str, body: dict = None, user: CurrentUser = Depends(get_current_user)):
     t, _ = await require_tournament(tournament_id, user, roles=OPS, writable=True)
     c = await scoped("competitions", tournament_id).get(competition_id)
     if not c:
         raise not_found("Competizione")
-    res = await engine.generate_finals(t, c, user)
-    await audit.record(user, "finals.generated", "competition", c.id, t.id, after=res)
+    res = await engine.generate_finals(t, c, user, (body or {}).get("pairs"))
+    await audit.record(user, "finals.generated", "competition", c.id, t.id, after={**res, "manual": bool((body or {}).get("pairs"))})
     return res
 
 
