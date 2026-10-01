@@ -8,8 +8,8 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useScoped, useTournamentDetail } from "@/hooks/useTournamentData";
 import { api, apiError } from "@/lib/api";
-import { GroupsBoard, STATE_LABEL, useBoard } from "@/components/fsl/GroupsBoard";
-import { CalendarGrid, CalendarTools, FinalsPanel, MatchEditDialog } from "@/components/fsl/CalendarStudio";
+import { CalendarGrid } from "@/components/fsl/CalendarStudio";
+import { SimpleMatchEdit } from "@/components/fsl/SimpleMatchEdit";
 import { RefereeAssignments } from "@/components/fsl/RefereeAssignments";
 
 export default function Matches({ mode = "matches" }) {
@@ -22,10 +22,6 @@ export default function Matches({ mode = "matches" }) {
   const [error, setError] = useState(null);
   const [create, setCreate] = useState(false);
   const [editM, setEditM] = useState(null);
-  const [conflicts, setConflicts] = useState([]);
-  const step = mode === "reports" ? "" : params.get("step") || "gironi";
-  const category = params.get("cat") || "";
-  const [board, reloadBoard] = useBoard(t?.id, category);
   const [form, setForm] = useState({ competition_id: "", home_team_id: "", away_team_id: "", kickoff_at: "", field_id: "", match_day: 1 });
   const [busy, setBusy] = useState(false);
   const comp = params.get("comp") || "";
@@ -38,9 +34,8 @@ export default function Matches({ mode = "matches" }) {
   const load = () => {
     if (!t) return;
     api.get(`/tournaments/${t.id}/matches`, { params: { competition_id: comp || undefined, status: status || undefined, date: day || undefined, upcoming_days: upcoming ? 7 : undefined } }).then((r) => setList(r.data)).catch(setError);
-    if (mode !== "reports") api.get(`/tournaments/${t.id}/groups/conflicts`).then((r) => setConflicts(r.data)).catch(() => {});
   };
-  const refreshAll = () => { load(); reloadBoard(); teams.reload?.(); reloadT(); };
+  const refreshAll = () => { load(); teams.reload?.(); reloadT(); };
   useEffect(load, [t?.id, comp, status, day, upcoming]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setP = (k, v) => { const p = new URLSearchParams(params); v ? p.set(k, v) : p.delete(k); setParams(p); };
@@ -56,8 +51,6 @@ export default function Matches({ mode = "matches" }) {
   const fieldList = fields.data?.fields || [];
   const teamList = (teams.data || []).map((tm) => ({ ...tm, name: tm.name || tm.club?.name }));
   const draftCount = (list || []).filter((m) => m.status === "draft").length;
-  const STEPS = [["gironi", "1 · Gironi"], ["calendario", "2 · Calendario gironi"], ["finali", "3 · Fasi finali"]];
-  const stepState = board ? STATE_LABEL[board.state] : "";
   const submitCreate = async () => {
     setBusy(true);
     try {
@@ -70,24 +63,13 @@ export default function Matches({ mode = "matches" }) {
   return (
     <div>
       <PageHeader
-        kicker={mode === "reports" ? "Referti, risultati e disciplina" : "Generatore e calendario"}
+        kicker={mode === "reports" ? "Referti, risultati e disciplina" : "Elenco gare, arbitri e campi"}
         title={mode === "reports" ? "Referti" : "Partite"}
-        subtitle={mode === "reports" ? "Gare in corso, referti inviati e risultati ufficiali. Solo il Direttore ufficializza o rettifica." : `${list?.length ?? 0} gare${draftCount ? ` (${draftCount} in bozza, non visibili al pubblico)` : ""} · ${t.counts.fields} campi × ${t.settings.slots.length} slot${stepState ? ` · Stato: ${stepState}` : ""}`}
+        subtitle={mode === "reports" ? "Gare in corso, referti inviati e risultati ufficiali. Solo il Direttore ufficializza o rettifica." : `${list?.length ?? 0} gare${draftCount ? ` (${draftCount} in bozza, non visibili al pubblico)` : ""} · ${t.counts.fields} campi × ${t.settings.slots.length} slot`}
         actions={canWrite && mode !== "reports" && (
           <button className="btn-ghost" onClick={() => setCreate(true)} data-testid="matches-create-button"><Plus className="h-4 w-4" /> Nuova gara</button>
         )}
       />
-      {mode !== "reports" && (
-        <div className="flex flex-wrap items-center gap-2 mb-4" data-testid="matches-steps">
-          {STEPS.map(([k, l]) => <button key={k} className={`h-10 px-4 rounded-full text-sm font-semibold border transition-colors ${step === k ? "bg-fsl-gold text-ink-950 border-fsl-gold" : "border-white/15 text-fsl-white/80 hover:border-fsl-gold/50"}`} onClick={() => setP("step", k)} data-testid={`matches-step-${k}`}>{l}</button>)}
-          {board?.categories?.length > 1 && <select className="fsl-input h-10 w-40 ml-auto" value={category} onChange={(e) => setP("cat", e.target.value)} data-testid="matches-category-filter"><option value="">Tutte le categorie</option>{board.categories.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
-          {stepState && <span className="h-10 px-3 rounded-full border border-fsl-gold/40 text-fsl-gold text-xs inline-flex items-center" data-testid="matches-state-badge">{stepState}</span>}
-        </div>
-      )}
-      {step === "gironi" && <GroupsBoard tid={t.id} category={category || board?.categories?.[0] || ""} board={board} reload={refreshAll} canWrite={canWrite} />}
-      {step === "finali" && <FinalsPanel tid={t.id} board={board} reload={refreshAll} canWrite={canWrite} list={list || []} onEdit={setEditM} />}
-      {step === "calendario" && canWrite && board && <div className="mb-4 space-y-3"><CalendarTools tid={t.id} groups={board.groups} fields={fieldList} teams={teamList} comps={comps.data} onDone={refreshAll} draftCount={draftCount} conflicts={conflicts} /></div>}
-      {(step === "calendario" || mode === "reports") && (<>
       <div className="fsl-card px-4 py-3 mb-4 flex flex-col md:flex-row gap-3">
         <select className="fsl-input md:w-64" value={comp} onChange={(e) => setP("comp", e.target.value)} data-testid="matches-filter-competition"><option value="">Tutte le competizioni</option>{comps.data.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         {mode !== "reports" && <select className="fsl-input md:w-48" value={status} onChange={(e) => setP("status", e.target.value)} data-testid="matches-filter-status"><option value="">Tutti gli stati</option>{Object.entries(MATCH_STATUS).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}</select>}
@@ -98,7 +80,7 @@ export default function Matches({ mode = "matches" }) {
       </div>
       {upcoming && <p className="text-xs text-fsl-slate -mt-2 mb-4" data-testid="matches-upcoming-hint">Gare da oggi ai prossimi 7 giorni: assegna arbitri e campi, verifica le distinte e organizza in anticipo.</p>}
       {!list ? <LoadingState /> : list.length === 0 ? (
-        <EmptyState icon={CalendarPlus} title={upcoming ? "Nessuna gara nei prossimi 7 giorni" : "Nessuna gara"} description={upcoming ? "Nessun impegno in programma da oggi a 7 giorni: rimuovi il filtro per vedere tutto il calendario." : canWrite ? "Componi prima i gironi (anche con squadre segnaposto), poi genera la bozza del calendario da «Genera calendario gironi»." : "Il calendario non è ancora stato pubblicato."} action={canWrite && !upcoming && mode !== "reports" && <button className="btn-gold" onClick={() => setP("step", "gironi")}>Vai a 1 · Gironi</button>} testId="matches-empty" />
+        <EmptyState icon={CalendarPlus} title={upcoming ? "Nessuna gara nei prossimi 7 giorni" : "Nessuna gara"} description={upcoming ? "Nessun impegno in programma da oggi a 7 giorni: rimuovi il filtro per vedere tutto il calendario." : canWrite ? "Crea i gironi e genera il calendario dalla pagina «Gironi e Calendario»." : "Il calendario non è ancora stato pubblicato."} action={canWrite && !upcoming && mode !== "reports" && <Link to={`/admin/t/${t.id}/calendario`} className="btn-gold">Vai a Gironi e Calendario</Link>} testId="matches-empty" />
       ) : view === "referees" && mode !== "reports" ? <RefereeAssignments tid={t.id} list={list} onDone={load} canWrite={["super_admin", "director", "secretary"].includes(t.my_role) && !t.read_only} /> : view === "grid" && mode !== "reports" ? <CalendarGrid list={list} slots={t.settings.slots} fields={fieldList} onPick={(m) => canWrite ? setEditM(m) : null} /> : (
         <div className="space-y-6">
           {Object.entries(byRound).map(([round, ms]) => (
@@ -109,8 +91,7 @@ export default function Matches({ mode = "matches" }) {
           ))}
         </div>
       )}
-      </>)}
-      {editM && <MatchEditDialog tid={t.id} m={editM} teams={teamList} fields={fieldList} comps={comps.data} onClose={() => setEditM(null)} onDone={refreshAll} />}
+      {editM && <SimpleMatchEdit tid={t.id} m={editM} teams={teamList} fields={fieldList} onClose={() => setEditM(null)} onDone={refreshAll} />}
       <Dialog open={create} onOpenChange={setCreate}>
         <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl" aria-describedby={undefined} data-testid="match-create-dialog">
           <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Nuova gara</DialogTitle></DialogHeader>

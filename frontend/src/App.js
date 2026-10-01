@@ -58,6 +58,7 @@ import TournamentHome from "@/pages/public/TournamentHome";
 import { PublicClubs, PublicRules } from "@/pages/public/PublicPages";
 import { PublicMatchCenter, PublicMatches, PublicStandingsLive, PublicStats } from "@/pages/public/PublicEngine";
 import Matches from "@/pages/admin/Matches";
+import SimpleEngine from "@/pages/admin/SimpleEngine";
 import MatchWorkspace from "@/components/fsl/MatchWorkspace";
 import { Rosters, Standings, Tickets } from "@/pages/admin/Engine";
 import { ClubCalendar, ClubMatch, ClubReports } from "@/pages/club/ClubEngine";
@@ -137,7 +138,7 @@ function AppRoutes() {
                 <Route path="giocatori/:playerId" element={<PlayerProfile mode="admin" />} />
                 <Route path="campi" element={<Venues />} />
                 <Route path="audit" element={<Audit />} />
-                <Route path="calendario" element={<Matches />} />
+                <Route path="calendario" element={<SimpleEngine />} />
                 <Route path="partite" element={<Matches />} />
                 <Route path="partite/:matchId" element={<MatchWorkspace />} />
                 <Route path="referti" element={<Matches mode="reports" />} />

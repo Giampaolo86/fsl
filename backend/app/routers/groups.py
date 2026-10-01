@@ -200,6 +200,7 @@ async def edit_team(tournament_id: str, team_id: str, body: TeamEditIn, user: Cu
         if len(body.name.strip()) < 2:
             raise bad_request("Nome troppo corto")
         patch["name"] = body.name.strip()
+        patch["placeholder"] = bool(re.match(r"^Squadra \d+$", patch["name"]))
     if body.status:
         if body.status not in ("active", "withdrawn", "disqualified"):
             raise bad_request("Stato non valido")

@@ -19,7 +19,7 @@ const TOURNAMENT_NAV = (id) => [
   { to: `/admin/t/${id}/competizioni`, label: "Competizioni", icon: Trophy },
   { to: `/admin/t/${id}/societa`, label: "Società", icon: Shield },
   { to: `/admin/t/${id}/campi`, label: "Campi", icon: Grid3X3 },
-  { to: `/admin/t/${id}/calendario`, label: "Calendario", icon: Calendar },
+  { to: `/admin/t/${id}/calendario`, label: "Gironi e Calendario", icon: Calendar },
   { to: `/admin/t/${id}/partite`, label: "Partite", icon: ClipboardList },
   { to: `/admin/t/${id}/referti`, label: "Referti", icon: FileText },
   { to: `/admin/t/${id}/classifiche`, label: "Classifiche", icon: BarChart3 },
