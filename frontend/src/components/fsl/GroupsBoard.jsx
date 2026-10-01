@@ -9,7 +9,7 @@ const TEAM_STATUS = { active: null, withdrawn: ["Ritirata", "text-fsl-warning bo
 
 export function useBoard(tid, category) {
   const [board, setBoard] = useState(null);
-  const load = () => api.get(`/tournaments/${tid}/groups/board`, { params: category ? { category } : {} }).then((r) => setBoard(r.data)).catch((e) => toast.error(apiError(e)));
+  const load = () => { if (!tid) return; api.get(`/tournaments/${tid}/groups/board`, { params: category ? { category } : {} }).then((r) => setBoard(r.data)).catch((e) => toast.error(apiError(e))); };
   useEffect(() => { load(); }, [tid, category]); // eslint-disable-line react-hooks/exhaustive-deps
   return [board, load];
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, UserCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileDown, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { teamLabel, fmtDate } from "@/lib/format";
@@ -35,11 +35,25 @@ export function RefereeAssignments({ tid, list, onDone, canWrite }) {
     } catch (e) { toast.error(apiError(e)); } finally { setBusyId(null); }
   };
 
+  const perReferee = useMemo(() => {
+    const map = {};
+    rows.forEach((m) => { if (!m.referee_user_id) return; (map[m.referee_user_id] = map[m.referee_user_id] || { name: m.referee_name, matches: [] }).matches.push(m); });
+    return Object.entries(map).sort((a, b) => b[1].matches.length - a[1].matches.length);
+  }, [rows]);
+  const [downloading, setDownloading] = useState(false);
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      const r = await api.get(`/tournaments/${tid}/matches/referee-sheet`, { params: { date: activeDay }, responseType: "blob" });
+      const url = URL.createObjectURL(r.data); const a = document.createElement("a"); a.href = url; a.download = `FSL_Designazioni_${activeDay}.pdf`; a.click(); URL.revokeObjectURL(url);
+    } catch (e) { toast.error(apiError(e)); } finally { setDownloading(false); }
+  };
+
   if (!matches.length) return <p className="text-sm text-fsl-slate py-8 text-center" data-testid="referees-empty">Nessuna gara programmata da designare con i filtri attuali.</p>;
 
   return (
     <div className="space-y-4" data-testid="referee-assignments">
-      <div className="flex flex-wrap gap-2" data-testid="referee-day-tabs">
+      <div className="flex flex-wrap items-center gap-2" data-testid="referee-day-tabs">
         {days.map((d) => {
           const ms = matches.filter((m) => m.kickoff_at.slice(0, 10) === d);
           const done = ms.filter((m) => m.referee_user_id).length;
@@ -49,6 +63,28 @@ export function RefereeAssignments({ tid, list, onDone, canWrite }) {
             </button>
           );
         })}
+        <button type="button" onClick={downloadPdf} disabled={downloading} className="btn-ghost ml-auto h-10" data-testid="referee-sheet-pdf-button"><FileDown className="h-4 w-4" aria-hidden="true" /> {downloading ? "Preparo il PDF…" : "Foglio designazioni PDF"}</button>
+      </div>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3" data-testid="referee-summary">
+        {referees.map((r) => {
+          const mine = perReferee.find(([id]) => id === r.id)?.[1]?.matches || [];
+          return (
+            <div key={r.id} className={`fsl-card px-4 py-3 ${mine.length ? "" : "opacity-60"}`} data-testid={`referee-summary-${r.id}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-semibold text-sm truncate">{r.full_name}</div>
+                <div className="font-display font-extrabold text-2xl num text-fsl-gold leading-none">{mine.length}</div>
+              </div>
+              <div className="text-[11px] text-fsl-slate mt-1 truncate">{mine.length ? mine.map((m) => `${m.kickoff_at.slice(11, 16)} ${m.field_name || ""}`.trim()).join(" · ") : "Libero in questa giornata"}</div>
+            </div>
+          );
+        })}
+        <div className={`fsl-card px-4 py-3 ${rows.length - assigned ? "border-fsl-danger/50" : "border-fsl-success/40"}`} data-testid="referee-summary-unassigned">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-semibold text-sm">Da designare</div>
+            <div className={`font-display font-extrabold text-2xl num leading-none ${rows.length - assigned ? "text-fsl-danger" : "text-fsl-success"}`}>{rows.length - assigned}</div>
+          </div>
+          <div className="text-[11px] text-fsl-slate mt-1">{rows.length - assigned ? "Gare ancora senza arbitro in questa giornata" : "Tutte le gare della giornata sono coperte"}</div>
+        </div>
       </div>
       <div className="fsl-card overflow-hidden">
         <div className="flex items-center justify-between px-4 h-12 border-b border-white/10">

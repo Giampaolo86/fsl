@@ -293,6 +293,21 @@ async def list_matches(tournament_id: str, competition_id: Optional[str] = None,
     return await _enrich(tournament_id, ms)
 
 
+@router.get("/matches/referee-sheet")
+async def referee_sheet(tournament_id: str, date: str, user: CurrentUser = Depends(get_current_user)):
+    """PDF del foglio designazioni arbitrali per una giornata (staff)."""
+    from fastapi import Response
+
+    from ..services import referee_sheet as sheet
+
+    t, _ = await require_tournament(tournament_id, user, roles=OPS | {"secretary"})
+    if not date or len(date) != 10:
+        raise bad_request("Data non valida (YYYY-MM-DD)")
+    ms = await scoped("matches", tournament_id).list({"kickoff_at": {"$regex": f"^{date}"}, "status": {"$in": ["scheduled", "confirmed", "postponed"]}}, sort=[("kickoff_at", 1), ("field_name", 1)], limit=500)
+    pdf = sheet.build({"name": t.name}, date, await _enrich(tournament_id, ms))
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="FSL_Designazioni_{t.slug}_{date}.pdf"'})
+
+
 @router.post("/matches", status_code=201)
 async def create_match(tournament_id: str, body: MatchIn, user: CurrentUser = Depends(get_current_user)):
     t, _ = await require_tournament(tournament_id, user, roles=OPS, writable=True)
