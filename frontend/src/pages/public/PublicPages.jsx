@@ -121,6 +121,26 @@ export function PublicRules() {
   return (
     <Wrap>
       <PageHeader kicker={data.tournament.name} title="Regolamento" subtitle={data.tournament.description} />
+      <Link to="/codice-fsl" className="group relative block rounded-2xl overflow-hidden border border-fsl-gold/40 mb-6 min-h-[160px]" data-testid="rules-codice-banner">
+        <img src="/img/codice/hero.jpg" alt="" className="absolute inset-0 h-full w-full object-cover group-hover:scale-[1.02] transition-transform duration-500" loading="lazy" />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(90deg,rgba(3,19,31,0.96) 0%,rgba(3,19,31,0.75) 60%,rgba(3,19,31,0.3) 100%)" }} />
+        <div className="relative p-6 sm:p-8 flex flex-wrap items-end justify-between gap-4">
+          <div><div className="text-[11px] font-semibold tracking-[0.28em] uppercase text-fsl-gold">Vale per ogni torneo FSL</div><div className="font-display font-extrabold uppercase text-3xl sm:text-4xl leading-none mt-2">Codice <span className="text-fsl-gold">FSL</span></div><div className="mt-2 text-sm sm:text-base text-fsl-white/85">Competere. Crescere. Rispettare. — i sei principi, i principi di gioco e il Patto FSL.</div></div>
+          <span className="btn-gold h-11 px-5">Leggi il Codice</span>
+        </div>
+      </Link>
+      {s.rules_text?.trim() && (
+        <div className="fsl-card p-5 mb-4 text-sm" data-testid="rules-special">
+          <SectionTitle>Regole speciali di questo torneo</SectionTitle>
+          <div className="space-y-3 text-fsl-white/85 leading-relaxed">
+            {s.rules_text.trim().split(/\n\s*\n/).map((block, i) => {
+              const lines = block.split("\n").filter(Boolean);
+              const title = lines[0]?.trim().endsWith(":") ? lines.shift().replace(/:$/, "") : null;
+              return <div key={i}>{title && <h4 className="font-display font-extrabold uppercase text-lg text-fsl-gold leading-none mb-1">{title}</h4>}{lines.map((l, k) => <p key={k}>{l}</p>)}</div>;
+            })}
+          </div>
+        </div>
+      )}
       <div className="grid md:grid-cols-2 gap-4">
         <div className="fsl-card p-5 space-y-2 text-sm" data-testid="rules-formula">
           <SectionTitle>Formula</SectionTitle>

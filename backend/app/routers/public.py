@@ -177,7 +177,7 @@ async def tournament_home(slug: str, request: Request, category: Optional[str] =
             mini.append({"competition": c.public(), "rows": (await engine.compute_standings(t.id, c))[:6]})
     return {
         "tournament": t.public(),
-        "settings": {k: getattr(s, k) for k in ("categories", "series", "teams_per_series", "teams_total", "groups_count", "qualifiers_per_group", "third_place", "fields_count", "formula", "points", "tiebreakers", "playoff_rules", "match_duration_min", "buffer_min", "slots", "match_days", "promoted_per_category", "relegated_per_category")},
+        "settings": {k: getattr(s, k) for k in ("categories", "series", "teams_per_series", "teams_total", "groups_count", "qualifiers_per_group", "third_place", "fields_count", "formula", "points", "tiebreakers", "playoff_rules", "match_duration_min", "buffer_min", "slots", "match_days", "promoted_per_category", "relegated_per_category", "rules_text")},
         "summary": compute_summary(s),
         "competitions": comp_out,
         "clubs": [_public_club(c) for c in clubs],

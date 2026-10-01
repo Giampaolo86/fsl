@@ -81,6 +81,7 @@ export default function Settings() {
           notification_channels: s.notification_channels,
           sponsors: s.sponsors || [],
           hospitality: s.hospitality || [],
+          rules_text: s.rules_text || "",
         },
       });
       toast.success("Impostazioni salvate");
@@ -244,6 +245,12 @@ export default function Settings() {
               ); })}
             </div>
           </div>}
+        </section>
+
+        <section className="fsl-card p-6" data-testid="settings-rules">
+          <SectionTitle>Regolamento speciale del torneo</SectionTitle>
+          <p className="text-xs text-fsl-slate mb-3">Regole proprie di questo torneo (tempi, sostituzioni, fuorigioco, premi, deroghe…). Compaiono nella tab «Regolamento» pubblica insieme a formula e punteggi. Il Codice FSL, comune a tutti i tornei, è sempre collegato automaticamente. Una riga vuota separa i paragrafi; una riga che termina con «:» diventa un titolo.</p>
+          <textarea className="fsl-input min-h-[180px] font-sans text-sm leading-relaxed" value={s.rules_text || ""} onChange={(e) => upd("rules_text", e.target.value)} placeholder={"Tempi di gioco:\nDue tempi da 20 minuti con intervallo di 5.\n\nSostituzioni:\nVolanti e illimitate…"} data-testid="settings-rules-text" />
         </section>
 
         <section className="fsl-card p-6" data-testid="settings-hospitality">

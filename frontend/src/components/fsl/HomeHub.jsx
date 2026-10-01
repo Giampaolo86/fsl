@@ -42,6 +42,28 @@ const MISSION = [
   { img: "mission-media", icon: PlayCircle, title: "Visibilità social e media", text: "Foto, video, highlights e interviste per dare valore ai talenti e alle società." },
 ];
 
+export function HubCodice() {
+  const pills = ["Competere è importante", "I ragazzi prima del risultato", "Rispetto, sempre", "Gli adulti danno l'esempio", "Fair play reale", "Ogni ragazzo è parte del gioco"];
+  return (
+    <section id="codice" className="relative overflow-hidden scroll-mt-20" data-testid="hub-codice">
+      <img src="/img/codice/hero.jpg" alt="" className="absolute inset-0 h-full w-full object-cover object-center" loading="lazy" />
+      <div className="absolute inset-0" style={{ background: "linear-gradient(90deg,rgba(3,19,31,0.97) 0%,rgba(3,19,31,0.88) 50%,rgba(3,19,31,0.35) 100%)" }} />
+      <div className="relative mx-auto max-w-[1488px] px-6 py-16 lg:py-24 grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-10 items-center">
+        <div>
+          <Kicker className="mb-3">Il nostro modello etico e sportivo</Kicker>
+          <h2 className="!text-5xl sm:!text-6xl lg:!text-7xl font-extrabold leading-[0.9]">Codice <span className="text-fsl-gold">FSL</span></h2>
+          <p className="mt-3 font-display font-extrabold uppercase tracking-wide text-xl sm:text-2xl text-fsl-white/90">Competere. Crescere. Rispettare.</p>
+          <p className="mt-5 max-w-2xl text-fsl-white/80 text-base sm:text-lg leading-relaxed">Il risultato conta, ma non vale più della crescita dei ragazzi. Sei principi, i principi di gioco e il Patto FSL valgono in ogni torneo: per giocatori, allenatori, dirigenti, famiglie e per noi che organizziamo.</p>
+          <Link to="/codice-fsl" className="btn-gold h-12 px-6 mt-8" data-testid="hub-codice-cta">Leggi il Codice FSL <ArrowRight className="h-4 w-4" /></Link>
+        </div>
+        <ul className="grid sm:grid-cols-2 gap-3">
+          {pills.map((t, i) => <li key={t} className="rounded-xl border border-white/15 bg-ink-950/60 backdrop-blur px-4 py-3 flex items-center gap-3 animate-rise" style={{ animationDelay: `${i * 70}ms` }}><span className="num font-display font-extrabold text-2xl text-fsl-gold w-9">0{i + 1}</span><span className="text-sm font-semibold">{t}</span></li>)}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
 export function HubMission() {
   return (
     <section id="missione" className="mx-auto max-w-[1488px] px-6 py-16 lg:py-24 scroll-mt-20" data-testid="hub-mission">

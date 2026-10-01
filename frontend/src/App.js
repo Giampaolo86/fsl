@@ -47,6 +47,7 @@ import DigitalProduct from "@/pages/DigitalProduct";
 import ClubHomeEditor from "@/pages/club/ClubHomeEditor";
 import PublicClubHome from "@/pages/public/PublicClubHome";
 import PublicClubEntity from "@/pages/public/PublicClubEntity";
+import CodiceFSL from "@/pages/public/CodiceFSL";
 import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
 import ClubDashboard from "@/pages/club/ClubDashboard";
 import { ClubTeams } from "@/pages/club/ClubModules";
@@ -186,6 +187,7 @@ function AppRoutes() {
                 <Route path="/albo-doro" element={<HallOfFame />} />
                 <Route path="/albo-doro/societa/:orgClubId" element={<ClubHistory />} />
                 <Route path="/club/:orgClubId" element={<PublicClubEntity />} />
+                <Route path="/codice-fsl" element={<CodiceFSL />} />
                 <Route path="/albo-doro/:archiveSlug" element={<SeasonArchive />} />
                 <Route path="/account" element={<ProtectedRoute roles={["fan"]}><FanAccount /></ProtectedRoute>} />
               </Route>

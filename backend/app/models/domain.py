@@ -110,6 +110,7 @@ class TournamentSettings(BaseDocument):
     qualifiers_per_group: int = 2
     third_place: bool = False
     hospitality: list[dict] = []
+    rules_text: str = ""
     skip_holidays: bool = False
     fees: dict = {"registration": 0, "currency": "EUR", "video_price": 0.99, "photo_price": 0.49, "digital_price": 2.49, "card_price": 3.99, "card_special_price": 4.99, "push_price": 3.99}
     required_documents: list[str] = []
