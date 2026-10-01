@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight, CheckCircle2, Circle } from "lucide-react";
+import { toast } from "sonner";
+import { api, apiError } from "@/lib/api";
 
 export function TournamentChecklist({ data }) {
   const pct = data.steps.length ? Math.round((100 * data.steps_done) / data.steps.length) : 0;
@@ -40,7 +43,12 @@ export function TournamentChecklist({ data }) {
   );
 }
 
-export function AttentionList({ items }) {
+export function AttentionList({ items, tid, canAssign = false, onChanged }) {
+  const [referees, setReferees] = useState([]);
+  const needRefs = canAssign && items.some((a) => a.key === "no_referee");
+  useEffect(() => {
+    if (needRefs) api.get("/users").then((r) => setReferees(r.data.filter((u) => u.role === "referee"))).catch(() => {});
+  }, [needRefs]);
   if (!items.length) return null;
   return (
     <div className="fsl-card p-5 border-fsl-warning/40" data-testid="attention-list">
@@ -54,9 +62,12 @@ export function AttentionList({ items }) {
               <span className={`font-display font-extrabold num ${a.key === "no_referee" ? "text-fsl-danger" : "text-fsl-warning"}`}>{a.count}</span>
             </Link>
             {a.matches?.length > 0 && (
-              <ul className="mt-1 ml-3 pl-4 border-l border-fsl-danger/30 space-y-1" data-testid="attention-no-referee-list">
+              <ul className="mt-1 ml-3 pl-4 border-l border-fsl-danger/30 space-y-1.5" data-testid="attention-no-referee-list">
                 {a.matches.map((m) => (
-                  <li key={m.id}><Link to={a.to.replace(/\/partite$/, `/partite/${m.id}`)} className="text-xs text-fsl-slate hover:text-fsl-white num" data-testid={`no-referee-match-${m.id}`}>{m.kickoff_at.slice(11, 16)} · {m.home} vs {m.away}{m.field_name ? ` · ${m.field_name}` : ""}</Link></li>
+                  <li key={m.id} className="flex items-center gap-2">
+                    <Link to={a.to.replace(/\/partite$/, `/partite/${m.id}`)} className="min-w-0 flex-1 truncate text-xs text-fsl-slate hover:text-fsl-white num" data-testid={`no-referee-match-${m.id}`}>{m.kickoff_at.slice(11, 16)} · {m.home} vs {m.away}{m.field_name ? ` · ${m.field_name}` : ""}</Link>
+                    {canAssign && <RefereeSelect tid={tid} matchId={m.id} referees={referees} onAssigned={onChanged} />}
+                  </li>
                 ))}
               </ul>
             )}
@@ -64,5 +75,24 @@ export function AttentionList({ items }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function RefereeSelect({ tid, matchId, referees, onAssigned }) {
+  const [busy, setBusy] = useState(false);
+  const assign = async (uid) => {
+    if (!uid) return;
+    setBusy(true);
+    try {
+      await api.patch(`/tournaments/${tid}/matches/${matchId}`, { referee_user_id: uid });
+      toast.success("Arbitro designato");
+      onAssigned?.();
+    } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
+  };
+  return (
+    <select className="fsl-input h-8 w-40 text-xs py-0" defaultValue="" disabled={busy || !referees.length} onChange={(e) => assign(e.target.value)} aria-label="Designa arbitro" data-testid={`quick-assign-referee-${matchId}`}>
+      <option value="" disabled>{referees.length ? "Designa arbitro…" : "Nessun arbitro"}</option>
+      {referees.map((r) => <option key={r.id} value={r.id}>{r.full_name}</option>)}
+    </select>
   );
 }

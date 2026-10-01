@@ -118,7 +118,7 @@ export default function Overview() {
       {dash ? (
         <div className="grid lg:grid-cols-5 gap-4">
           <div className="lg:col-span-2 space-y-4">
-            <AttentionList items={dash.attention} />
+            <AttentionList items={dash.attention} tid={t.id} canAssign={["super_admin", "director", "secretary"].includes(t.my_role)} onChanged={() => setDashTick((n) => n + 1)} />
             <TournamentChecklist data={dash} />
             {["super_admin", "director", "secretary"].includes(t.my_role) && <TodoList tournamentId={t.id} onChange={() => setDashTick((n) => n + 1)} />}
           </div>
