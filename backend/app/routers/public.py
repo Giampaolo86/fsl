@@ -251,6 +251,7 @@ async def public_schedule(slug: str, request: Request):
         "fields_count": s.fields_count if s else len(fields),
         "sessions": (s.calendar_sessions if s else None) or [],
         "breaks": (s.calendar_breaks if s else None) or [],
+        "slots": (s.calendar_slots if s else None) or {},
         "match_minutes": s.match_duration_min if s else 25,
         "buffer_minutes": s.buffer_min if s else 10,
     }

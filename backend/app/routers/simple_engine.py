@@ -80,7 +80,7 @@ async def _board(tid: str, cat: str) -> dict:
         "matches": group_ms,
         "finals": finals_ms,
         "finals_competition_id": ko.id if ko else None,
-        "calendar": {"fields_count": s.fields_count, "start_time": s.day_start, "end_time": s.day_end, "match_minutes": s.match_duration_min, "buffer_minutes": s.buffer_min, "date": group_ms[0]["kickoff_at"][:10] if group_ms else None, "sessions": s.calendar_sessions or [], "breaks": s.calendar_breaks or []},
+        "calendar": {"fields_count": s.fields_count, "start_time": s.day_start, "end_time": s.day_end, "match_minutes": s.match_duration_min, "buffer_minutes": s.buffer_min, "date": group_ms[0]["kickoff_at"][:10] if group_ms else None, "sessions": s.calendar_sessions or [], "breaks": s.calendar_breaks or [], "slots": s.calendar_slots or {}},
         "played": sum(1 for m in group_ms if m["played"]),
         "finals_played": sum(1 for m in finals_ms if m["played"]),
     }
@@ -251,6 +251,9 @@ async def _generate(tid: str, cat: str, user, body: CalendarIn) -> dict:
     s = await settings_repo.find_one({"tournament_id": tid})
     windows = body.windows()
     slot_times = {id(w): svc.compute_slots(w.start_time, w.end_time, body.match_minutes, body.buffer_minutes) for w in windows}
+    for w in windows:
+        ov = (s.calendar_slots or {}).get(w.date) or {}
+        slot_times[id(w)] = sorted((set(slot_times[id(w)]) | set(ov.get("add") or [])) - set(ov.get("remove") or []))
     if not any(slot_times.values()):
         raise bad_request("Nessuna sessione consente almeno una gara: allarga la fascia oraria")
     first = windows[0]
@@ -630,4 +633,28 @@ async def save_breaks(tournament_id: str, body: BreaksIn, user: CurrentUser = De
     await _ctx(tournament_id, user, writable=True)
     s = await settings_repo.find_one({"tournament_id": tournament_id})
     await settings_repo.update(s.id, {"calendar_breaks": [b.model_dump() for b in sorted(body.breaks, key=lambda b: (b.date, b.start_time))]}, user.id)
+    return await _board(tournament_id, await _category(tournament_id, body.category))
+
+
+class SlotsIn(BaseModel):
+    category: str | None = None
+    date: str
+    add: list[str] = []
+    remove: list[str] = []
+
+
+@router.put("/slots")
+async def save_slots(tournament_id: str, body: SlotsIn, user: CurrentUser = Depends(get_current_user)):
+    """Fasce orarie personalizzate per giornata: orari aggiunti a mano e fasce automatiche nascoste (solo se vuote)."""
+    await _ctx(tournament_id, user, writable=True)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    used = {m.kickoff_at[11:16] for m in await scoped("matches", tournament_id).list({"kickoff_at": {"$regex": f"^{body.date}"}, "status": {"$ne": "cancelled"}}, limit=5000)}
+    busy = sorted(set(body.remove) & used)
+    if busy:
+        raise conflict(f"La fascia {busy[0]} ha partite programmate: spostale prima di eliminarla")
+    slots = dict(s.calendar_slots or {})
+    slots[body.date] = {"add": sorted(set(body.add) - set(body.remove)), "remove": sorted(set(body.remove))}
+    if not slots[body.date]["add"] and not slots[body.date]["remove"]:
+        slots.pop(body.date, None)
+    await settings_repo.update(s.id, {"calendar_slots": slots}, user.id)
     return await _board(tournament_id, await _category(tournament_id, body.category))

@@ -24,7 +24,7 @@ export function PublicTimeGrid({ schedule, matches, slug }) {
       {days.map((day) => {
         const dayMatches = matches.filter((m) => m.kickoff_at.startsWith(day));
         if (!dayMatches.length) return null;
-        const rows = gridRows(day, schedule.sessions || [], breaks, dayMatches, step, dur);
+        const rows = gridRows(day, schedule.sessions || [], breaks, dayMatches, step, dur, (schedule.slots || {})[day] || {});
         return (
           <div key={day} className="fsl-card overflow-hidden !p-0" data-testid={`public-grid-day-${day}`}>
             <div className="px-3 sm:px-4 min-h-11 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 bg-ink-950/60 border-b border-white/10"><span className="font-display font-extrabold uppercase text-fsl-gold text-sm sm:text-base">{WEEKDAYS[new Date(day + "T12:00").getDay()]} {fmtDate(day)}</span><span className="text-xs text-fsl-slate">{dayMatches.length} partite</span></div>

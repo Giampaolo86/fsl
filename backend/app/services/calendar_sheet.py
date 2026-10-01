@@ -58,7 +58,8 @@ def build(tournament_name: str, category: str, board: dict) -> bytes:
         if story:
             story.append(PageBreak())
         day_matches = [m for m in matches if m["kickoff_at"].startswith(day)]
-        times = _slot_times(cal.get("sessions") or [], day, step, duration) | {m["kickoff_at"][11:16] for m in day_matches}
+        ov = (cal.get("slots") or {}).get(day) or {}
+        times = (_slot_times(cal.get("sessions") or [], day, step, duration) | set(ov.get("add") or [])) - set(ov.get("remove") or []) | {m["kickoff_at"][11:16] for m in day_matches}
         rows_src = [("slot", t) for t in times] + [("break", b) for b in breaks if b["date"] == day]
         rows_src.sort(key=lambda x: x[1] if x[0] == "slot" else x[1]["start_time"])
         wd = WEEKDAYS[datetime.strptime(day, "%Y-%m-%d").weekday()]

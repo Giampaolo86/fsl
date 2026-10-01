@@ -14,10 +14,11 @@ export function slotTimes(sessions, day, step, duration) {
   return out;
 }
 
-export function gridRows(day, sessions, breaks, matches, step, duration, extraTimes = []) {
+export function gridRows(day, sessions, breaks, matches, step, duration, overrides = {}) {
   const times = slotTimes(sessions, day, step, duration);
+  (overrides.add || []).forEach((t) => times.add(t));
+  (overrides.remove || []).forEach((t) => times.delete(t));
   matches.filter((m) => m.kickoff_at.startsWith(day)).forEach((m) => times.add(m.kickoff_at.slice(11, 16)));
-  extraTimes.forEach((t) => times.add(t));
   return [...[...times].map((t) => ({ kind: "slot", t })), ...breaks.filter((b) => b.date === day).map((b) => ({ kind: "break", t: b.start_time, b }))].sort((a, z) => a.t.localeCompare(z.t));
 }
 
@@ -54,14 +55,17 @@ function TeamBox({ m, side, teams, canWrite, onQuickTeam, conflict }) {
   return <TeamRow team={{ ...team, name: m[side] }} side={side} conflict={conflict} onClick={canWrite && !m.played ? () => setOpen(true) : undefined} testId={`grid-team-${side}-${m.id}`} />;
 }
 
-export function TimeGrid({ board, canWrite, onMove, onEdit, onBreaks, onQuickTeam }) {
+export function TimeGrid({ board, canWrite, onMove, onEdit, onBreaks, onSlots, onQuickTeam }) {
   const mobile = useIsMobile();
   const [over, setOver] = useState(null);
-  const [extra, setExtra] = useState({});
   const [newTime, setNewTime] = useState({});
   const [newBreak, setNewBreak] = useState({});
   const c = board.calendar;
   const breaks = c.breaks || [];
+  const step = (c.match_minutes || 25) + (c.buffer_minutes ?? 10);
+  const slotsOv = c.slots || {};
+  const addSlot = (day, t) => { const o = slotsOv[day] || {}; onSlots(day, [...new Set([...(o.add || []), t])], (o.remove || []).filter((x) => x !== t)); };
+  const removeSlot = (day, t) => { const o = slotsOv[day] || {}; const auto = slotTimes(c.sessions || [], day, step, c.match_minutes || 25).has(t); onSlots(day, (o.add || []).filter((x) => x !== t), auto ? [...new Set([...(o.remove || []), t])] : o.remove || []); };
   const addBreak = (day) => {
     const b = newBreak[day] || {};
     if (!b.start_time || !b.end_time) return;
@@ -69,7 +73,6 @@ export function TimeGrid({ board, canWrite, onMove, onEdit, onBreaks, onQuickTea
     setNewBreak({ ...newBreak, [day]: {} });
   };
   const removeBreak = (b) => onBreaks(breaks.filter((x) => !(x.date === b.date && x.start_time === b.start_time && x.label === b.label)));
-  const step = (c.match_minutes || 25) + (c.buffer_minutes ?? 10);
   const all = useMemo(() => [...board.matches, ...board.finals], [board]);
   const conflicts = useMemo(() => findConflicts(all, c.match_minutes || 25), [all, c.match_minutes]);
   const teamById = useMemo(() => Object.fromEntries(board.teams.map((t) => [t.id, t])), [board.teams]);
@@ -105,20 +108,21 @@ export function TimeGrid({ board, canWrite, onMove, onEdit, onBreaks, onQuickTea
   return (
     <div className="space-y-6" data-testid="time-grid">
       {[...new Set([...days, ...breaks.map((b) => b.date)])].sort().map((day) => {
-        const rows = gridRows(day, c.sessions || [], breaks, all, step, c.match_minutes || 25, extra[day] || []);
+        const rows = gridRows(day, c.sessions || [], breaks, all, step, c.match_minutes || 25, slotsOv[day] || {});
+        const slotFree = (t) => !all.some((m) => m.kickoff_at === `${day}T${t}`);
         const nConf = all.filter((m) => m.kickoff_at.startsWith(day) && (conflicts.field[m.id] || conflicts.team[`${m.id}|home`] || conflicts.team[`${m.id}|away`])).length;
         return (
           <div key={day} className="rounded-lg border border-white/10 overflow-hidden" data-testid={`grid-day-${day}`}>
             <div className="px-3 sm:px-4 min-h-11 py-2 flex flex-wrap items-center gap-x-3 gap-y-2 bg-ink-950/60 border-b border-white/10"><span className="font-display font-extrabold uppercase text-fsl-gold text-sm sm:text-base">{WEEKDAYS[new Date(day + "T12:00").getDay()]} {fmtDate(day)}</span><span className="text-xs text-fsl-slate">{all.filter((m) => m.kickoff_at.startsWith(day)).length} partite</span>{nConf > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-fsl-danger/60 bg-fsl-danger/15 px-2 h-6 text-[10px] font-semibold uppercase tracking-wider text-fsl-danger" data-testid={`grid-conflicts-${day}`}><AlertTriangle className="h-3 w-3" /> {nConf} in conflitto</span>}
-              {canWrite && <form className="sm:ml-auto flex items-center gap-1 flex-wrap" onSubmit={(e) => { e.preventDefault(); const t = newTime[day]; if (t) { setExtra({ ...extra, [day]: [...(extra[day] || []), t] }); setNewTime({ ...newTime, [day]: "" }); } }} data-testid={`grid-add-row-${day}`}><input type="time" className="fsl-input h-8 w-28 text-xs py-0" value={newTime[day] || ""} onChange={(e) => setNewTime({ ...newTime, [day]: e.target.value })} aria-label="Nuovo orario" data-testid={`grid-add-time-${day}`} /><button type="submit" className="btn-ghost h-8 px-2 text-xs" data-testid={`grid-add-time-button-${day}`}>+ Orario</button></form>}
-              {canWrite && <form className="flex items-center gap-1 flex-wrap" onSubmit={(e) => { e.preventDefault(); addBreak(day); }} data-testid={`grid-add-break-${day}`}><input className="fsl-input h-8 w-32 text-xs py-0" placeholder="Pausa pranzo" value={newBreak[day]?.label || ""} onChange={(e) => setNewBreak({ ...newBreak, [day]: { ...newBreak[day], label: e.target.value } })} aria-label="Nome pausa" data-testid={`grid-break-label-${day}`} /><input type="time" className="fsl-input h-8 w-24 text-xs py-0" value={newBreak[day]?.start_time || ""} onChange={(e) => setNewBreak({ ...newBreak, [day]: { ...newBreak[day], start_time: e.target.value } })} aria-label="Inizio pausa" data-testid={`grid-break-start-${day}`} /><input type="time" className="fsl-input h-8 w-24 text-xs py-0" value={newBreak[day]?.end_time || ""} onChange={(e) => setNewBreak({ ...newBreak, [day]: { ...newBreak[day], end_time: e.target.value } })} aria-label="Fine pausa" data-testid={`grid-break-end-${day}`} /><button type="submit" className="btn-ghost h-8 px-2 text-xs" data-testid={`grid-break-add-button-${day}`}><Coffee className="h-3.5 w-3.5" /> Pausa</button></form>}</div>
+              {canWrite && <form className="sm:ml-auto flex items-center gap-1 flex-wrap" onSubmit={(e) => { e.preventDefault(); const t = newTime[day]; if (t) { addSlot(day, t); setNewTime({ ...newTime, [day]: "" }); } }} data-testid={`grid-add-row-${day}`}><span className="text-[10px] uppercase tracking-wider text-fsl-slate sm:hidden w-full">Aggiungi fascia oraria</span><input type="time" className="fsl-input h-8 w-28 text-xs py-0" value={newTime[day] || ""} onChange={(e) => setNewTime({ ...newTime, [day]: e.target.value })} aria-label="Nuovo orario" data-testid={`grid-add-time-${day}`} /><button type="submit" className="btn-ghost h-8 px-2 text-xs" data-testid={`grid-add-time-button-${day}`}>+ Orario</button></form>}
+              {canWrite && <form className="flex items-center gap-1 flex-wrap" onSubmit={(e) => { e.preventDefault(); addBreak(day); }} data-testid={`grid-add-break-${day}`}><span className="text-[10px] uppercase tracking-wider text-fsl-slate sm:hidden w-full">Aggiungi pausa (nome, inizio, fine)</span><input className="fsl-input h-8 w-32 text-xs py-0" placeholder="Pausa pranzo" value={newBreak[day]?.label || ""} onChange={(e) => setNewBreak({ ...newBreak, [day]: { ...newBreak[day], label: e.target.value } })} aria-label="Nome pausa" data-testid={`grid-break-label-${day}`} /><input type="time" className="fsl-input h-8 w-24 text-xs py-0" value={newBreak[day]?.start_time || ""} onChange={(e) => setNewBreak({ ...newBreak, [day]: { ...newBreak[day], start_time: e.target.value } })} aria-label="Inizio pausa" data-testid={`grid-break-start-${day}`} /><input type="time" className="fsl-input h-8 w-24 text-xs py-0" value={newBreak[day]?.end_time || ""} onChange={(e) => setNewBreak({ ...newBreak, [day]: { ...newBreak[day], end_time: e.target.value } })} aria-label="Fine pausa" data-testid={`grid-break-end-${day}`} /><button type="submit" className="btn-ghost h-8 px-2 text-xs" data-testid={`grid-break-add-button-${day}`}><Coffee className="h-3.5 w-3.5" /> Pausa</button></form>}</div>
             {mobile ? (
               <div className="divide-y divide-white/[0.06]" data-testid={`grid-mobile-${day}`}>
                 {rows.map(({ kind, t, b }) => kind === "break" ? (
                   <div key={`b-${t}-${b.label}`} className="bg-fsl-gold/[0.07] px-3 py-2 flex items-center gap-2 text-sm" data-testid={`grid-break-${day}-${t}`}><Coffee className="h-4 w-4 text-fsl-gold shrink-0" /><span className="font-semibold uppercase tracking-wide truncate">{b.label}</span><span className="ml-auto num text-xs text-fsl-slate whitespace-nowrap">{b.start_time} – {b.end_time}</span>{canWrite && <button type="button" onClick={() => removeBreak(b)} className="text-fsl-slate hover:text-fsl-danger" aria-label="Rimuovi pausa" data-testid={`grid-break-remove-${day}-${t}`}><X className="h-4 w-4" /></button>}</div>
                 ) : (
                   <div key={t} className="px-3 py-2">
-                    <div className="flex items-baseline gap-2 mb-1.5"><span className="num font-display font-extrabold text-lg text-fsl-gold leading-none">{t}</span><span className="num text-[10px] text-fsl-slate">– {toHHMM(toMin(t) + (c.match_minutes || 25))}</span></div>
+                    <div className="flex items-baseline gap-2 mb-1.5"><span className="num font-display font-extrabold text-lg text-fsl-gold leading-none">{t}</span><span className="num text-[10px] text-fsl-slate">– {toHHMM(toMin(t) + (c.match_minutes || 25))}</span>{slotFree(t) && <span className="text-[10px] uppercase tracking-wider text-fsl-slate/60">libero</span>}{canWrite && slotFree(t) && <button type="button" onClick={() => removeSlot(day, t)} className="ml-auto inline-flex items-center gap-1 text-[10px] text-fsl-slate hover:text-fsl-danger" aria-label={`Elimina fascia ${t}`} data-testid={`grid-slot-remove-${day}-${t}`}><X className="h-3.5 w-3.5" /> Elimina fascia</button>}</div>
                     <div className="space-y-1.5">
                       {fields.map((f) => { const m = byKey[`${day}T${t}|${f.id}`]; return m ? <div key={f.id}><div className="text-[9px] uppercase tracking-[0.16em] text-fsl-slate mb-0.5 pl-1">{f.name}</div>{tile(m, false)}</div> : null; })}
                     </div>
@@ -144,7 +148,7 @@ export function TimeGrid({ board, canWrite, onMove, onEdit, onBreaks, onQuickTea
                     const kickoff = `${day}T${t}`;
                     return (
                       <tr key={t}>
-                        <td className="px-3 py-1.5 num font-semibold text-fsl-white/90 align-top">{t}<span className="block text-[10px] text-fsl-slate font-normal">– {toHHMM(toMin(t) + (c.match_minutes || 25))}</span></td>
+                        <td className="px-3 py-1.5 num font-semibold text-fsl-white/90 align-top group/slot">{t}<span className="block text-[10px] text-fsl-slate font-normal">– {toHHMM(toMin(t) + (c.match_minutes || 25))}</span>{canWrite && slotFree(t) && <button type="button" onClick={() => removeSlot(day, t)} className="mt-1 inline-flex items-center gap-1 text-[10px] font-sans font-normal text-fsl-slate/60 hover:text-fsl-danger opacity-0 group-hover/slot:opacity-100 focus:opacity-100 transition-opacity" aria-label={`Elimina fascia ${t}`} data-testid={`grid-slot-remove-${day}-${t}`}><X className="h-3 w-3" /> Elimina</button>}</td>
                         {fields.map((f) => {
                           const m = byKey[`${kickoff}|${f.id}`];
                           const key = `${kickoff}|${f.id}`;

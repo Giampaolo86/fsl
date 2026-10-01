@@ -32,6 +32,9 @@ export default function SimpleEngine() {
     try { const { data } = await api.post(`/tournaments/${tid}/simple/matches/move`, { match_id: matchId, kickoff_at: kickoff, field_id: fieldId }); setBoard(data); toast.success(data.swapped ? "Partite scambiate" : "Partita spostata"); } catch (e) { toast.error(apiError(e)); }
   };
 
+  const saveSlots = async (date, add, remove) => {
+    try { const { data } = await api.put(`/tournaments/${tid}/simple/slots`, { category: board?.category, date, add, remove }); setBoard(data); } catch (e) { toast.error(apiError(e)); }
+  };
   const saveBreaks = async (breaks) => {
     try { const { data } = await api.put(`/tournaments/${tid}/simple/breaks`, { category: board?.category, breaks }); setBoard(data); toast.success("Pause aggiornate"); } catch (e) { toast.error(apiError(e)); }
   };
@@ -61,7 +64,7 @@ export default function SimpleEngine() {
         )}
       />
       <GroupsBlock tid={tid} board={board} reload={load} canWrite={canWrite} />
-      <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} onMove={move} onBreaks={saveBreaks} onQuickTeam={quickTeam} />
+      <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} onMove={move} onBreaks={saveBreaks} onSlots={saveSlots} onQuickTeam={quickTeam} />
       <FinalsBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} />
       {editM && <SimpleMatchEdit tid={tid} m={editM} teams={board.teams} fields={board.fields} onClose={() => setEditM(null)} onDone={load} />}
     </div>
