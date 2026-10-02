@@ -337,7 +337,15 @@ async def get_match(tournament_id: str, match_id: str, user: CurrentUser = Depen
         raise forbidden("Gara non della tua società")
     d = (await _enrich(tournament_id, [m]))[0]
     players = await scoped("players", tournament_id).list({"team_id": {"$in": [m.home_team_id, m.away_team_id]}}, sort=[("shirt_number", 1)])
-    d["players"] = {"home": [{**p.public(), "link_code": None} for p in players if p.team_id == m.home_team_id], "away": [{**p.public(), "link_code": None} for p in players if p.team_id == m.away_team_id]}
+    own_teams = await _club_teams(user, tournament_id) if role == "club_manager" else set()
+    PRIVATE = ("guardian_emails", "birth_year", "media_consent", "profile", "photo_pending_by", "link_code", "created_by", "updated_by")
+
+    def _proj(p):
+        full = role in STAFF or p.team_id in own_teams
+        d_ = {**p.public(), "link_code": None}
+        return d_ if full else {k: v for k, v in d_.items() if k not in PRIVATE}
+
+    d["players"] = {"home": [_proj(p) for p in players if p.team_id == m.home_team_id], "away": [_proj(p) for p in players if p.team_id == m.away_team_id]}
     d["report_versions"] = [v.public() for v in await scoped("report_versions", tournament_id).list({"match_id": m.id}, sort=[("version", -1)])]
     d["tickets"] = [e.public() for e in await scoped("error_reports", tournament_id).list({"match_id": m.id}, sort=[("created_at", -1)])] if role != "referee" else []
     d["can_edit_match"] = role in OPS or (role == "referee" and m.status not in FINAL + ("report_submitted",))

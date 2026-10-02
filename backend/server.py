@@ -8,7 +8,7 @@ load_dotenv(ROOT_DIR / ".env")
 import logging  # noqa: E402
 import os  # noqa: E402
 
-from fastapi import APIRouter, Depends, FastAPI  # noqa: E402
+from fastapi import Response, APIRouter, Depends, FastAPI  # noqa: E402
 from starlette.middleware.cors import CORSMiddleware  # noqa: E402
 
 from app.core.db import client  # noqa: E402
@@ -67,6 +67,40 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "X-Requested-With", "X-Client"],
 )
+
+
+PUBLIC_HIDDEN_KEYS = frozenset({
+    "created_by", "updated_by", "deleted_at", "version", "organization_id", "duplicated_from_id", "template_key",
+    "archived_at", "restored_at", "profile_draft", "review_note", "approval_status", "sheet_notes",
+    "guardian_emails", "media_consent", "birth_date", "birth_year", "link_code", "fiscal_code", "password_hash", "mfa_secret", "mfa_recovery_codes",
+    "internal_notes", "stripe_customer_id",
+})
+
+
+def _scrub_public(obj):
+    if isinstance(obj, dict):
+        return {k: _scrub_public(v) for k, v in obj.items() if k not in PUBLIC_HIDDEN_KEYS}
+    if isinstance(obj, list):
+        return [_scrub_public(v) for v in obj]
+    return obj
+
+
+@app.middleware("http")
+async def public_response_scrub(request, call_next):
+    """Le risposte di /api/public non espongono mai campi interni o dati sensibili, qualunque sia la query."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/public") or request.method != "GET" or "application/json" not in response.headers.get("content-type", ""):
+        return response
+    body = b"".join([chunk async for chunk in response.body_iterator])
+    try:
+        import json
+
+        data = json.loads(body)
+    except Exception:
+        return Response(content=body, status_code=response.status_code, headers=dict(response.headers), media_type=response.media_type)
+    payload = json.dumps(_scrub_public(data), ensure_ascii=False).encode()
+    headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
+    return Response(content=payload, status_code=response.status_code, headers=headers, media_type="application/json")
 
 
 @app.middleware("http")

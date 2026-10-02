@@ -78,7 +78,7 @@ async def _visible_to(t, request: Request) -> bool:
     if (s.hospitality_visibility if s else "clubs") == "all":
         return True
     user = await _staff(request)
-    return bool(user and user.role_in(t.id) in {"club_manager", "super_admin", "director", "secretary"})
+    return bool(user and user.role_in(t.id) == "club_manager")
 
 
 @public_router.get("")
