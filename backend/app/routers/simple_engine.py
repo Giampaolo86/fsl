@@ -519,6 +519,61 @@ async def calendar_pdf(tournament_id: str, category: str | None = None, user: Cu
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="FSL_Calendario_{t.slug}.pdf"'})
 
 
+
+class ProgramOptsIn(BaseModel):
+    title: str = ""
+    logo_url: str | None = None
+    style: str = "dark"
+    sections: list[str] = ["cover", "groups", "schedule", "finals", "info"]
+    show_crests: bool = True
+    show_notes: bool = True
+    contacts: str = ""
+    public: bool = False
+
+
+async def build_program_pdf(tournament_id: str, cat: str, opts: dict, public_url: str) -> tuple[bytes, str]:
+    from ..repositories.registry import tournaments as t_repo
+    from ..services import program_pdf
+
+    t = await t_repo.get(tournament_id)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    b = await _board(tournament_id, cat)
+    venues = await scoped("venues", tournament_id).list(limit=20)
+    fields_all = await scoped("fields", tournament_id).list({"active": True}, sort=[("code", 1)])
+    pdf = await program_pdf.build(t, s, b, venues, fields_all, {**opts, "public_url": public_url})
+    return pdf, f"FSL_Programma_{t.slug}{'_' + cat if cat and cat != 'Unica' else ''}.pdf"
+
+
+@router.get("/program-settings")
+async def get_program_settings(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    await _ctx(tournament_id, user)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    return {**ProgramOptsIn().model_dump(), **((s.program_pdf if s else None) or {})}
+
+
+@router.put("/program-settings")
+async def save_program_settings(tournament_id: str, body: ProgramOptsIn, user: CurrentUser = Depends(get_current_user)):
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    await settings_repo.update(s.id, {"program_pdf": body.model_dump()}, user.id)
+    await audit.record(user, "simple.program_settings", "tournament", t.id, t.id, after=body.model_dump())
+    return body.model_dump()
+
+
+@router.get("/program.pdf")
+async def program_pdf_download(tournament_id: str, category: str | None = None, base_url: str = "", user: CurrentUser = Depends(get_current_user)):
+    from fastapi import Response
+
+    from ..repositories.registry import tournaments as t_repo
+
+    await _ctx(tournament_id, user)
+    cat = await _category(tournament_id, category)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    t = await t_repo.get(tournament_id)
+    pdf, name = await build_program_pdf(tournament_id, cat, (s.program_pdf if s else None) or {}, f"{base_url.rstrip('/')}/tornei/{t.slug}" if base_url else "")
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
 # ---------- eliminazioni ----------
 async def _delete_team_matches(tid: str, team_id: str, user) -> None:
     repo = scoped("matches", tid)

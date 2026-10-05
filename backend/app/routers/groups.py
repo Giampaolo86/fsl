@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
@@ -281,8 +282,27 @@ class MatchEditIn(BaseModel):
     round_name: Optional[str] = None
     note: Optional[str] = None
     is_grand_final: Optional[bool] = None
+    home_name: Optional[str] = None
+    away_name: Optional[str] = None
     force: bool = False
     reason: str = ""
+
+
+async def _named_team(tournament_id: str, m, side: str, name: str, user) -> str:
+    """Segnaposto con nome libero: riusa un omonimo della categoria, rinomina il segnaposto attuale se usato solo qui, altrimenti ne crea uno nuovo."""
+    teams_repo, matches_repo = scoped("teams", tournament_id), scoped("matches", tournament_id)
+    name = name.strip()[:60]
+    if not name:
+        raise bad_request("Nome squadra vuoto")
+    same = next((t for t in await teams_repo.list({"category": m.category, "status": {"$ne": "withdrawn"}}, limit=2000) if t.name.strip().lower() == name.lower()), None)
+    if same:
+        return same.id
+    current_id = m.home_team_id if side == "home" else m.away_team_id
+    current = await teams_repo.get(current_id) if current_id else None
+    if current and current.placeholder and not current.qualifier and await matches_repo.count({"status": {"$ne": "cancelled"}, "_id": {"$ne": ObjectId(m.id)}, "$or": [{"home_team_id": current.id}, {"away_team_id": current.id}]}) == 0:
+        await teams_repo.update(current.id, {"name": name}, user.id)
+        return current.id
+    return (await teams_repo.insert(Team(tournament_id=tournament_id, competition_id=m.competition_id, name=name, category=m.category, series=m.series, placeholder=True), user.id)).id
 
 
 @router.patch("/matches/{match_id}")
@@ -293,6 +313,10 @@ async def edit_match(tournament_id: str, match_id: str, body: MatchEditIn, user:
     if not m:
         raise not_found("Gara")
     patch = {}
+    if body.home_name:
+        body.home_team_id = await _named_team(tournament_id, m, "home", body.home_name, user)
+    if body.away_name:
+        body.away_team_id = await _named_team(tournament_id, m, "away", body.away_name, user)
     if body.kickoff_at:
         patch["kickoff_at"] = body.kickoff_at
     if body.field_id:

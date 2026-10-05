@@ -178,6 +178,7 @@ async def tournament_home(slug: str, request: Request, category: Optional[str] =
     return {
         "tournament": t.public(),
         "settings": {k: getattr(s, k) for k in ("categories", "series", "teams_per_series", "teams_total", "groups_count", "qualifiers_per_group", "third_place", "fields_count", "formula", "points", "tiebreakers", "playoff_rules", "match_duration_min", "buffer_min", "slots", "match_days", "promoted_per_category", "relegated_per_category", "rules_text")},
+        "program_pdf_public": bool((s.program_pdf or {}).get("public")),
         "summary": compute_summary(s),
         "competitions": comp_out,
         "clubs": [_public_club(c) for c in clubs],
@@ -397,6 +398,24 @@ async def public_stats(slug: str):
 
     outcomes = await scoped("season_outcomes", t.id).list(sort=[("competition_name", 1)]) if "season_outcomes" in __import__("app.repositories.registry", fromlist=["SCOPED"]).SCOPED else []
     return {"matches_official": len(ms), "goals": goals, "avg_goals": round(goals / len(ms), 2) if ms else 0, "top_scorers": await _top_scorers(t.id, ms, 20), "awards": (await awards_board(t.id, public=True))[:20], "outcomes": [o.public() for o in outcomes]}
+
+
+@router.get("/tournaments/{slug}/program.pdf")
+async def public_program_pdf(slug: str, request: Request, category: Optional[str] = None):
+    from fastapi import Response
+
+    from .simple_engine import _category, build_program_pdf
+
+    t = await _published(slug, request)
+    s = await settings_repo.find_one({"tournament_id": t.id})
+    opts = (s.program_pdf if s else None) or {}
+    if not opts.get("public"):
+        raise not_found("Programma")
+    cat = await _category(t.id, category)
+    base = str(request.headers.get("origin") or request.headers.get("referer") or "").rstrip("/")
+    base = "/".join(base.split("/")[:3]) if base else ""
+    pdf, name = await build_program_pdf(t.id, cat, opts, f"{base}/tornei/{t.slug}" if base else "")
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
 
 @router.get("/tournaments/{slug}/clubs/{club_slug}")

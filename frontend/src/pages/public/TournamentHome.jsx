@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, BarChart3, CalendarDays, Grid3X3, Shield, Trophy, Users, Volleyball } from "lucide-react";
+import { ArrowRight, FileDown, BarChart3, CalendarDays, Grid3X3, Shield, Trophy, Users, Volleyball } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
 import { FeaturedNews, HomeHeading, InterviewsBlock, ShopShowcase } from "@/components/fsl/HomeSections";
@@ -58,6 +58,7 @@ export default function TournamentHome() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to={`/tornei/${slug}/squadre`} className="btn-gold" data-testid="public-hero-cta-teams">Scopri le squadre <ArrowRight className="h-4 w-4" /></Link>
             <Link to="/codice-fsl" className="btn-ghost" data-testid="public-hero-cta-rules">Codice FSL</Link>
+            {data.program_pdf_public && <a href={`${process.env.REACT_APP_BACKEND_URL}/api/public/tournaments/${slug}/program.pdf`} className="btn-ghost" data-testid="public-program-pdf"><FileDown className="h-4 w-4" /> Scarica il programma</a>}
           </div>
         </div>
       </section>
