@@ -12,7 +12,7 @@ export function VideoSlot({ kind, step, video, canEdit, onChange }) {
   useEffect(() => { setUrl(video?.url || ""); setTitle(video?.title || ""); }, [video]);
   const save = (clear = false) => api.put(`/guides/${kind}/video`, { step: String(step), url: clear ? null : url.trim() || null, title }).then(({ data }) => { onChange(data.videos); toast.success(clear ? "Video rimosso" : "Video salvato"); }).catch((e) => toast.error(apiError(e)));
   const isFile = video && /\.(mp4|webm|mov)(\?|$)/i.test(video.embed_url || video.url);
-  const tid = (s) => `${kind === "referee" ? "referee" : "club"}-video-${s}-${step}`;
+  const tid = (s) => `${kind}-video-${s}-${step}`;
   return (
     <div className="space-y-2" data-testid={tid("slot")}>
       {video ? (

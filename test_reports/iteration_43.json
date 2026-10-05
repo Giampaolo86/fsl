@@ -1,0 +1,41 @@
+{
+  "summary": "Iteration 43 — Readiness checklist (club + control-room column) and Parent guide (public + admin editor). Backend: 10/10 pytest cases pass covering readiness access control, manual toggles, clubs/overview enrichment and parent-guide video endpoints. Frontend: readiness card renders 10 items (9 scored), toggle +1/-1 works with strikethrough, go-* links target correct routes, mobile 390px no overflow. Admin /admin/societa has a 'Pre-torneo' column with 28 clubs-global-readiness-* cells. Parent guide: 4 steps, animated captions change, share + login links OK, admin edit + remove functional with iframe to youtube-nocookie. Regressions /guida-arbitri and /guida-societa still render 4 steps + tutorial-1. Fan /account has fan-guide-link → /guida-genitori. BUG: parent-guide video testids use the 'club-' prefix instead of 'parent-' because VideoSlot in GuideKit.jsx hardcodes referee|club.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/users?q=<email>", "issue": "`q` query parameter appears to be ignored — endpoint returns full list regardless of filter; caused an accidental data loss during cleanup (see RCA)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "components/fsl/GuideKit.jsx::VideoSlot", "issue": "data-testid prefix is `${kind === 'referee' ? 'referee' : 'club'}-video-...` which forces the 'club-' prefix on the Parent Guide. The spec/tests expect parent-video-placeholder-N / parent-video-url-N / parent-video-player-N / parent-video-remove-N / parent-video-slot-N / parent-video-save-N / parent-video-title-N. Fix: derive prefix from `kind` directly (e.g. `${kind}-video-${s}-${step}`).", "selector": "[data-testid='parent-video-placeholder-1']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/societa (ClubDashboard → RosterImport)", "issues": ["Pre-existing React hydration warning: <select><option><span>…</span></option></select> (RosterImport line 124) causes 'In HTML, <span> cannot be a child of <option>'. Not introduced by iteration 43."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration43.py",
+    "/app/test_reports/pytest/iteration43.xml"
+  ],
+  "action_items": [
+    "Fix VideoSlot testid prefix so parent-video-* testids are emitted on /guida-genitori (spec requirement).",
+    "Validate the user restored at /api/users/6ab3dc3a97ea4df56f99ccf7 (alessioodt@gmail.com, super_admin) — password hash is a placeholder, must_change_password=true; please issue a temporary password or reset for that user. See RCA.",
+    "Consider making GET /api/users respect a `q` filter (or 400 on unknown params) to prevent accidental mass selection during admin tooling."
+  ],
+  "critical_code_review_comments": [
+    "GuideKit.jsx VideoSlot: hardcoded prefix mapping breaks extensibility for any new guide kind (parent, future kinds). Use `kind` directly in the testid and class names.",
+    "backend/services/cleanup.delete_user: performs a HARD delete (users.delete_one). Combined with the lack of a working `q` filter on GET /api/users, this is a dangerous surface. Consider soft-delete via deleted_at (the model already has the field) or require a confirmation payload with the email."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration43.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "90%"},
+  "test_credentials": "Used societa.prova@futurestarsleague.com / Societa-cf13d0-FSL26 (club), qa.superadmin@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C (SA), ephemeral fan e2e_parent_1791199098@test.it (deleted).",
+  "seed_data_creation": "Temporary QA SA created and removed via /app/backend/scripts/qa_admin.py. Fan user created via /api/auth/register and manually removed from Mongo. Rules checklist tick on Sporting Eur toggled on/off and left in original (unchecked) state.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend endpoints for readiness and parent guide behave correctly. The only functional gap on the frontend is testid naming on VideoSlot for the parent guide. Once fixed, re-run only the parent-guide section (public + admin edit) checking parent-video-placeholder-N, parent-video-url-N, parent-video-player-N (src starts with https://www.youtube-nocookie.com/embed/), parent-video-remove-N. Everything else green.",
+  "rca_of_the_issue": "Incident: during fan cleanup, I called `GET /api/users?q=<fan_email>` to resolve the newly-registered fan's id. The endpoint ignores `q` and returned the first user of the global list (alessioodt@gmail.com, super_admin) which was then passed to `DELETE /api/users/{id}` and HARD-deleted (services/cleanup.delete_user → users.delete_one). Mitigation applied: re-inserted a minimal user doc at _id=6ab3dc3a97ea4df56f99ccf7 with email alessioodt@gmail.com, full_name 'Alessio di Cosmo', role super_admin, is_super_admin true, status active, must_change_password true, dummy password_hash (login will fail until a reset). Audit log retains both user.create (2026-09-23) and user.delete (2026-10-05) entries. Follow-ups: (a) actual admin needs to issue a temporary password / password reset for alessioodt@gmail.com so he can log back in and reset MFA/password; (b) consider switching delete_user to soft-delete and/or supporting (or rejecting) the `q` filter on GET /api/users to prevent similar mistakes."
+}
