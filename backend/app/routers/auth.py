@@ -443,6 +443,42 @@ async def me(user: CurrentUser = Depends(get_current_user)):
     return {"user": user.to_public(), "landing": _landing(user), "csrf_token": s["csrf"] if s else None}
 
 
+# ---------- «Entra come» (Super Admin) ----------
+IMPERSONABLE_ROLES = {"club_manager", "referee", "fan", "secretary"}
+IMPERSONATION_MINUTES = 20
+
+
+@router.post("/impersonate/end")
+async def impersonate_end(request: Request, user: CurrentUser = Depends(get_current_user)):
+    if not user.impersonated_by:
+        raise ApiError(400, "NOT_IMPERSONATING", "Nessuna sessione «Entra come» attiva")
+    await sessions.revoke_session(user.sid, reason="impersonation_end")
+    await audit.record(user, "auth.impersonate_end", "user", user.id, after={"by": user.impersonated_by.get("user_id")}, ip=_ip(request))
+    return {"ok": True}
+
+
+@router.post("/impersonate/{user_id}")
+async def impersonate(user_id: str, request: Request, user: CurrentUser = Depends(get_current_user)):
+    if not user.is_super_admin:
+        raise ApiError(403, "FORBIDDEN", "Solo il Super Admin può usare «Entra come»")
+    s = await sessions.get_session(user.sid)
+    if not s or not s.get("mfa_verified"):
+        raise ApiError(403, "MFA_REQUIRED", "Serve una sessione verificata con il codice MFA")
+    target = await users.get(user_id)
+    if not target or target.status != "active":
+        raise ApiError(404, "NOT_FOUND", "Utente non trovato o disabilitato")
+    if target.is_super_admin or target.role not in IMPERSONABLE_ROLES:
+        raise ApiError(403, "FORBIDDEN", "Questo ruolo non può essere impersonato")
+    extra = {"impersonated_by": {"user_id": user.id, "full_name": user.full_name, "sid": user.sid}}
+    sid, _, _ = await sessions.create_session(target.id, _ip(request), request.headers.get("user-agent"), True, extra=extra, ttl=timedelta(minutes=IMPERSONATION_MINUTES))
+    current = await load_current_user(target.id)
+    current.must_change_password = False
+    current.impersonated_by = extra["impersonated_by"]
+    await audit.record(user, "auth.impersonate", "user", target.id, after={"session_id": sid, "minutes": IMPERSONATION_MINUTES, "role": target.role}, ip=_ip(request))
+    expires = utcnow() + timedelta(minutes=IMPERSONATION_MINUTES)
+    return {"access_token": create_access_token(target.id, target.email, sid), "landing": _landing(current), "user": current.to_public(), "expires_at": expires.isoformat()}
+
+
 # ---------- password ----------
 class ChangePasswordIn(BaseModel):
     current_password: str

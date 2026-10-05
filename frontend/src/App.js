@@ -11,6 +11,8 @@ import PublicShell from "@/components/layout/PublicShell";
 import ClubShell from "@/components/layout/ClubShell";
 import RefereeShell from "@/components/layout/RefereeShell";
 import Login from "@/pages/Login";
+import Impersonate from "@/pages/Impersonate";
+import { ImpersonationBanner } from "@/components/fsl/ImpersonationBanner";
 import ChildCodesSheet from "@/pages/admin/ChildCodesSheet";
 import ChangePassword, { SecurityPage } from "@/pages/Security";
 import Top11Admin from "@/pages/admin/Top11";
@@ -98,6 +100,7 @@ function App() {
             <Toaster theme="dark" position="top-right" toastOptions={{ className: "bg-navy-800 border border-white/20 text-fsl-white" }} />
             <AppRoutes />
             <CartDrawer />
+            <ImpersonationBanner />
             </CartProvider>
           </TournamentProvider>
         </AuthProvider>
@@ -112,6 +115,7 @@ function AppRoutes() {
   return (
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/impersona" element={<Impersonate />} />
               <Route path="/cambia-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
               <Route path="/sicurezza" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
               <Route path="/registrati" element={<Register />} />

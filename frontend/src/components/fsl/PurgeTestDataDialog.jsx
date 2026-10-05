@@ -24,7 +24,7 @@ export function PurgeTestDataDialog({ tournaments, onDone }) {
     setBusy(true);
     try {
       const { data } = await api.post("/tournaments/purge-test-data", { keep_slugs: keep });
-      toast.success(`Pulizia completata: ${data.tournaments.length} tornei e ${data.users.length} utenti di test eliminati`);
+      toast.success(`Pulizia completata: ${data.tournaments.length} tornei, ${data.users.length} utenti, ${data.access_requests || 0} richieste di accesso e ${(data.clubs || []).length} società di test eliminati`);
       setOpen(false);
       onDone?.();
     } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
@@ -39,7 +39,7 @@ export function PurgeTestDataDialog({ tournaments, onDone }) {
         <DialogContent className="max-w-lg" data-testid="purge-dialog">
           <DialogHeader>
             <DialogTitle>Pulizia dati di test</DialogTitle>
-            <DialogDescription>Seleziona i tornei da eliminare definitivamente (con società, squadre, gare, vendite). Verranno rimossi anche gli account di test (@test.it, qa_*, test-*). I tornei non selezionati restano intatti.</DialogDescription>
+            <DialogDescription>Seleziona i tornei da eliminare definitivamente (con società, squadre, gare, vendite). Verranno rimossi anche gli account di test e demo (@test.it, @fsl.demo, qa_*, test-*), le richieste di accesso di prova e le società vuote che avevano creato. I tornei non selezionati restano intatti.</DialogDescription>
           </DialogHeader>
           <div className="max-h-80 overflow-y-auto divide-y divide-white/[0.06] rounded-lg border border-white/10" data-testid="purge-list">
             {tournaments.map((t) => (

@@ -3,6 +3,7 @@ from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, Response
+from bson import ObjectId
 from pydantic import BaseModel, EmailStr
 
 from ..core.deps import CurrentUser, get_current_user, load_current_user, require_tournament
@@ -153,6 +154,17 @@ async def approve_access_request(tournament_id: str, request_id: str, body: dict
     await requests_repo.update(r.id, {"status": "approved", "created_user_id": u.id, "club_id": club.id, "review_note": (body or {}).get("note", "")}, user.id)
     await audit.record(user, "access_request.approve", "access_request", r.id, tournament_id, after={"user_id": u.id, "club_id": club.id})
     return {"ok": True, "email": u.email, "temp_password": temp, "club": {"id": club.id, "name": club.name}}
+
+
+@router.delete("/tournaments/{tournament_id}/access-requests/{request_id}")
+async def delete_access_request(tournament_id: str, request_id: str, user: CurrentUser = Depends(get_current_user)):
+    await require_tournament(tournament_id, user, roles={"super_admin", "director"}, writable=True)
+    r = await requests_repo.get(request_id)
+    if not r or r.tournament_id != tournament_id:
+        raise not_found("Richiesta")
+    await requests_repo.col.delete_one({"_id": ObjectId(r.id)})
+    await audit.record(user, "access_request.delete", "access_request", r.id, tournament_id, before={"club_name": r.club_name, "email": r.email, "status": r.status})
+    return {"ok": True}
 
 
 @router.post("/tournaments/{tournament_id}/access-requests/{request_id}/reject")

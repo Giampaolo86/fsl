@@ -27,6 +27,7 @@ class CurrentUser:
     mfa_enabled: bool = False
     mfa_required: bool = False
     must_change_password: bool = False
+    impersonated_by: Optional[dict] = None
 
     def role_in(self, tournament_id: str) -> Optional[str]:
         if self.is_super_admin:
@@ -58,6 +59,7 @@ class CurrentUser:
             "mfa_enabled": self.mfa_enabled,
             "mfa_required": self.mfa_required,
             "must_change_password": self.must_change_password,
+            "impersonation": self.impersonated_by,
         }
 
 
@@ -86,6 +88,7 @@ async def load_current_user(user_id: str) -> Optional[CurrentUser]:
 
 
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+IMPERSONATION_BLOCKED = ("/auth/password/change", "/auth/mfa/", "/auth/logout-all", "/auth/sessions", "/auth/impersonate/", "/push/", "/auth/google")
 
 
 async def get_current_user(request: Request) -> CurrentUser:
@@ -115,6 +118,12 @@ async def get_current_user(request: Request) -> CurrentUser:
         await revoke_session(session["_id"], reason="user_disabled")
         raise ApiError(401, "USER_NOT_FOUND", "Utente non trovato o disabilitato")
     user.sid = session["_id"]
+    if session.get("impersonated_by"):
+        user.impersonated_by = {**session["impersonated_by"], "expires_at": session["expires_at"].isoformat()}
+        user.must_change_password = False
+        path = request.url.path
+        if request.method in UNSAFE and any(p in path for p in IMPERSONATION_BLOCKED) and not path.endswith("/impersonate/end"):
+            raise ApiError(403, "IMPERSONATION", "Operazione non disponibile in modalità «Entra come»")
     return user
 
 

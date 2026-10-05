@@ -2,7 +2,7 @@ from bson import ObjectId
 
 from ..core.db import db
 
-TEST_USER_PATTERNS = [r"@test\.it$", r"^test-ref-", r"^qa[._-]", r"^test_fan", r"^pw-"]
+TEST_USER_PATTERNS = [r"@test\.it$", r"@fsl\.demo$", r"^test-ref-", r"^qa[._-]", r"^test_fan", r"^pw-"]
 
 
 async def delete_tournament(tournament_id: str) -> dict:
@@ -27,14 +27,26 @@ async def delete_user(user_id: str) -> dict:
             removed[name] = r.deleted_count
     r = await db.users.delete_one({"_id": ObjectId(user_id)})
     removed["users"] = r.deleted_count
+    await db.matches.update_many({"referee_user_id": user_id}, {"$set": {"referee_user_id": None}})
     return removed
 
 
+async def delete_empty_club(club_id: str) -> bool:
+    """Remove a club only if it has no teams; drops memberships and invites pointing to it."""
+    if await db.teams.count_documents({"club_id": club_id}):
+        return False
+    r = await db.clubs.delete_one({"_id": ObjectId(club_id)})
+    if r.deleted_count:
+        await db.tournament_memberships.delete_many({"club_id": club_id})
+        await db.club_invites.delete_many({"club_id": club_id})
+    return bool(r.deleted_count)
+
+
 async def purge_test_data(keep_slugs: list[str], keep_emails: list[str]) -> dict:
-    """Remove every tournament not in keep_slugs and every user whose email looks like a test account."""
+    """Remove every tournament not in keep_slugs, every test user, test access requests and the empty clubs they created."""
     import re
 
-    out = {"tournaments": [], "users": []}
+    out = {"tournaments": [], "users": [], "access_requests": 0, "clubs": []}
     async for t in db.tournaments.find({"slug": {"$nin": keep_slugs}}, {"slug": 1}):
         await delete_tournament(str(t["_id"]))
         out["tournaments"].append(t["slug"])
@@ -43,6 +55,13 @@ async def purge_test_data(keep_slugs: list[str], keep_emails: list[str]) -> dict
         if u["email"] not in keep_emails and pat.search(u["email"]):
             await delete_user(str(u["_id"]))
             out["users"].append(u["email"])
+    async for a in db.access_requests.find({}, {"email": 1, "club_id": 1, "club_name": 1}):
+        if not pat.search(a.get("email") or ""):
+            continue
+        if a.get("club_id") and await delete_empty_club(a["club_id"]):
+            out["clubs"].append(a.get("club_name"))
+        await db.access_requests.delete_one({"_id": a["_id"]})
+        out["access_requests"] += 1
     return out
 
 

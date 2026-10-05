@@ -14,10 +14,10 @@ async def ensure_indexes():
     await db.users.create_index("email", unique=True)
 
 
-async def create_session(user_id: str, ip: Optional[str], user_agent: Optional[str], mfa_verified: bool) -> tuple[str, str, str]:
+async def create_session(user_id: str, ip: Optional[str], user_agent: Optional[str], mfa_verified: bool, extra: Optional[dict] = None, ttl: Optional[timedelta] = None) -> tuple[str, str, str]:
     sid, jti, csrf = new_id(), new_id(), new_id()
     now = utcnow()
-    await db.sessions.insert_one({"_id": sid, "user_id": user_id, "refresh_jti": jti, "csrf": csrf, "ip": ip, "user_agent": (user_agent or "")[:200], "mfa_verified": mfa_verified, "created_at": now, "last_used_at": now, "expires_at": now + timedelta(days=REFRESH_DAYS), "revoked_at": None})
+    await db.sessions.insert_one({"_id": sid, "user_id": user_id, "refresh_jti": jti, "csrf": csrf, "ip": ip, "user_agent": (user_agent or "")[:200], "mfa_verified": mfa_verified, "created_at": now, "last_used_at": now, "expires_at": now + (ttl or timedelta(days=REFRESH_DAYS)), "revoked_at": None, **(extra or {})})
     return sid, jti, csrf
 
 

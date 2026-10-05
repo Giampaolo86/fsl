@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { api, authEvents, setCsrfToken } from "@/lib/api";
+import { api, authEvents, endImpersonation, impersonationToken, setCsrfToken } from "@/lib/api";
 
 const AuthContext = createContext(null);
 const SYNC_KEY = "fsl_auth_sync";
@@ -8,19 +8,20 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [landing, setLanding] = useState("/admin");
   const [checking, setChecking] = useState(true);
+  const impersonating = !!impersonationToken();
 
   const adopt = useCallback((data) => {
     setCsrfToken(data.csrf_token);
     setUser(data.user);
     setLanding(data.landing);
-    localStorage.setItem(SYNC_KEY, `in:${Date.now()}`);
+    if (!impersonationToken()) localStorage.setItem(SYNC_KEY, `in:${Date.now()}`);
   }, []);
 
   const clear = useCallback((broadcast = true) => {
     setCsrfToken("");
-    localStorage.removeItem("fsl_tournament");
+    if (!impersonationToken()) localStorage.removeItem("fsl_tournament");
     setUser(false);
-    if (broadcast) localStorage.setItem(SYNC_KEY, `out:${Date.now()}`);
+    if (broadcast && !impersonationToken()) localStorage.setItem(SYNC_KEY, `out:${Date.now()}`);
   }, []);
 
   const check = useCallback(() => api.get("/auth/me").then(({ data }) => { setCsrfToken(data.csrf_token); setUser(data.user); setLanding(data.landing); }).catch(() => setUser(false)), []);
@@ -33,11 +34,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const onLogout = () => clear(false);
     const onRefreshed = (e) => { setUser(e.detail.user); setLanding(e.detail.landing); };
-    const onStorage = (e) => { if (e.key === SYNC_KEY && e.newValue) { if (e.newValue.startsWith("out")) clear(false); else check(); } };
+    const onStorage = (e) => { if (impersonationToken()) return; if (e.key === SYNC_KEY && e.newValue) { if (e.newValue.startsWith("out")) clear(false); else check(); } };
+    const onImpersonationExpired = () => { setUser(false); window.location.replace("/admin/utenti?entra_come=scaduta"); };
     authEvents.addEventListener("logout", onLogout);
     authEvents.addEventListener("refreshed", onRefreshed);
+    authEvents.addEventListener("impersonation-expired", onImpersonationExpired);
     window.addEventListener("storage", onStorage);
-    return () => { authEvents.removeEventListener("logout", onLogout); authEvents.removeEventListener("refreshed", onRefreshed); window.removeEventListener("storage", onStorage); };
+    return () => { authEvents.removeEventListener("logout", onLogout); authEvents.removeEventListener("refreshed", onRefreshed); authEvents.removeEventListener("impersonation-expired", onImpersonationExpired); window.removeEventListener("storage", onStorage); };
   }, [check, clear]);
 
   const login = useCallback(async (email, password, area) => {
@@ -54,10 +57,17 @@ export function AuthProvider({ children }) {
   const updateUser = useCallback((patch) => setUser((u) => ({ ...u, ...patch })), []);
 
   const logout = useCallback(async () => {
+    if (impersonationToken()) {
+      try { await api.post("/auth/impersonate/end"); } catch { /* sessione già scaduta */ }
+      endImpersonation();
+      setUser(false);
+      window.location.replace("/admin/utenti");
+      return;
+    }
     try { await api.post("/auth/logout"); } finally { clear(); }
   }, [clear]);
 
-  return <AuthContext.Provider value={{ user, landing, checking, login, logout, register, googleSession, updateUser, setSession: adopt, mfaVerify, mfaSetupConfirm, setLanding }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, landing, checking, impersonating, login, logout, register, googleSession, updateUser, setSession: adopt, mfaVerify, mfaSetupConfirm, setLanding }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => useContext(AuthContext);

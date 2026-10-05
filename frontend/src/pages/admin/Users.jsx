@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { KeyRound, Plus, UserCog } from "lucide-react";
+import { Eye, KeyRound, Plus, Trash2, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { AccessRequests } from "@/components/fsl/ClubOnboarding";
 import { ResetRequests } from "@/components/fsl/AccountTools";
@@ -11,15 +11,36 @@ import { useTournaments } from "@/context/TournamentContext";
 import { api, apiError } from "@/lib/api";
 import { ROLE_LABELS } from "@/lib/format";
 
+const IMPERSONABLE = ["club_manager", "referee", "fan", "secretary"];
+
 function UserActions({ u, me, onChanged }) {
   const [temp, setTemp] = useState(null);
   const act = async (label, fn) => { try { const r = await fn(); toast.success(label); onChanged(); return r; } catch (e) { toast.error(apiError(e)); } };
   const canMfaReset = u.mfa_enabled && (me?.is_super_admin || !["director", "super_admin"].includes(u.role));
+  const canImpersonate = me?.is_super_admin && !me?.impersonation && u.status === "active" && !u.is_super_admin && IMPERSONABLE.includes(u.role);
+  const impersonate = async () => {
+    const win = window.open("", "_blank");
+    try {
+      const { data } = await api.post(`/auth/impersonate/${u.id}`);
+      const url = `/impersona#token=${encodeURIComponent(data.access_token)}&to=${encodeURIComponent(data.landing)}`;
+      if (win) win.location = url; else window.location.assign(url);
+      toast.success(`Area di ${u.full_name} aperta in una nuova scheda (20 minuti)`);
+    } catch (e) {
+      win?.close();
+      toast.error(apiError(e));
+    }
+  };
+  const remove = () => {
+    if (!window.confirm(`Eliminare DEFINITIVAMENTE ${u.full_name} (${u.email})? Verranno rimosse sessioni, membership e notifiche. L'operazione non è reversibile.`)) return;
+    act("Utente eliminato", () => api.delete(`/users/${u.id}`));
+  };
   return (
     <div className="inline-flex flex-wrap justify-end gap-1.5">
+      {canImpersonate && <button className="btn-gold h-8 px-2.5 text-xs" onClick={impersonate} data-testid={`user-impersonate-${u.email}`}><Eye className="h-3.5 w-3.5" /> Entra come</button>}
       <button className="btn-ghost h-8 px-2.5 text-xs" onClick={async () => { const r = await act("Password temporanea generata", () => api.post(`/users/${u.id}/temporary-password`).then((x) => x.data)); if (r) setTemp(r.temporary_password); }} data-testid={`user-temp-password-${u.email}`}><KeyRound className="h-3.5 w-3.5" /> Password temp.</button>
       {canMfaReset && <button className="btn-ghost h-8 px-2.5 text-xs" onClick={() => window.confirm(`Azzerare la verifica in due passaggi di ${u.full_name}? Dovrà riconfigurarla al prossimo accesso.`) && act("MFA azzerata", () => api.post(`/users/${u.id}/mfa/reset`))} data-testid={`user-mfa-reset-${u.email}`}>Azzera MFA</button>}
       <button className={`btn-ghost h-8 px-2.5 text-xs ${u.status === "active" ? "text-fsl-danger" : "text-fsl-success"}`} onClick={() => window.confirm(u.status === "active" ? `Disabilitare ${u.full_name}? Le sue sessioni verranno chiuse subito.` : `Riattivare ${u.full_name}?`) && act(u.status === "active" ? "Utente disabilitato" : "Utente riattivato", () => api.patch(`/users/${u.id}/status`, { status: u.status === "active" ? "disabled" : "active" }))} data-testid={`user-toggle-status-${u.email}`}>{u.status === "active" ? "Disabilita" : "Riattiva"}</button>
+      {me?.is_super_admin && <button className="btn-ghost h-8 px-2 text-xs text-fsl-danger" onClick={remove} title="Elimina utente" aria-label={`Elimina ${u.full_name}`} data-testid={`user-delete-${u.email}`}><Trash2 className="h-3.5 w-3.5" /></button>}
       <Dialog open={!!temp} onOpenChange={() => setTemp(null)}>
         <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl" data-testid="temp-password-dialog" aria-describedby={undefined}>
           <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Password temporanea</DialogTitle></DialogHeader>
@@ -69,6 +90,7 @@ export default function UsersPage() {
   return (
     <div>
       <PageHeader kicker="Utenti, ruoli e permessi" title="Utenti" subtitle="Ogni utente ha un ruolo e una o più membership per torneo. I permessi sono applicati lato API." actions={canCreate && <button className="btn-primary" onClick={() => setOpen(true)} data-testid="users-create-button"><Plus className="h-4 w-4" /> Nuovo utente</button>} />
+      {user.is_super_admin && <p className="mb-6 -mt-2 text-xs text-fsl-slate flex items-start gap-2" data-testid="impersonation-hint"><Eye className="h-3.5 w-3.5 text-fsl-gold mt-0.5 shrink-0" /><span><strong className="text-fsl-white">Entra come</strong>: apre l'Area Società, l'Area Arbitro o l'Area Genitori di un utente in una nuova scheda per 20 minuti, con i suoi stessi permessi, senza chiudere la tua sessione. Ogni accesso è registrato nell'Audit.</span></p>}
       <AccessRequests tournaments={tournaments || []} canApprove={canCreate} />
       <ResetRequests />
       <div className="fsl-card overflow-x-auto">

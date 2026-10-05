@@ -109,6 +109,18 @@ async def set_status(user_id: str, body: StatusIn, user: CurrentUser = Depends(r
     return (await users.get(target.id)).safe()
 
 
+@router.delete("/{user_id}")
+async def delete_user_account(user_id: str, user: CurrentUser = Depends(require_roles("director"))):
+    if not user.is_super_admin:
+        raise forbidden("Solo un Super Admin può eliminare un utente")
+    target = await _manageable(user, user_id)
+    from ..services.cleanup import delete_user
+
+    removed = await delete_user(target.id)
+    await audit.record(user, "user.delete", "user", target.id, before={"email": target.email, "role": target.role, "full_name": target.full_name}, after=removed)
+    return {"ok": True, "removed": removed}
+
+
 @router.post("/{user_id}/temporary-password")
 async def temp_password(user_id: str, user: CurrentUser = Depends(require_roles("director"))):
     target = await _manageable(user, user_id)
