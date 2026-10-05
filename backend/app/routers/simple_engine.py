@@ -15,6 +15,7 @@ from ..repositories.registry import scoped, settings_repo
 from ..services import audit, engine
 from ..services import tournaments as svc
 from .groups import ORD, PLAYED
+from ..services.plan_preview import in_break
 
 router = APIRouter(prefix="/tournaments/{tournament_id}/simple", tags=["simple-engine"])
 OPS = {"super_admin", "director", "secretary"}
@@ -277,7 +278,7 @@ async def _generate(tid: str, cat: str, user, body: CalendarIn) -> dict:
         raise bad_request("Nessun girone con almeno 2 squadre")
     venue = (await scoped("venues", tid).list(limit=1) or [None])[0]
     other = {(m.kickoff_at, m.field_id) for m in await matches_repo.list({"status": {"$ne": "cancelled"}}, limit=5000)}
-    slots = [sl for w in windows for sl in _slots_for(w.date, slot_times[id(w)], fields)]
+    slots = [sl for w in windows for sl in _slots_for(w.date, slot_times[id(w)], fields) if not in_break(sl["kickoff_at"], body.match_minutes, s.calendar_breaks or [])]
     next_time = {}
     for w in windows:
         ts = slot_times[id(w)]
@@ -362,7 +363,7 @@ async def _placement_finals(tournament_id, cat, ko, groups, n, body, user, s):
         raise bad_request("Configura almeno un campo (genera prima il calendario dei gironi)")
     times = svc.compute_slots(body.start_time, "23:00", s.match_duration_min, s.buffer_min)
     taken = {(m.kickoff_at, m.field_id) for m in await matches_repo.list({"status": {"$ne": "cancelled"}}, limit=5000)}
-    free = [sl for sl in _slots_for(body.date, times, fields) if (sl["kickoff_at"], sl["field_id"]) not in taken]
+    free = [sl for sl in _slots_for(body.date, times, fields) if (sl["kickoff_at"], sl["field_id"]) not in taken and not in_break(sl["kickoff_at"], s.match_duration_min, s.calendar_breaks or [])]
     if len(free) < len(pairs):
         raise conflict("Slot insufficienti nella giornata della fase finale: anticipa l'orario o aggiungi campi")
     # la finalissima per ultima: le finali minori prima
@@ -419,7 +420,7 @@ async def generate_finals(tournament_id: str, body: FinalsIn, user: CurrentUser 
         raise bad_request("Configura almeno un campo (genera prima il calendario dei gironi)")
     times = svc.compute_slots(body.start_time, "23:00", s.match_duration_min, s.buffer_min)
     taken = {(m.kickoff_at, m.field_id) for m in await matches_repo.list({"status": {"$ne": "cancelled"}}, limit=5000)}
-    slots = iter([sl for sl in _slots_for(body.date, times, fields) if (sl["kickoff_at"], sl["field_id"]) not in taken])
+    slots = iter([sl for sl in _slots_for(body.date, times, fields) if (sl["kickoff_at"], sl["field_id"]) not in taken and not in_break(sl["kickoff_at"], s.match_duration_min, s.calendar_breaks or [])])
 
     def next_slot():
         try:

@@ -43,10 +43,10 @@ FSL è una lega di calcio giovanile (bambini e ragazzi 2012–2018) con l'organi
 
 CAL_SYSTEM = """Sei l'assistente calendario di Future Stars League. Aiuti il direttore a trasformare la descrizione a parole di un torneo in un PIANO concreto che il software applicherà.
 
-Strumenti che il piano può usare (tutti opzionali, ordine di esecuzione fisso):
+Strumenti che il piano può usare (tutti opzionali; ordine di esecuzione fisso: groups → breaks → calendar → finals → extra_matches, quindi le pause vengono rispettate dal calendario):
 1. groups: {"count": N, "teams_per_group": M}  → crea N gironi da M squadre (segnaposto sostituibili). Omettere se i gironi esistono già e vanno bene.
 2. calendar: {"sessions": [{"date": "YYYY-MM-DD", "start_time": "HH:MM", "end_time": "HH:MM"}], "fields_count": K, "match_minutes": D, "buffer_minutes": B} → genera tutte le gare dei gironi.
-3. breaks: [{"date","start_time","end_time","label"}] → pause (pranzo, premiazioni…) che nessuna gara può occupare.
+3. breaks: [{"date","start_time","end_time","label"}] → pause (tecnica, pranzo, premiazioni…): gli slot che le toccano non vengono usati da calendario e fase finale.
 4. finals: {"mode": "knockout"|"placement", "teams": N, "date": "YYYY-MM-DD", "start_time": "HH:MM", "third_place": bool} → eliminazione diretta (N = 2/4/8/16) oppure tutte a premio (N pari = squadre totali).
 5. extra_matches: {"replace_finals": bool, "items": [{"home_name","away_name","date","time","field","round_name","note","is_grand_final"}]} → gare libere aggiuntive (semifinali/finali con incroci personalizzati, amichevoli, spareggi). "field" è il numero del campo (1 = primo campo, 2 = secondo…) oppure il suo nome: usalo sempre quando la fonte indica il campo. "replace_finals": true elimina prima la fase finale esistente (se non ha gare già giocate), così le nuove gare la sostituiscono.
 Preferisci "finals" quando la fase finale è un tabellone standard; usa "extra_matches" quando orari, incroci o nomi dei turni sono specifici (es. «1ª A vs 2ª B alle 11:05 sul Campo A»).
@@ -177,6 +177,16 @@ class ApplyIn(BaseModel):
     plan: dict
 
 
+@router.post("/tournaments/{tournament_id}/calendar/preview")
+async def calendar_preview(tournament_id: str, body: ApplyIn, user: CurrentUser = Depends(get_current_user)):
+    """Simula il piano senza scrivere nulla: griglia giorno × orario × campo delle gare che verranno create."""
+    await require_tournament(tournament_id, user, roles={"super_admin", "director", "secretary"})
+    cat = await se._category(tournament_id, body.category)
+    from ..services.plan_preview import preview_plan
+
+    return await preview_plan(tournament_id, cat, body.plan)
+
+
 @router.post("/tournaments/{tournament_id}/calendar/apply")
 async def calendar_apply(tournament_id: str, body: ApplyIn, user: CurrentUser = Depends(get_current_user)):
     """Esegue il piano usando gli stessi strumenti dei pulsanti manuali; si ferma al primo errore e riporta cosa è stato fatto."""
@@ -211,7 +221,8 @@ async def calendar_apply(tournament_id: str, body: ApplyIn, user: CurrentUser = 
             await teams_repo.soft_delete(tm.id, user.id)
         return len(existing)
 
-    for st in steps:
+    order = {"groups": 0, "breaks": 1, "calendar": 2, "finals": 3, "extra_matches": 4}
+    for st in sorted(steps, key=lambda x: order.get(x.get("tool"), 9)):
         tool = st.get("tool")
         raw = st.get("args")
         args = raw if isinstance(raw, dict) else {}

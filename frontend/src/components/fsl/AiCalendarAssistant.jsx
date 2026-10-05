@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Check, History, ImagePlus, Loader2, Send, Sparkles, X } from "lucide-react";
+import { Bot, Check, History, ImagePlus, LayoutGrid, Loader2, Send, Sparkles, X } from "lucide-react";
+import { PlanPreviewDialog } from "@/components/fsl/PlanPreviewDialog";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 
 const TOOL_LABEL = { groups: "Gironi", calendar: "Calendario gironi", breaks: "Pause", finals: "Fase finale", extra_matches: "Gare libere" };
 const sid = (tid, cat) => `cal-${tid}-${cat}`.replace(/[^a-zA-Z0-9_-]/g, "-");
 
-function PlanCard({ plan, onApply, busy, applied }) {
+function PlanCard({ plan, onApply, busy, applied, tid, category }) {
+  const [preview, setPreview] = useState(false);
   return (
     <div className="rounded-lg border border-fsl-gold/50 bg-fsl-gold/10 p-3 space-y-2" data-testid="ai-plan">
       <div className="flex items-center gap-2 text-fsl-gold font-display font-extrabold uppercase text-sm"><Sparkles className="h-4 w-4" /> Piano proposto</div>
@@ -16,7 +18,13 @@ function PlanCard({ plan, onApply, busy, applied }) {
           <li key={i} className="flex gap-2"><span className="num text-fsl-gold w-4 shrink-0">{i + 1}.</span><span><b>{TOOL_LABEL[s.tool] || s.tool}</b> <span className="text-fsl-slate break-all">{summarize(s)}</span></span></li>
         ))}
       </ol>
-      {applied ? <div className="text-xs text-fsl-success inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Applicato</div> : <button className="btn-gold h-9 w-full" disabled={busy} onClick={onApply} data-testid="ai-plan-apply">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Applica il piano</button>}
+      {applied ? <div className="text-xs text-fsl-success inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Applicato · ogni gara resta modificabile dalla griglia</div> : (
+        <div className="grid grid-cols-2 gap-2">
+          <button className="btn-ghost h-9" disabled={busy} onClick={() => setPreview(true)} data-testid="ai-plan-preview"><LayoutGrid className="h-4 w-4" /> Anteprima griglia</button>
+          <button className="btn-gold h-9" disabled={busy} onClick={onApply} data-testid="ai-plan-apply">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Applica il piano</button>
+        </div>
+      )}
+      <PlanPreviewDialog open={preview} onOpenChange={setPreview} tid={tid} category={category} plan={plan} applying={busy} onApply={async () => { const ok = await onApply(true); if (ok) setPreview(false); }} />
     </div>
   );
 }
@@ -65,15 +73,16 @@ export function AiCalendarAssistant({ tid, board, onApplied, onClose }) {
     const same = f.tournament_id === tid && f.category === board.category;
     sendMessage(`Riproponi il formato salvato «${f.name}»${same ? "" : ` (usato in ${f.tournament_name || "un torneo precedente"}, categoria ${f.category})`} per questa categoria, adattando le date al torneo attuale: se non conosci le date chiedimele, altrimenti dammi subito il piano. Piano di riferimento: ${JSON.stringify(f.plan)}`, `Riproponi il formato «${f.name.slice(0, 80)}» per questa categoria, adattando le date.`);
   };
-  const apply = async (plan, idx) => {
-    if (!window.confirm("Applicare il piano? Gironi, calendario e fase finale verranno creati o rigenerati come descritto.")) return;
+  const apply = async (plan, idx, fromPreview = false) => {
+    if (!fromPreview && !window.confirm("Applicare il piano? Gironi, calendario e fase finale verranno creati o rigenerati come descritto.")) return false;
     setApplying(true);
     try {
       const { data } = await api.post(`/ai/tournaments/${tid}/calendar/apply`, { category: board.category, plan });
       if (data.error) toast.error(`Fermato a: ${data.error}${data.done.length ? ` · fatto: ${data.done.join(", ")}` : ""}`, { duration: 9000 }); else toast.success(`Piano applicato: ${data.done.join(" · ")}. Ogni gara resta modificabile a mano.`, { duration: 7000 });
       setApplied((a) => ({ ...a, [idx]: !data.error }));
       onApplied(data);
-    } catch (err) { toast.error(`Applicazione non riuscita: ${apiError(err)}. Nulla è stato perso: puoi riprovare o modificare il piano in chat.`, { duration: 9000 }); } finally { setApplying(false); }
+      return !data.error;
+    } catch (err) { toast.error(`Applicazione non riuscita: ${apiError(err)}. Nulla è stato perso: puoi riprovare o modificare il piano in chat.`, { duration: 9000 }); return false; } finally { setApplying(false); }
   };
   return (
     <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[420px] bg-navy-800 border-l border-white/10 shadow-2xl flex flex-col" data-testid="ai-calendar-assistant">
@@ -97,7 +106,7 @@ export function AiCalendarAssistant({ tid, board, onApplied, onClose }) {
             <div className={`max-w-[92%] rounded-xl px-3 py-2 whitespace-pre-wrap leading-relaxed ${m.role === "user" ? "bg-fsl-gold text-ink-950 rounded-br-sm" : "bg-ink-950/60 border border-white/10 rounded-bl-sm"}`}>
               {m.images?.length > 0 && <div className="flex gap-1 mb-1">{m.images.map((src, k) => <img key={k} src={src} alt="" className="h-14 w-14 object-cover rounded border border-ink-950/20" />)}</div>}
               {m.content}
-              {m.plan && <div className="mt-3"><PlanCard plan={m.plan} busy={applying} applied={applied[i]} onApply={() => apply(m.plan, i)} /></div>}
+              {m.plan && <div className="mt-3"><PlanCard plan={m.plan} busy={applying} applied={applied[i]} tid={tid} category={board.category} onApply={(fromPreview) => apply(m.plan, i, fromPreview === true)} /></div>}
             </div>
           </div>
         ))}
