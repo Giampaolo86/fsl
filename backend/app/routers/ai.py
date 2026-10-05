@@ -516,3 +516,115 @@ async def weekly_recap(tournament_id: str, body: RecapIn, user: CurrentUser = De
     if not p:
         raise bad_request("Recap non generabile: la giornata ha un recap già pubblicato oppure l'IA non ha risposto")
     return p
+
+
+# ---------- recap finale del torneo ----------
+FINAL_SYSTEM = """Sei la redazione di FSL Weekly. Scrivi il racconto conclusivo di una categoria del torneo Future Stars League nel tono del Cervello FSL.
+Struttura del body (Markdown leggero): attacco emozionante di 3–4 frasi sulla finalissima; «## La finalissima» (racconto della gara decisiva: risultato, eventuali rigori, marcatori SOLO se forniti); «## Il podio» (1°, 2°, 3° e, se presenti, le altre posizioni delle finali di piazzamento); «## I premi» (MVP, capocannoniere e riconoscimenti SOLO se forniti, con nome e squadra come dati); «## Grazie a tutti» (chiusura: società, famiglie, arbitri, Codice FSL). Complimenti a tutte le squadre, nessuna pressione sul risultato, nessun nome inventato.
+Rispondi SOLO con JSON: {"title": "max 70 caratteri", "excerpt": "1–2 frasi", "body": "Markdown"}"""
+
+
+def _ord(n: int) -> str:
+    return f"{n}°"
+
+
+async def _final_payload(tournament_id: str, cat: str) -> tuple[str, list]:
+    from .extras import awards_board
+
+    ms = await scoped("matches", tournament_id).list({"category": cat, "stage": "finals", "status": {"$in": ["official", "rectified"]}}, sort=[("kickoff_at", 1)], limit=200)
+    names = {x.id: x.name for x in await scoped("teams", tournament_id).list({"category": cat}, limit=400)}
+    lines, podium = [], {}
+
+    def sc(m):
+        return m.score if isinstance(m.score, dict) else (m.score.model_dump() if m.score else {})
+
+    def winner(m):
+        s = sc(m)
+        if s.get("home") is None:
+            return None, None
+        if s["home"] != s["away"]:
+            return (m.home_team_id, m.away_team_id) if s["home"] > s["away"] else (m.away_team_id, m.home_team_id)
+        if s.get("home_pen") is not None and s.get("away_pen") is not None and s["home_pen"] != s["away_pen"]:
+            return (m.home_team_id, m.away_team_id) if s["home_pen"] > s["away_pen"] else (m.away_team_id, m.home_team_id)
+        return None, None
+
+    for m in ms:
+        s = sc(m)
+        scorers = [((e if isinstance(e, dict) else e.model_dump())).get("player_name") for e in (m.events or []) if ((e if isinstance(e, dict) else e.model_dump())).get("type") == "goal"]
+        scorers = [x for x in scorers if x]
+        lines.append(f"- {m.round_name}{' ★ FINALISSIMA' if m.is_grand_final else ''}: {names.get(m.home_team_id, '?')} {s.get('home')}–{s.get('away')} {names.get(m.away_team_id, '?')}" + (f" (dcr {s.get('home_pen')}–{s.get('away_pen')})" if s.get("home_pen") is not None else "") + (f" · gol: {', '.join(scorers)}" if scorers else "") + (f" · nota: {m.note}" if m.note else ""))
+        w, l = winner(m)
+        mm = re.search(r"(\d+)°\s*/\s*(\d+)°", m.round_name or "")
+        if w and mm:
+            podium[int(mm.group(1))], podium[int(mm.group(2))] = names.get(w, "?"), names.get(l, "?")
+        elif w and m.is_grand_final:
+            podium[1], podium[2] = names.get(w, "?"), names.get(l, "?")
+        elif w and re.search(r"3|terzo", (m.round_name or "").lower()):
+            podium[3], podium[4] = names.get(w, "?"), names.get(l, "?")
+    pod = "\n".join(f"{_ord(k)}: {v}" for k, v in sorted(podium.items())) or "non determinabile dai risultati"
+    board = (await awards_board(tournament_id))[:6]
+    aw = "\n".join(f"- {r['name']} ({r.get('team', '')}): MVP {r.get('mvp', 0)}, gol {r.get('goals', 0)}, assist {r.get('assists', 0)}" for r in board) or "nessun premio registrato"
+    t = await db.tournaments.find_one({"_id": __import__("bson").ObjectId(tournament_id)}, {"name": 1})
+    return (f"Torneo: {(t or {}).get('name', '')}. Categoria {cat}.\nFinali ufficiali:\n" + "\n".join(lines) + f"\nPodio ricavato dai risultati:\n{pod}\nPremi individuali (dati reali dal tabellone):\n{aw}"), ms
+
+
+async def generate_final_recap(tournament_id: str, cat: str, user_id: str | None = None, force: bool = False) -> dict | None:
+    from emergentintegrations.llm.chat import UserMessage
+
+    from ..models.domain import Post
+    from .posts import slugify
+
+    posts = scoped("posts", tournament_id)
+    key = f"final:{cat}"
+    existing = await posts.find_one({"auto_key": key})
+    if existing and existing.status != "draft":
+        return None
+    if existing and not force:
+        return existing.public()
+    payload, ms = await _final_payload(tournament_id, cat)
+    if not ms:
+        return None
+    chat = _llm(f"{FINAL_SYSTEM}\n\n# Cervello FSL\n{await _brain_text()}", f"{tournament_id}:final:{cat}")
+    try:
+        raw = await chat.send_message(UserMessage(text=payload + "\nProduci il JSON."))
+        mm = re.search(r"\{.*\}", raw or "", re.S)
+        out = json.loads(mm.group(0)) if mm else {}
+    except Exception:  # noqa: BLE001
+        return None
+    if not out.get("body"):
+        return None
+    team_ids = sorted({m.home_team_id for m in ms} | {m.away_team_id for m in ms})
+    club_ids = sorted({x.club_id for x in await scoped("teams", tournament_id).list({"_id": {"$in": team_ids}}, limit=200) if x.club_id})
+    gf = next((m for m in ms if m.is_grand_final), None)
+    fields = {"title": str(out["title"])[:120], "excerpt": str(out.get("excerpt", ""))[:300], "body": str(out["body"]), "category": cat, "club_ids": club_ids, "team_ids": team_ids, "match_id": gf.id if gf else None, "auto": True, "auto_key": key}
+    if existing:
+        p = await posts.update(existing.id, fields, user_id)
+    else:
+        base = slugify(fields["title"]) or f"finale-{cat}"
+        slug = base if not await posts.find_one({"slug": base}) else f"{base}-{cat}"
+        p = await posts.insert(Post(tournament_id=tournament_id, kind="weekly", status="draft", slug=slug, author_name="Redazione IA FSL", **fields), user_id)
+    return p.public()
+
+
+async def maybe_final_recap_after_official(tournament_id: str, m) -> None:
+    if m.stage != "finals":
+        return
+    ms = await scoped("matches", tournament_id).list({"category": m.category, "stage": "finals", "status": {"$ne": "cancelled"}}, limit=200)
+    if ms and all(x.status in ("official", "rectified") for x in ms):
+        await generate_final_recap(tournament_id, m.category, None, force=False)
+
+
+class FinalRecapIn(BaseModel):
+    category: str
+    force: bool = True
+
+
+@router.post("/tournaments/{tournament_id}/weekly/final-recap")
+async def weekly_final_recap(tournament_id: str, body: FinalRecapIn, user: CurrentUser = Depends(get_current_user)):
+    t, role = await require_tournament(tournament_id, user, writable=True)
+    if role not in STAFF:
+        raise bad_request("Riservato allo staff")
+    p = await generate_final_recap(tournament_id, body.category, user.id, force=body.force)
+    if not p:
+        raise bad_request("Recap finale non generabile: servono finali ufficiali, oppure il recap è già pubblicato")
+    return p

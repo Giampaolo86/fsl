@@ -451,10 +451,11 @@ async def _write_version(t_id, m: Match, kind, score, user, role, notes="", dire
 async def _after_official(t_id, m: Match, user):
     import asyncio
 
-    from .ai import generate_caption, maybe_recap_after_official
+    from .ai import generate_caption, maybe_final_recap_after_official, maybe_recap_after_official
 
     asyncio.get_event_loop().create_task(generate_caption(t_id, m.id, force=True))
     asyncio.get_event_loop().create_task(maybe_recap_after_official(t_id, m))
+    asyncio.get_event_loop().create_task(maybe_final_recap_after_official(t_id, m))
     c = await scoped("competitions", t_id).get(m.competition_id)
     if c and m.stage == "qualification":
         await engine.snapshot_standings(t_id, c, m.id, user)
