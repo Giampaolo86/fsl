@@ -48,14 +48,16 @@ Strumenti che il piano può usare (tutti opzionali, ordine di esecuzione fisso):
 2. calendar: {"sessions": [{"date": "YYYY-MM-DD", "start_time": "HH:MM", "end_time": "HH:MM"}], "fields_count": K, "match_minutes": D, "buffer_minutes": B} → genera tutte le gare dei gironi.
 3. breaks: [{"date","start_time","end_time","label"}] → pause (pranzo, premiazioni…) che nessuna gara può occupare.
 4. finals: {"mode": "knockout"|"placement", "teams": N, "date": "YYYY-MM-DD", "start_time": "HH:MM", "third_place": bool} → eliminazione diretta (N = 2/4/8/16) oppure tutte a premio (N pari = squadre totali).
-5. extra_matches: [{"home_name","away_name","date","time","round_name","note","is_grand_final"}] → gare libere aggiuntive (es. amichevoli, spareggi).
+5. extra_matches: {"replace_finals": bool, "items": [{"home_name","away_name","date","time","field","round_name","note","is_grand_final"}]} → gare libere aggiuntive (semifinali/finali con incroci personalizzati, amichevoli, spareggi). "field" è il numero del campo (1 = primo campo, 2 = secondo…) oppure il suo nome: usalo sempre quando la fonte indica il campo. "replace_finals": true elimina prima la fase finale esistente (se non ha gare già giocate), così le nuove gare la sostituiscono.
+Preferisci "finals" quando la fase finale è un tabellone standard; usa "extra_matches" quando orari, incroci o nomi dei turni sono specifici (es. «1ª A vs 2ª B alle 11:05 sul Campo A»).
 
 REGOLE
 - Rispondi SEMPRE in italiano, in modo breve e concreto. Fai al massimo 2 domande se mancano dati essenziali (date, squadre, campi, durata).
 - Quando hai abbastanza informazioni, produci il piano. Verifica la capienza: slot per sessione = floor((fine-inizio - pause)/(durata+buffer)) × campi; gare gironi = per ogni girone M*(M-1)/2 (×2 se andata/ritorno). Se non ci stanno, dillo e proponi alternative (più campi, gare più corte, altra sessione).
 - Non inventare date: se il direttore dice «sabato» senza data chiedi la data o usa quella del contesto.
 - Output: testo per l'umano + alla fine, SOLO quando il piano è pronto, un blocco ```json ... ``` con {"summary": "...", "steps": [...]} dove ogni step è {"tool": "groups"|"calendar"|"breaks"|"finals"|"extra_matches", "args": {...}}. Niente JSON se stai ancora facendo domande.
-- Nulla viene applicato senza il clic «Applica» del direttore: ricordaglielo solo alla fine, in una riga.
+- Il piano SOSTITUISCE ciò che esiste per la categoria: "groups" rifà i gironi, "calendar" rigenera le gare dei gironi (se non ci sono gare già giocate). Se il direttore sta rifacendo da capo, includi tutti gli step necessari.
+- Nulla viene applicato senza il clic «Applica» del direttore. Dopo l'applicazione ogni gara resta modificabile a mano (orario, campo, squadre, giorno, drag & drop): ricordaglielo in una riga alla fine.
 """
 
 
@@ -184,8 +186,36 @@ async def calendar_apply(tournament_id: str, body: ApplyIn, user: CurrentUser = 
     cat = await se._category(tournament_id, body.category)
     steps = body.plan.get("steps") or []
     done, error = [], None
+
+    async def resolve_field(ref):
+        if ref in (None, ""):
+            return None
+        fields = await scoped("fields", tournament_id).list({"active": True}, sort=[("code", 1)])
+        if isinstance(ref, int) or str(ref).strip().isdigit():
+            i = int(ref) - 1
+            return fields[i].id if 0 <= i < len(fields) else None
+        want = str(ref).strip().lower()
+        return next((f.id for f in fields if f.name.lower() == want or f.code.lower() == want or f.name.lower().endswith(want)), None)
+
+    async def clear_finals():
+        ko = await se._knockout(tournament_id, cat)
+        if not ko:
+            return 0
+        matches_repo, teams_repo = scoped("matches", tournament_id), scoped("teams", tournament_id)
+        existing = await matches_repo.list({"competition_id": ko.id, "stage": "finals", "status": {"$ne": "cancelled"}}, limit=200)
+        if any(m.status in se.PLAYED for m in existing):
+            raise ValueError("La fase finale ha gare già giocate: modifica le singole partite")
+        for m in existing:
+            await matches_repo.soft_delete(m.id, user.id)
+        for tm in await teams_repo.list({"competition_id": ko.id, "placeholder": True}, limit=200):
+            await teams_repo.soft_delete(tm.id, user.id)
+        return len(existing)
+
     for st in steps:
-        tool, args = st.get("tool"), dict(st.get("args") or {})
+        tool = st.get("tool")
+        raw = st.get("args")
+        args = raw if isinstance(raw, dict) else {}
+        items = raw if isinstance(raw, list) else (args.get("items") or args.get("breaks") or args.get("matches") or [])
         try:
             if tool == "groups":
                 await se.setup_groups(tournament_id, se.SetupIn(category=cat, groups=int(args["count"]), teams_per_group=int(args["teams_per_group"])), user)
@@ -195,15 +225,18 @@ async def calendar_apply(tournament_id: str, body: ApplyIn, user: CurrentUser = 
                 res = await se.generate_calendar(tournament_id, se.CalendarIn(category=cat, sessions=sessions, fields_count=int(args.get("fields_count") or 1), match_minutes=int(args.get("match_minutes") or 25), buffer_minutes=int(args.get("buffer_minutes") if args.get("buffer_minutes") is not None else 10)), user)
                 done.append(f"Calendario gironi: {res.get('count', '?')} gare")
             elif tool == "breaks":
-                await se.save_breaks(tournament_id, se.BreaksIn(category=cat, breaks=[se.BreakIn(**x) for x in (args if isinstance(args, list) else args.get("items") or args.get("breaks") or [])]), user)
-                done.append("Pause inserite")
+                await se.save_breaks(tournament_id, se.BreaksIn(category=cat, breaks=[se.BreakIn(**x) for x in items]), user)
+                done.append(f"Pause inserite: {len(items)}")
             elif tool == "finals":
                 res = await se.generate_finals(tournament_id, se.FinalsIn(category=cat, mode=args.get("mode") or "knockout", teams=int(args.get("teams") or 4), date=args["date"], start_time=args.get("start_time") or "09:00", third_place=bool(args.get("third_place"))), user)
                 done.append(f"Fase finale: {res.get('count', '?')} gare")
             elif tool == "extra_matches":
-                items = args if isinstance(args, list) else args.get("items") or []
+                if args.get("replace_finals"):
+                    removed = await clear_finals()
+                    if removed:
+                        done.append(f"Vecchia fase finale rimossa: {removed} gare")
                 for x in items:
-                    await se.create_match(tournament_id, se.NewMatchIn(category=cat, stage="finals", home_name=x.get("home_name", ""), away_name=x.get("away_name", ""), date=x["date"], time=x["time"], round_name=x.get("round_name", ""), note=x.get("note", ""), is_grand_final=bool(x.get("is_grand_final")), force=True), user)
+                    await se.create_match(tournament_id, se.NewMatchIn(category=cat, stage="finals", home_name=x.get("home_name", ""), away_name=x.get("away_name", ""), date=x["date"], time=x["time"], field_id=await resolve_field(x.get("field")), round_name=x.get("round_name", ""), note=x.get("note", ""), is_grand_final=bool(x.get("is_grand_final")), force=True), user)
                 done.append(f"Gare libere: {len(items)}")
             else:
                 raise ValueError(f"Strumento sconosciuto: {tool}")

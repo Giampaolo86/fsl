@@ -70,10 +70,10 @@ export function AiCalendarAssistant({ tid, board, onApplied, onClose }) {
     setApplying(true);
     try {
       const { data } = await api.post(`/ai/tournaments/${tid}/calendar/apply`, { category: board.category, plan });
-      if (data.error) toast.error(`Fermato a: ${data.error}${data.done.length ? ` · fatto: ${data.done.join(", ")}` : ""}`); else toast.success(`Piano applicato: ${data.done.join(" · ")}`);
+      if (data.error) toast.error(`Fermato a: ${data.error}${data.done.length ? ` · fatto: ${data.done.join(", ")}` : ""}`, { duration: 9000 }); else toast.success(`Piano applicato: ${data.done.join(" · ")}. Ogni gara resta modificabile a mano.`, { duration: 7000 });
       setApplied((a) => ({ ...a, [idx]: !data.error }));
       onApplied(data);
-    } catch (err) { toast.error(apiError(err)); } finally { setApplying(false); }
+    } catch (err) { toast.error(`Applicazione non riuscita: ${apiError(err)}. Nulla è stato perso: puoi riprovare o modificare il piano in chat.`, { duration: 9000 }); } finally { setApplying(false); }
   };
   return (
     <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[420px] bg-navy-800 border-l border-white/10 shadow-2xl flex flex-col" data-testid="ai-calendar-assistant">
