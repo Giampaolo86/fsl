@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { LoadingState } from "@/components/fsl/States";
 import { AiStudioPanel } from "@/components/fsl/AiStudioPanel";
+import { SocialCaption } from "@/components/fsl/SocialCaption";
 import { LayerPanel } from "@/components/studio/LayerPanel";
 import { drawLayers, drawSelection, hitLayer } from "@/components/studio/layers";
 import { PublishToBlog } from "@/components/studio/PublishToBlog";
@@ -165,6 +166,7 @@ export default function Studio() {
         </section>
         <div className="space-y-4">
         <AiStudioPanel tid={tid} format={format === "9:16" ? "story" : format === "16:9" ? "wide" : "square"} onBackground={(url) => { setOptions({ ...options, baseImage: url }); toast.success("Sfondo IA applicato"); }} onCopy={(c) => { setOptions({ ...options, headline: c.title, subtitle: c.subtitle }); toast.success("Titolo e sottotitolo applicati"); }} />
+        {matchId && template?.needs === "match" && <SocialCaption tid={tid} matchId={matchId} compact />}
         <LayerPanel tid={tid} template={tpl} layers={layers} setLayers={setLayers} selectedId={selectedId} setSelectedId={setSelectedId} options={options} setOptions={setOptions} sponsors={sponsors} onReset={reset} />
         </div>
       </div>

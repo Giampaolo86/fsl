@@ -6,6 +6,7 @@ import { KIND_LABEL } from "@/components/fsl/Article";
 import { api, apiError } from "@/lib/api";
 import { PlayerTagPicker } from "@/components/fsl/PlayerTagPicker";
 import { AiBlogWriter } from "@/components/fsl/AiBlogWriter";
+import { AiTextarea } from "@/components/fsl/AiTextarea";
 import { mediaUrl, uploadMedia } from "@/lib/upload";
 
 const EMPTY = { kind: "news", title: "", excerpt: "", body: "", cover_url: null, media: [], club_ids: [], player_ids: [], match_id: "", publish_at: "" };
@@ -52,7 +53,7 @@ export function PostEditor({ tournamentId, post, clubMode, clubs, matches, onClo
         </div>
         <AiBlogWriter tournamentId={tournamentId} form={form} onApply={(d) => setForm((f) => ({ ...f, title: d.title || f.title, excerpt: d.excerpt || f.excerpt, body: d.body || f.body }))} />
         <input className="fsl-input" placeholder="Sommario (una frase)" value={form.excerpt} onChange={(e) => set("excerpt", e.target.value)} data-testid="post-excerpt" />
-        <textarea className="fsl-input h-48 py-2 leading-relaxed" placeholder="Testo dell'articolo. Separa i paragrafi con una riga vuota." value={form.body} onChange={(e) => set("body", e.target.value)} data-testid="post-body" />
+        <AiTextarea tournamentId={tournamentId} title={form.title} className="fsl-input h-48 py-2 leading-relaxed w-full" placeholder="Testo dell'articolo. Separa i paragrafi con una riga vuota. Seleziona un brano per riscriverlo con l'IA." value={form.body} onChange={(v) => set("body", v)} data-testid="post-body" />
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="fsl-card p-3 space-y-2">
             <div className="fsl-label flex items-center gap-1"><ImageIcon className="h-3.5 w-3.5" /> Copertina</div>

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { PlayerTagPicker } from "@/components/fsl/PlayerTagPicker";
+import { SocialCaption } from "@/components/fsl/SocialCaption";
 import { useCart } from "@/context/CartContext";
 import { fmtDate } from "@/lib/format";
 import { mediaUrl, uploadMedia } from "@/lib/upload";
@@ -50,9 +51,11 @@ export function ShopManager({ tournamentId, matchId }) {
   const [tags, setTags] = useState([]);
   const [editTags, setEditTags] = useState(null);
   const [rosterMissing, setRosterMissing] = useState(false);
+  const [played, setPlayed] = useState(false);
   useEffect(() => {
     api.get(`/tournaments/${tournamentId}/matches/${matchId}`).then(async (r) => {
       const m = r.data;
+      setPlayed(['official','rectified'].includes(m.status));
       const [all, teams] = await Promise.all([api.get(`/tournaments/${tournamentId}/players`), api.get(`/tournaments/${tournamentId}/teams`)]);
       const tn = Object.fromEntries(teams.data.map((x) => [x.id, x.name]));
       const mk = (x) => ({ id: x.id, team_id: x.team_id, shirt_number: x.shirt_number, label: `${x.first_name} ${x.last_name}`, team: tn[x.team_id] || "" });
@@ -80,6 +83,7 @@ export function ShopManager({ tournamentId, matchId }) {
   const regen = (it) => { setBusyPreview(it.id); api.post(`/tournaments/${tournamentId}/shop/items/${it.id}/preview`).then(() => { toast.success("Anteprima generata"); load(); }).catch((e) => toast.error(apiError(e))).finally(() => setBusyPreview(null)); };
   return (
     <div className="space-y-4" data-testid="shop-manager">
+      {played && <SocialCaption tid={tournamentId} matchId={matchId} compact />}
       <div className="fsl-card p-4 grid sm:grid-cols-[140px_1fr_auto] gap-3 items-center">
         <select className="fsl-input" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} data-testid="shop-kind"><option value="photo">Foto · 0,49 €</option><option value="video">Video · 0,99 €</option></select>
         <input className="fsl-input" placeholder="Titolo (facoltativo, altrimenti nome file)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="shop-title" />

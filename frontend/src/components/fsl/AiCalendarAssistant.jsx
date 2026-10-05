@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Check, Loader2, Send, Sparkles, X } from "lucide-react";
+import { Bot, Check, History, Loader2, Send, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 
@@ -39,18 +39,22 @@ export function AiCalendarAssistant({ tid, board, onApplied, onClose }) {
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState({});
   const end = useRef(null);
-  useEffect(() => { api.get(`/ai/tournaments/${tid}/calendar/chat/${session}`).then((r) => setMsgs(r.data)).catch(() => {}); }, [tid, session]);
+  const [formats, setFormats] = useState([]);
+  useEffect(() => { api.get(`/ai/tournaments/${tid}/calendar/chat/${session}`).then((r) => setMsgs(r.data)).catch(() => {}); api.get(`/ai/tournaments/${tid}/calendar/formats`).then((r) => setFormats(r.data)).catch(() => {}); }, [tid, session]);
   useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, busy]);
-  const send = async (e) => {
-    e?.preventDefault();
-    const message = text.trim();
+  const sendMessage = async (message, display) => {
     if (!message || busy) return;
     setText(""); setBusy(true);
-    setMsgs((m) => [...m, { role: "user", content: message }]);
+    setMsgs((m) => [...m, { role: "user", content: display || message }]);
     try {
-      const { data } = await api.post(`/ai/tournaments/${tid}/calendar/chat`, { category: board.category, session_id: session, message });
+      const { data } = await api.post(`/ai/tournaments/${tid}/calendar/chat`, { category: board.category, session_id: session, message, display: display || null });
       setMsgs((m) => [...m, { role: "assistant", content: data.reply, plan: data.plan }]);
     } catch (err) { toast.error(apiError(err)); } finally { setBusy(false); }
+  };
+  const send = (e) => { e?.preventDefault(); sendMessage(text.trim()); };
+  const reuseAndSend = (f) => {
+    const same = f.tournament_id === tid && f.category === board.category;
+    sendMessage(`Riproponi il formato salvato «${f.name}»${same ? "" : ` (usato in ${f.tournament_name || "un torneo precedente"}, categoria ${f.category})`} per questa categoria, adattando le date al torneo attuale: se non conosci le date chiedimele, altrimenti dammi subito il piano. Piano di riferimento: ${JSON.stringify(f.plan)}`, `Riproponi il formato «${f.name.slice(0, 80)}» per questa categoria, adattando le date.`);
   };
   const apply = async (plan, idx) => {
     if (!window.confirm("Applicare il piano? Gironi, calendario e fase finale verranno creati o rigenerati come descritto.")) return;
@@ -66,6 +70,13 @@ export function AiCalendarAssistant({ tid, board, onApplied, onClose }) {
     <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[420px] bg-navy-800 border-l border-white/10 shadow-2xl flex flex-col" data-testid="ai-calendar-assistant">
       <div className="h-14 px-4 flex items-center gap-2 border-b border-white/10 bg-ink-950/60"><Bot className="h-5 w-5 text-fsl-gold" /><div className="leading-tight"><div className="font-display font-extrabold uppercase">Assistente calendario</div><div className="text-[10px] text-fsl-slate">Categoria {board.category} · nulla viene toccato senza «Applica»</div></div><button type="button" onClick={onClose} className="ml-auto h-9 w-9 inline-flex items-center justify-center rounded-full hover:bg-white/10" aria-label="Chiudi" data-testid="ai-close"><X className="h-4 w-4" /></button></div>
       <div className="flex-1 overflow-y-auto fsl-scroll p-4 space-y-3 text-sm">
+        {formats.length > 0 && (
+          <div className="rounded-lg border border-white/10 bg-ink-950/40 p-3 text-xs space-y-2" data-testid="ai-formats">
+            <div className="flex items-center gap-1.5 text-fsl-gold font-display font-extrabold uppercase"><History className="h-3.5 w-3.5" /> Formati già usati</div>
+            <div className="flex flex-wrap gap-1.5">{formats.map((f) => <button key={`${f.tournament_id}-${f.category}`} type="button" onClick={() => { setText(""); setTimeout(() => reuseAndSend(f), 0); }} className="h-8 px-3 rounded-full border border-white/15 hover:border-fsl-gold hover:text-fsl-gold text-left truncate max-w-full" title={f.name} data-testid={`ai-format-${f.category}`}>{f.tournament_name ? `${f.tournament_name} · ` : ""}{f.category} — {f.name.length > 60 ? f.name.slice(0, 60) + "…" : f.name}</button>)}</div>
+            <p className="text-[10px] text-fsl-slate">Un clic: l'assistente ripropone lo stesso format adattando le date; poi «Applica».</p>
+          </div>
+        )}
         {msgs.length === 0 && (
           <div className="rounded-lg border border-white/10 bg-ink-950/40 p-3 text-xs text-fsl-slate space-y-2" data-testid="ai-intro">
             <p className="text-fsl-white/85">Spiegami il format a parole e ti propongo gironi, fasce orarie, pause e finali. Esempio:</p>

@@ -185,6 +185,7 @@ class Match(BaseDocument):
     round_name: str = ""
     note: str = ""
     is_grand_final: bool = False
+    social: dict = {}
     stage: Literal["qualification", "finals"] = "qualification"
     bracket_round: Optional[int] = None
     bracket_slot: Optional[int] = None

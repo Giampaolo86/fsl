@@ -87,7 +87,8 @@ async def put_brain(body: BrainIn, user: CurrentUser = Depends(get_current_user)
 class ChatIn(BaseModel):
     category: Optional[str] = None
     session_id: str = Field(min_length=6, max_length=80)
-    message: str = Field(min_length=1, max_length=4000)
+    message: str = Field(min_length=1, max_length=12000)
+    display: Optional[str] = Field(default=None, max_length=400)
 
 
 def _llm(system: str, session_id: str):
@@ -145,7 +146,7 @@ async def calendar_chat(tournament_id: str, body: ChatIn, user: CurrentUser = De
     reply, plan = _extract_plan(raw or "")
     now = datetime.now(timezone.utc).isoformat()
     await db.ai_chats.insert_many([
-        {"session_id": body.session_id, "tournament_id": tournament_id, "user_id": user.id, "role": "user", "content": body.message, "created_at": now},
+        {"session_id": body.session_id, "tournament_id": tournament_id, "user_id": user.id, "role": "user", "content": body.display or body.message, "created_at": now},
         {"session_id": body.session_id, "tournament_id": tournament_id, "user_id": user.id, "role": "assistant", "content": reply, "plan": plan, "created_at": now},
     ])
     return {"reply": reply, "plan": plan}
@@ -199,6 +200,8 @@ async def calendar_apply(tournament_id: str, body: ApplyIn, user: CurrentUser = 
             detail = getattr(e, "detail", None)
             error = f"{tool}: {detail.get('message') if isinstance(detail, dict) else detail or e}"
             break
+    if not error and done:
+        await save_format(tournament_id, cat, body.plan, user.id)
     return {"done": done, "error": error, **await se._board(tournament_id, cat)}
 
 
@@ -313,3 +316,113 @@ async def studio_image(tournament_id: str, body: StudioImageIn, user: CurrentUse
     ct = img.get("mime_type") or "image/png"
     m = await _store(tournament_id, data, ct, f"ai-studio.{ 'jpg' if 'jpeg' in ct else 'png'}", user.id, user.club_in(tournament_id))
     return {"url": f"/api/media/{m.id}", "media_id": m.id}
+
+
+# ---------- formati salvati (memoria dei tornei passati) ----------
+async def save_format(tournament_id: str, cat: str, plan: dict, user_id: str) -> None:
+    t = await db.tournaments.find_one({"_id": __import__("bson").ObjectId(tournament_id)}, {"name": 1, "organization_id": 1})
+    now = datetime.now(timezone.utc).isoformat()
+    name = (plan.get("summary") or "Formato")[:140]
+    await db.ai_formats.update_one(
+        {"tournament_id": tournament_id, "category": cat},
+        {"$set": {"name": name, "plan": plan, "tournament_name": (t or {}).get("name", ""), "organization_id": (t or {}).get("organization_id"), "updated_at": now, "updated_by": user_id}, "$setOnInsert": {"created_at": now}},
+        upsert=True,
+    )
+
+
+@router.get("/tournaments/{tournament_id}/calendar/formats")
+async def list_formats(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Formati applicati in passato (in questo e negli altri tornei dell'organizzazione)."""
+    t, role = await require_tournament(tournament_id, user)
+    if role not in STAFF:
+        raise bad_request("Riservato allo staff")
+    q = {"organization_id": t.organization_id} if getattr(t, "organization_id", None) else {}
+    docs = await db.ai_formats.find(q, {"_id": 0}).sort("updated_at", -1).to_list(30)
+    return docs
+
+
+@router.delete("/tournaments/{tournament_id}/calendar/formats/{category}")
+async def delete_format(tournament_id: str, category: str, user: CurrentUser = Depends(get_current_user)):
+    t, role = await require_tournament(tournament_id, user)
+    if role not in {"super_admin", "director"}:
+        raise bad_request("Riservato al direttore")
+    await db.ai_formats.delete_one({"tournament_id": tournament_id, "category": category})
+    return {"deleted": True}
+
+
+# ---------- riscrittura inline ----------
+class RewriteIn(BaseModel):
+    text: str = Field(min_length=3, max_length=4000)
+    instruction: str = Field(default="Riscrivi meglio, stesso significato", max_length=300)
+    title: str = ""
+
+
+@router.post("/tournaments/{tournament_id}/blog/rewrite")
+async def blog_rewrite(tournament_id: str, body: RewriteIn, user: CurrentUser = Depends(get_current_user)):
+    from emergentintegrations.llm.chat import UserMessage
+
+    t, role = await require_tournament(tournament_id, user)
+    if role not in STAFF | {"club_manager"}:
+        raise bad_request("Funzione riservata a staff e società")
+    system = f"Sei la redazione di Future Stars League. Riscrivi SOLO il brano fornito seguendo l'istruzione, nel tono del Cervello FSL. Non aggiungere titoli, premesse o virgolette: rispondi con il solo testo riscritto, stessa lingua, nessun fatto o nome inventato.\n\n# Cervello FSL\n{await _brain_text()}"
+    chat = _llm(system, f"{tournament_id}:rewrite:{user.id}")
+    try:
+        raw = await chat.send_message(UserMessage(text=f"Articolo: {body.title or '—'}\nIstruzione: {body.instruction}\n\nBrano:\n{body.text}"))
+    except Exception as e:  # noqa: BLE001
+        raise bad_request(f"Redazione IA non disponibile: {e}")
+    return {"text": (raw or "").strip().strip('"')}
+
+
+# ---------- didascalie automatiche ----------
+CAPTION_SYSTEM = """Sei il social media manager di Future Stars League. Per ogni gara ufficiale scrivi la didascalia Instagram/Facebook della grafica «Full Time».
+Regole: tono Cervello FSL, 2–3 frasi, bambini protagonisti, complimenti a entrambe le squadre, nessun nome di bambino se non fornito, massimo 1 emoji, poi una riga vuota e 6–10 hashtag (#FutureStarsLeague sempre, poi categoria, società, torneo).
+Rispondi SOLO con JSON: {"caption": "...", "hashtags": ["#...", ...]}"""
+
+
+async def _caption_payload(tournament_id: str, m) -> str:
+    names = {x.id: x for x in await scoped("teams", tournament_id).list({"_id": {"$in": [m.home_team_id, m.away_team_id]}}, limit=2)}
+    h, a = names.get(m.home_team_id), names.get(m.away_team_id)
+    sc = m.score if isinstance(m.score, dict) else (m.score.model_dump() if m.score else {})
+    scorers = []
+    for ev in m.events or []:
+        e = ev if isinstance(ev, dict) else ev.model_dump()
+        if e.get("type") == "goal" and e.get("player_name"):
+            scorers.append(e["player_name"])
+    t = await db.tournaments.find_one({"_id": __import__("bson").ObjectId(tournament_id)}, {"name": 1})
+    return f"Torneo: {(t or {}).get('name', '')}. Categoria {m.category} · {m.series} · {m.round_name}. Gara: {h.name if h else '?'} {sc.get('home')}–{sc.get('away')} {a.name if a else '?'}" + (f" (dcr {sc.get('home_pen')}–{sc.get('away_pen')})" if sc.get("home_pen") is not None else "") + (f". Marcatori: {', '.join(scorers[:6])}" if scorers else "") + f". Finalissima: {'sì' if getattr(m, 'is_grand_final', False) else 'no'}."
+
+
+async def generate_caption(tournament_id: str, match_id: str, force: bool = False) -> dict | None:
+    """Genera (o restituisce) la didascalia social della gara. Chiamata in background all'ufficializzazione."""
+    from emergentintegrations.llm.chat import UserMessage
+
+    repo = scoped("matches", tournament_id)
+    m = await repo.get(match_id)
+    if not m:
+        return None
+    existing = (m.model_dump().get("social") or {})
+    if existing.get("caption") and not force:
+        return existing
+    chat = _llm(f"{CAPTION_SYSTEM}\n\n# Cervello FSL\n{await _brain_text()}", f"{tournament_id}:caption:{match_id}")
+    try:
+        raw = await chat.send_message(UserMessage(text=await _caption_payload(tournament_id, m) + "\nProduci il JSON."))
+        mm = re.search(r"\{.*\}", raw or "", re.S)
+        out = json.loads(mm.group(0)) if mm else {}
+    except Exception:  # noqa: BLE001
+        return None
+    if not out.get("caption"):
+        return None
+    social = {"caption": str(out["caption"])[:800], "hashtags": [str(h) for h in (out.get("hashtags") or [])][:12], "generated_at": datetime.now(timezone.utc).isoformat()}
+    await db.matches.update_one({"_id": __import__("bson").ObjectId(match_id)}, {"$set": {"social": social}})
+    return social
+
+
+@router.get("/tournaments/{tournament_id}/matches/{match_id}/caption")
+async def match_caption(tournament_id: str, match_id: str, regenerate: bool = False, user: CurrentUser = Depends(get_current_user)):
+    t, role = await require_tournament(tournament_id, user)
+    if role not in STAFF | {"club_manager"}:
+        raise bad_request("Funzione riservata a staff e società")
+    out = await generate_caption(tournament_id, match_id, force=regenerate)
+    if not out:
+        raise bad_request("Didascalia non disponibile: la gara deve avere un risultato")
+    return out
