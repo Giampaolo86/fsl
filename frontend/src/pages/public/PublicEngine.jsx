@@ -74,7 +74,7 @@ export function PublicMatchCenter() {
     <div>
       <section className="relative grain bg-navy-800 border-b border-white/10">
         <div className="mx-auto max-w-[1488px] px-6 py-10">
-          <div className="flex items-center justify-between text-xs text-fsl-slate mb-4"><span className="fsl-kicker">{m.competition_name} · {m.round_name}</span><MatchStatusBadge status={m.status} label={m.display_status} /></div>
+          <div className="flex items-center justify-between text-xs text-fsl-slate mb-4"><span className="fsl-kicker">{m.competition_name} · {m.is_grand_final ? "★ Finalissima · " : ""}{m.round_name}{m.note ? <span className="block normal-case tracking-normal text-fsl-white/80 mt-1" data-testid="match-center-note">{m.note}</span> : null}</span><MatchStatusBadge status={m.status} label={m.display_status} /></div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
             <Link to={`/tornei/${slug}/squadre/${m.home.club?.slug}`} className="flex flex-col items-center text-center gap-3"><ClubCrest club={m.home.club} size={96} /><span className="font-display font-extrabold uppercase text-xl leading-none">{m.home.club?.name}</span></Link>
             <div className="text-center"><div className="font-display font-extrabold text-6xl sm:text-8xl num leading-none" data-testid="match-center-score">{hasScore ? `${m.score.home} - ${m.score.away}` : m.kickoff_at.slice(11, 16)}</div><div className={`text-xs uppercase tracking-wider mt-2 inline-flex items-center gap-2 ${live ? "text-fsl-danger" : "text-fsl-gold"}`} data-testid="match-center-status">{live && <span className="h-2 w-2 rounded-full bg-fsl-danger animate-pulse" />}{live ? "Live · aggiornamento automatico" : m.display_status}</div></div>

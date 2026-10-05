@@ -278,6 +278,9 @@ class MatchEditIn(BaseModel):
     home_team_id: Optional[str] = None
     away_team_id: Optional[str] = None
     competition_id: Optional[str] = None
+    round_name: Optional[str] = None
+    note: Optional[str] = None
+    is_grand_final: Optional[bool] = None
     force: bool = False
     reason: str = ""
 
@@ -310,10 +313,19 @@ async def edit_match(tournament_id: str, match_id: str, body: MatchEditIn, user:
         if not c:
             raise not_found("Competizione")
         patch.update({"competition_id": c.id, "category": c.category, "series": c.series})
+    if body.round_name is not None:
+        patch["round_name"] = body.round_name.strip()[:80]
+    if body.note is not None:
+        patch["note"] = body.note.strip()[:300]
+    if body.is_grand_final is not None:
+        patch["is_grand_final"] = body.is_grand_final
+        if body.is_grand_final:
+            for other in await repo.list({"category": m.category, "is_grand_final": True, "_id": {"$ne": m.id}}, limit=50):
+                await repo.update(other.id, {"is_grand_final": False}, user.id)
     if patch.get("home_team_id", m.home_team_id) == patch.get("away_team_id", m.away_team_id):
         raise bad_request("Casa e ospite coincidono")
     preview = m.model_copy(update=patch)
-    found = [c for c in await _conflicts(tournament_id, extra=preview) if m.id in (c.get("match_ids") or [c.get("match_id")]) or c.get("team_id") in (preview.home_team_id, preview.away_team_id)]
+    found = [c for c in await _conflicts(tournament_id, extra=preview) if c["type"] not in ("no_field", "no_time") and (m.id in (c.get("match_ids") or [c.get("match_id")]) or c.get("team_id") in (preview.home_team_id, preview.away_team_id))]
     if found and not body.force:
         raise conflict("Conflitto rilevato: " + " · ".join(c["message"] for c in found[:4]))
     m2 = await repo.update(m.id, patch, user.id)

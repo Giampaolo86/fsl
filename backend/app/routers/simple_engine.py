@@ -1,6 +1,7 @@
 """Gironi e calendario in modalità semplice: una pagina, tre blocchi (gironi, calendario, fase finale)."""
 import random
 import re
+from typing import Literal
 from collections import defaultdict
 from datetime import date
 
@@ -64,7 +65,7 @@ async def _board(tid: str, cat: str) -> dict:
     fields = await scoped("fields", tid).list({"active": True}, sort=[("code", 1)])
 
     def mp(m):
-        return {"id": m.id, "kickoff_at": m.kickoff_at, "field_id": m.field_id, "field_name": m.field_name, "competition_id": m.competition_id, "series": m.series, "round_name": m.round_name, "match_day": m.match_day, "stage": m.stage, "bracket_round": m.bracket_round, "home_team_id": m.home_team_id, "away_team_id": m.away_team_id, "home": names.get(m.home_team_id, "?"), "away": names.get(m.away_team_id, "?"), "status": m.status, "score": m.score, "played": m.status in PLAYED}
+        return {"id": m.id, "kickoff_at": m.kickoff_at, "field_id": m.field_id, "field_name": m.field_name, "competition_id": m.competition_id, "series": m.series, "round_name": m.round_name, "note": m.note, "is_grand_final": m.is_grand_final, "match_day": m.match_day, "stage": m.stage, "bracket_round": m.bracket_round, "home_team_id": m.home_team_id, "away_team_id": m.away_team_id, "home": names.get(m.home_team_id, "?"), "away": names.get(m.away_team_id, "?"), "status": m.status, "score": m.score, "played": m.status in PLAYED}
 
     gl = [{"id": g.id, "name": g.series, "size": g.teams_count, "teams": [_team_pub(tm, clubs) for tm in teams if tm.competition_id == g.id]} for g in groups]
     group_ms = [mp(m) for m in ms if m.stage == "qualification"]
@@ -322,17 +323,64 @@ async def generate_calendar(tournament_id: str, body: CalendarIn, user: CurrentU
 # ---------- C. fase finale ----------
 class FinalsIn(BaseModel):
     category: str | None = None
-    teams: int = Field(default=4, description="8 = quarti, 4 = semifinali, 2 = finale")
+    mode: Literal["knockout", "placement"] = "knockout"
+    teams: int = Field(default=4, description="knockout: 8 = quarti, 4 = semifinali, 2 = finale · placement: squadre totali (pari)")
     date: str
     start_time: str = "09:00"
     third_place: bool = False
+
+
+PLACE_ORD = {1: "1ª", 2: "2ª", 3: "3ª", 4: "4ª", 5: "5ª", 6: "6ª", 7: "7ª", 8: "8ª", 9: "9ª", 10: "10ª", 11: "11ª", 12: "12ª", 13: "13ª", 14: "14ª", 15: "15ª", 16: "16ª"}
+
+
+async def _placement_finals(tournament_id, cat, ko, groups, n, body, user, s):
+    """Finali di piazzamento: tutte le squadre giocano (1°/2°, 3°/4°, 5°/6°…). La 1°/2° è la finalissima."""
+    teams_repo, matches_repo = scoped("teams", tournament_id), scoped("matches", tournament_id)
+    if n % 2:
+        raise bad_request("Per le finali di piazzamento serve un numero pari di squadre")
+    pairs = []
+    if len(groups) == 2 and n % 2 == 0 and all(g.teams_count >= n // 2 for g in groups):
+        per = n // 2
+        for pos in range(1, per + 1):
+            ids = [(await teams_repo.insert(Team(tournament_id=tournament_id, competition_id=ko.id, name=f"{PLACE_ORD.get(pos, f'{pos}ª')} {g.series}", category=cat, series=ko.series, placeholder=True, qualifier={"competition_id": g.id, "pos": pos}), user.id)).id for g in groups]
+            pairs.append((ids[0], ids[1], 2 * pos - 1))
+    elif len(groups) == 1:
+        g = groups[0]
+        for i in range(n // 2):
+            p1, p2 = 2 * i + 1, 2 * i + 2
+            a = (await teams_repo.insert(Team(tournament_id=tournament_id, competition_id=ko.id, name=f"{PLACE_ORD.get(p1, f'{p1}ª')} {g.series}", category=cat, series=ko.series, placeholder=True, qualifier={"competition_id": g.id, "pos": p1}), user.id)).id
+            b = (await teams_repo.insert(Team(tournament_id=tournament_id, competition_id=ko.id, name=f"{PLACE_ORD.get(p2, f'{p2}ª')} {g.series}", category=cat, series=ko.series, placeholder=True, qualifier={"competition_id": g.id, "pos": p2}), user.id)).id
+            pairs.append((a, b, p1))
+    else:
+        for i in range(n // 2):
+            p1, p2 = 2 * i + 1, 2 * i + 2
+            a = (await teams_repo.insert(Team(tournament_id=tournament_id, competition_id=ko.id, name=f"Classificata {p1}", category=cat, series=ko.series, placeholder=True), user.id)).id
+            b = (await teams_repo.insert(Team(tournament_id=tournament_id, competition_id=ko.id, name=f"Classificata {p2}", category=cat, series=ko.series, placeholder=True), user.id)).id
+            pairs.append((a, b, p1))
+    fields = await scoped("fields", tournament_id).list({"active": True}, sort=[("code", 1)])
+    if not fields:
+        raise bad_request("Configura almeno un campo (genera prima il calendario dei gironi)")
+    times = svc.compute_slots(body.start_time, "23:00", s.match_duration_min, s.buffer_min)
+    taken = {(m.kickoff_at, m.field_id) for m in await matches_repo.list({"status": {"$ne": "cancelled"}}, limit=5000)}
+    free = [sl for sl in _slots_for(body.date, times, fields) if (sl["kickoff_at"], sl["field_id"]) not in taken]
+    if len(free) < len(pairs):
+        raise conflict("Slot insufficienti nella giornata della fase finale: anticipa l'orario o aggiungi campi")
+    # la finalissima per ultima: le finali minori prima
+    ordered = sorted(pairs, key=lambda x: -x[2])
+    created = 0
+    for (h, a, place), sl in zip(ordered, free):
+        label = f"Finale {place}°/{place + 1}° posto"
+        await matches_repo.insert(Match(tournament_id=tournament_id, competition_id=ko.id, home_team_id=h, away_team_id=a, category=cat, series=ko.series, match_day=0, round_name=label, stage="finals", bracket_round=1 if place == 1 else 0, bracket_slot=place, is_grand_final=place == 1, kickoff_at=sl["kickoff_at"], field_id=sl["field_id"], field_name=sl["field_name"], status="scheduled"), user.id)
+        created += 1
+    await scoped("competitions", tournament_id).update(ko.id, {"finals": {"mode": "placement", "qualifiers": n, "qualifiers_per_group": n // len(groups) if groups and n % len(groups) == 0 else 0, "third_place": False}}, user.id)
+    return created
 
 
 @router.post("/finals")
 async def generate_finals(tournament_id: str, body: FinalsIn, user: CurrentUser = Depends(get_current_user)):
     """Crea tutto il tabellone con segnaposto («1ª Girone A», «Vincente QF1»…): le squadre si sostituiscono con Modifica."""
     t, _ = await _ctx(tournament_id, user, writable=True)
-    if body.teams not in (2, 4, 8, 16):
+    if body.mode == "knockout" and body.teams not in (2, 4, 8, 16):
         raise bad_request("Fase finale possibile con 2, 4, 8 o 16 squadre")
     cat = await _category(tournament_id, body.category)
     ko = await _knockout(tournament_id, cat, create=True, actor=user)
@@ -348,6 +396,10 @@ async def generate_finals(tournament_id: str, body: FinalsIn, user: CurrentUser 
         await teams_repo.soft_delete(tm.id, user.id)
 
     n = body.teams
+    if body.mode == "placement":
+        created = await _placement_finals(tournament_id, cat, ko, groups, n, body, user, s)
+        await audit.record(user, "simple.finals", "competition", ko.id, t.id, after={"mode": "placement", "teams": n, "matches": created})
+        return {"count": created, **await _board(tournament_id, cat)}
     per_group = n // len(groups) if groups and n % len(groups) == 0 else 0
     if per_group:
         cols = []
@@ -658,3 +710,66 @@ async def save_slots(tournament_id: str, body: SlotsIn, user: CurrentUser = Depe
         slots.pop(body.date, None)
     await settings_repo.update(s.id, {"calendar_slots": slots}, user.id)
     return await _board(tournament_id, await _category(tournament_id, body.category))
+
+
+class NewMatchIn(BaseModel):
+    category: str | None = None
+    stage: Literal["qualification", "finals"] = "finals"
+    competition_id: str | None = None
+    home_team_id: str | None = None
+    away_team_id: str | None = None
+    home_name: str = ""
+    away_name: str = ""
+    date: str
+    time: str
+    field_id: str | None = None
+    round_name: str = ""
+    note: str = ""
+    is_grand_final: bool = False
+    force: bool = False
+
+
+@router.post("/matches", status_code=201)
+async def create_match(tournament_id: str, body: NewMatchIn, user: CurrentUser = Depends(get_current_user)):
+    """Partita libera: squadre reali o segnaposto scritti a mano («Vincente spareggio», «Da definire»…)."""
+    from .groups import _conflicts
+
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    cat = await _category(tournament_id, body.category)
+    teams_repo, matches_repo = scoped("teams", tournament_id), scoped("matches", tournament_id)
+    if body.competition_id:
+        comp = await scoped("competitions", tournament_id).get(body.competition_id)
+        if not comp:
+            raise not_found("Competizione")
+    else:
+        comp = await _knockout(tournament_id, cat, create=True, actor=user) if body.stage == "finals" else None
+        if comp is None:
+            raise bad_request("Scegli il girone")
+    async def team(tid_, name, side):
+        if tid_:
+            tm = await teams_repo.get(tid_)
+            if not tm:
+                raise not_found("Squadra")
+            return tm.id
+        label = (name or "").strip() or f"Da definire ({side})"
+        return (await teams_repo.insert(Team(tournament_id=tournament_id, competition_id=comp.id, name=label[:60], category=cat, series=comp.series, placeholder=True), user.id)).id
+    h, a = await team(body.home_team_id, body.home_name, "casa"), await team(body.away_team_id, body.away_name, "ospite")
+    if h == a:
+        raise bad_request("Casa e ospite coincidono")
+    field = await scoped("fields", tournament_id).get(body.field_id) if body.field_id else None
+    if body.field_id and not field:
+        raise not_found("Campo")
+    stage = "finals" if comp.kind == "knockout" else body.stage
+    m = Match(tournament_id=tournament_id, competition_id=comp.id, home_team_id=h, away_team_id=a, category=cat, series=comp.series, match_day=0, round_name=(body.round_name or ("Fase finale" if stage == "finals" else comp.series)).strip()[:80], note=body.note.strip()[:300], is_grand_final=body.is_grand_final, stage=stage, bracket_round=0, bracket_slot=0, kickoff_at=f"{body.date}T{body.time}", field_id=field.id if field else None, field_name=field.name if field else "", status="scheduled")
+    from bson import ObjectId
+
+    m.id = str(ObjectId())
+    found = [c for c in await _conflicts(tournament_id, extra=m) if m.id in (c.get("match_ids") or [c.get("match_id")]) and c["type"] not in ("cross_group", "no_field", "no_time")]
+    if found and not body.force:
+        raise conflict("Conflitto rilevato: " + " · ".join(c["message"] for c in found[:4]))
+    if body.is_grand_final:
+        for other in await matches_repo.list({"category": cat, "is_grand_final": True}, limit=50):
+            await matches_repo.update(other.id, {"is_grand_final": False}, user.id)
+    m = await matches_repo.insert(m, user.id)
+    await audit.record(user, "simple.match_create", "match", m.id, t.id, after={"home": h, "away": a, "kickoff_at": m.kickoff_at, "round_name": m.round_name})
+    return {"match": m.public(), "warnings": [c["message"] for c in found], **await _board(tournament_id, cat)}

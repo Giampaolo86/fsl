@@ -6,6 +6,7 @@ import { GroupsBlock } from "@/components/fsl/simple/GroupsBlock";
 import { CalendarBlock } from "@/components/fsl/simple/CalendarBlock";
 import { FinalsBlock } from "@/components/fsl/simple/FinalsBlock";
 import { SimpleMatchEdit } from "@/components/fsl/SimpleMatchEdit";
+import { SimpleMatchCreate } from "@/components/fsl/SimpleMatchCreate";
 import { useTournamentDetail } from "@/hooks/useTournamentData";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
@@ -18,6 +19,7 @@ export default function SimpleEngine() {
   const [board, setBoard] = useState(null);
   const [error, setError] = useState(null);
   const [editM, setEditM] = useState(null);
+  const [createM, setCreateM] = useState(null);
 
   const load = useCallback(() => {
     api.get(`/tournaments/${tid}/simple/board`, { params: category ? { category } : {} }).then((r) => { setBoard(r.data); setError(null); }).catch(setError);
@@ -64,8 +66,9 @@ export default function SimpleEngine() {
         )}
       />
       <GroupsBlock tid={tid} board={board} reload={load} canWrite={canWrite} />
-      <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} onMove={move} onBreaks={saveBreaks} onSlots={saveSlots} onQuickTeam={quickTeam} />
-      <FinalsBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} />
+      <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} onMove={move} onBreaks={saveBreaks} onSlots={saveSlots} onQuickTeam={quickTeam} onCreate={setCreateM} />
+      <FinalsBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} onCreate={setCreateM} />
+      {createM && <SimpleMatchCreate tid={tid} board={board} defaults={createM} onClose={() => setCreateM(null)} onDone={load} />}
       {editM && <SimpleMatchEdit tid={tid} m={editM} teams={board.teams} fields={board.fields} onClose={() => setEditM(null)} onDone={load} />}
     </div>
   );

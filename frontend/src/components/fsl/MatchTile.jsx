@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Star } from "lucide-react";
 import { ClubCrest } from "./ClubCrest";
 
 const LIVE = new Set(["in_progress", "finished", "report_submitted", "under_review"]);
@@ -53,7 +53,7 @@ export function MatchTile({ m, home, away, kicker, to, className = "", fieldConf
   const hc = home.club?.colors?.primary || home.colors?.primary || "#0B57D9";
   const ac = away.club?.colors?.primary || away.colors?.primary || "#F4AE2B";
   const body = (
-    <div {...tileProps} className={`group relative flex items-stretch h-[70px] rounded-md overflow-hidden border bg-ink-950 shadow-md transition-[border-color,transform,box-shadow] duration-200 ${fieldConflict ? "border-fsl-danger ring-1 ring-fsl-danger/50 shadow-[0_0_12px_rgba(239,68,68,0.3)]" : finals ? "border-fsl-gold/50 hover:border-fsl-gold" : "border-white/10 hover:border-fsl-gold/50"} ${to ? "hover:-translate-y-px hover:shadow-[0_8px_24px_-12px_rgba(244,174,43,0.35)]" : ""} ${className}`} title={fieldConflict ? `Campo occupato anche da ${fieldConflict}` : undefined} data-conflict={fieldConflict ? "field" : undefined} data-testid={testId}>
+    <div {...tileProps} className={`group relative flex items-stretch h-[70px] rounded-md overflow-hidden border bg-ink-950 shadow-md transition-[border-color,transform,box-shadow] duration-200 ${fieldConflict ? "border-fsl-danger ring-1 ring-fsl-danger/50 shadow-[0_0_12px_rgba(239,68,68,0.3)]" : finals ? "border-fsl-gold/50 hover:border-fsl-gold" : "border-white/10 hover:border-fsl-gold/50"} ${to ? "hover:-translate-y-px hover:shadow-[0_8px_24px_-12px_rgba(244,174,43,0.35)]" : ""} ${className}`} title={fieldConflict ? `Campo occupato anche da ${fieldConflict}` : m.note || undefined} data-conflict={fieldConflict ? "field" : undefined} data-testid={testId}>
       <div className="w-1.5 shrink-0 flex flex-col"><span className="flex-1" style={{ background: hc }} /><span className="flex-1" style={{ background: ac }} /></div>
       {dragHandle}
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 py-1 pl-1 pr-1">
@@ -62,9 +62,9 @@ export function MatchTile({ m, home, away, kicker, to, className = "", fieldConf
       </div>
       <div className="w-[72px] shrink-0 flex flex-col items-center justify-center gap-[3px] border-l border-white/[0.06] bg-white/[0.03] px-1">
         <ScoreBlock m={m} st={st} />
-        {kicker && <div className={`w-full text-center text-[8px] font-display font-bold uppercase tracking-[0.14em] truncate ${finals ? "text-fsl-gold" : "text-fsl-slate/70"}`}>{kicker}</div>}
+        {kicker && <div className={`w-full text-center text-[8px] font-display font-bold uppercase tracking-[0.14em] truncate ${finals ? "text-fsl-gold" : "text-fsl-slate/70"}`}>{m.is_grand_final && <Star className="inline h-2.5 w-2.5 -mt-0.5 mr-0.5 fill-fsl-gold text-fsl-gold" />}{kicker}</div>}
       </div>
-      {finals && <span className="absolute top-0 left-1.5 right-0 h-px bg-gradient-to-r from-fsl-gold via-fsl-gold/60 to-transparent" />}
+      {finals && <span className={`absolute top-0 left-1.5 right-0 ${m.is_grand_final ? "h-0.5 bg-fsl-gold" : "h-px bg-gradient-to-r from-fsl-gold via-fsl-gold/60 to-transparent"}`} />}
       {actions}
     </div>
   );

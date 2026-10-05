@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { MatchTable } from "./CalendarBlock";
 
-export function FinalsBlock({ tid, board, reload, canWrite, onEdit, onSwap }) {
+export function FinalsBlock({ tid, board, reload, canWrite, onEdit, onSwap, onCreate }) {
+  const allTeams = board.groups.reduce((n, g) => n + (g.teams?.length || g.size || 0), 0);
   const lastGroupDay = board.matches.length ? board.matches[board.matches.length - 1].kickoff_at.slice(0, 10) : new Date().toISOString().slice(0, 10);
-  const [f, setF] = useState({ teams: 4, date: board.finals[0]?.kickoff_at.slice(0, 10) || lastGroupDay, start_time: board.finals[0]?.kickoff_at.slice(11, 16) || "15:00", third_place: false });
+  const [f, setF] = useState({ teams: 4, date: board.finals[0]?.kickoff_at.slice(0, 10) || lastGroupDay, start_time: board.finals[0]?.kickoff_at.slice(11, 16) || "15:00", third_place: false, mode: "knockout" });
   const [busy, setBusy] = useState(false);
   const generate = async () => {
     if (board.finals.length && !window.confirm("La fase finale attuale verrà sostituita. Continuare?")) return;
@@ -29,17 +30,23 @@ export function FinalsBlock({ tid, board, reload, canWrite, onEdit, onSwap }) {
   return (
     <section className="fsl-card p-5" data-testid="block-finals">
       <div className="flex flex-wrap items-end gap-3 mb-4">
-        <div><div className="fsl-kicker">C</div><h2 className="font-display font-extrabold uppercase text-2xl leading-none">Fase finale</h2><p className="text-xs text-fsl-slate mt-1">Da generare quando i gironi sono finiti. Le squadre («1ª Girone A», «Vincente QF1»…) si sostituiscono con Modifica.</p></div>
+        <div><div className="fsl-kicker">C</div><h2 className="font-display font-extrabold uppercase text-2xl leading-none">Fase finale</h2><p className="text-xs text-fsl-slate mt-1">Eliminazione diretta oppure «tutte a premio»: 1ª/2ª, 3ª/4ª, 5ª/6ª… giocano tutte, la 1°/2° è la finalissima ★. Nome gara, commento e finalissima si cambiano con Modifica; «+ Partita» aggiunge gare libere.</p></div>
         {canWrite && board.groups.length > 0 && (
           <div className="flex flex-wrap items-end gap-2 ml-auto">
-            <label className="text-xs text-fsl-slate">Si parte da<select className="fsl-input h-10 w-44 mt-1" value={f.teams} onChange={(e) => setF({ ...f, teams: e.target.value })} data-testid="finals-start-select"><option value={8}>Quarti di finale (8)</option><option value={4}>Semifinali (4)</option><option value={2}>Finale (2)</option></select></label>
+            <label className="text-xs text-fsl-slate">Formula<select className="fsl-input h-10 w-56 mt-1" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value, teams: e.target.value === "placement" ? (allTeams % 2 ? allTeams - 1 : allTeams) || 8 : 4 })} data-testid="finals-mode-select"><option value="knockout">Eliminazione diretta</option><option value="placement">Tutte a premio (piazzamento)</option></select></label>
+            {f.mode === "knockout" ? (
+              <label className="text-xs text-fsl-slate">Si parte da<select className="fsl-input h-10 w-44 mt-1" value={f.teams} onChange={(e) => setF({ ...f, teams: e.target.value })} data-testid="finals-start-select"><option value={8}>Quarti di finale (8)</option><option value={4}>Semifinali (4)</option><option value={2}>Finale (2)</option></select></label>
+            ) : (
+              <label className="text-xs text-fsl-slate">Squadre<input type="number" min={2} max={32} step={2} className="fsl-input h-10 w-24 mt-1" value={f.teams} onChange={(e) => setF({ ...f, teams: e.target.value })} data-testid="finals-teams-count" /></label>
+            )}
             <label className="text-xs text-fsl-slate">Data<input type="date" className="fsl-input h-10 w-40 mt-1" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} data-testid="finals-date" /></label>
             <label className="text-xs text-fsl-slate">Prima partita<input type="time" className="fsl-input h-10 w-28 mt-1" value={f.start_time} onChange={(e) => setF({ ...f, start_time: e.target.value })} data-testid="finals-time" /></label>
-            <label className="text-xs text-fsl-slate inline-flex items-center gap-2 h-10"><input type="checkbox" checked={f.third_place} onChange={(e) => setF({ ...f, third_place: e.target.checked })} disabled={Number(f.teams) < 4} data-testid="finals-third" /> Finale 3°/4°</label>
+            <label className="text-xs text-fsl-slate inline-flex items-center gap-2 h-10"><input type="checkbox" checked={f.third_place} onChange={(e) => setF({ ...f, third_place: e.target.checked })} disabled={Number(f.teams) < 4 || f.mode === "placement"} data-testid="finals-third" /> Finale 3°/4°</label>
             <button className="btn-gold h-10" disabled={busy} onClick={generate} data-testid="finals-generate-button">Genera fase finale</button>
           </div>
         )}
       </div>
+      {canWrite && <div className="mb-3"><button className="btn-ghost h-9 px-3 text-xs" onClick={() => onCreate({ stage: "finals", date: f.date, time: f.start_time })} data-testid="finals-add-match"><Plus className="h-4 w-4" /> Partita</button></div>}
       {board.finals.length === 0 ? (
         <p className="text-sm text-fsl-slate" data-testid="finals-empty">Nessuna fase finale generata.</p>
       ) : (

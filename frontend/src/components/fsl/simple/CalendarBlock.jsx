@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileDown, GripVertical, LayoutGrid, List, Pencil, X } from "lucide-react";
+import { FileDown, GripVertical, LayoutGrid, List, Pencil, Plus, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -36,7 +36,7 @@ export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, t
               <td className="px-3 py-2 text-xs text-fsl-slate whitespace-nowrap">{fmtDate(m.kickoff_at)}</td>
               <td className="px-2 py-2 num font-semibold">{m.kickoff_at.slice(11, 16)}</td>
               <td className="px-2 py-2 text-fsl-slate whitespace-nowrap">{m.field_name || "—"}</td>
-              {showGroup && <td className="px-2 py-2 text-xs text-fsl-gold whitespace-nowrap">{m.stage === "finals" ? m.round_name : m.series}</td>}
+              {showGroup && <td className="px-2 py-2 text-xs text-fsl-gold whitespace-nowrap">{m.is_grand_final && <Star className="inline h-3 w-3 mr-1 -mt-0.5 fill-fsl-gold" aria-label="Finalissima" />}{m.stage === "finals" ? m.round_name : m.series}{m.note && <span className="block text-[10px] text-fsl-slate normal-case whitespace-normal max-w-[220px]" data-testid={`match-note-${m.id}`}>{m.note}</span>}</td>}
               <td className="px-2 py-2 font-semibold">{m.home}</td>
               <td className="px-2 py-2 font-semibold">{m.away}</td>
               <td className="px-2 py-2 text-right whitespace-nowrap">
@@ -53,7 +53,7 @@ export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, t
 const WEEKDAYS = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
 const dayLabel = (d) => (d ? `${WEEKDAYS[new Date(d + "T12:00").getDay()]} ${fmtDate(d)}` : "");
 
-export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, onMove, onBreaks, onSlots, onQuickTeam }) {
+export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, onMove, onBreaks, onSlots, onQuickTeam, onCreate }) {
   const c = board.calendar;
   const [view, setView] = useState("grid");
   const today = new Date().toISOString().slice(0, 10);
@@ -122,6 +122,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
                 <button type="button" role="tab" aria-selected={view === "grid"} onClick={() => setView("grid")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "grid" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-grid"><LayoutGrid className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Griglia ora × campo</span><span className="sm:hidden">Griglia</span></button>
                 <button type="button" role="tab" aria-selected={view === "list"} onClick={() => setView("list")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "list" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-list"><List className="h-3.5 w-3.5" /> Per girone</button>
               </div>
+              {canWrite && <button className="btn-ghost h-9" onClick={() => onCreate({ stage: "qualification" })} data-testid="cal-add-match"><Plus className="h-4 w-4" /> Partita</button>}
               <button className="btn-ghost h-9" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button>
             </div>
           </div>

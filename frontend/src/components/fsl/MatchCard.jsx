@@ -48,7 +48,7 @@ export function MatchCard({ m, to, compact = false }) {
   const body = (
     <>
       <div className="flex items-center justify-between gap-2 px-3 h-8 bg-black/25 border-b border-white/[0.06]">
-        <span className={`font-display text-[11px] font-bold uppercase tracking-[0.16em] truncate ${finals ? "text-fsl-gold" : "text-fsl-gold/80"}`}>{finals ? `Fase finale · ${m.round_name}` : `${m.competition_name || `${m.category} · ${m.series}`} · ${m.round_name}`}</span>
+        <span className={`font-display text-[11px] font-bold uppercase tracking-[0.16em] truncate ${finals ? "text-fsl-gold" : "text-fsl-gold/80"}`}>{finals ? `${m.is_grand_final ? "★ Finalissima · " : "Fase finale · "}${m.round_name}` : `${m.competition_name || `${m.category} · ${m.series}`} · ${m.round_name}`}</span>
         <MatchStatusBadge status={m.status} label={m.display_status} />
       </div>
       <div className={`relative flex items-center gap-2 ${compact ? "px-3 py-3" : "px-4 py-4"}`}>
