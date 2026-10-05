@@ -30,13 +30,14 @@ export function ShopItemCard({ it, onBuy, busy }) {
 export function PublicShop({ slug, matchId }) {
   const [items, setItems] = useState(null);
   const [busy, setBusy] = useState(null);
-  useEffect(() => { api.get(`/public/tournaments/${slug}/matches/${matchId}/shop`).then((r) => setItems(r.data)).catch(() => setItems([])); }, [slug, matchId]);
+  const [prices, setPrices] = useState(null);
+  useEffect(() => { api.get(`/public/tournaments/${slug}/matches/${matchId}/shop`).then((r) => setItems(r.data)).catch(() => setItems([])); api.get(`/public/tournaments/${slug}/prices`).then((r) => setPrices(r.data)).catch(() => {}); }, [slug, matchId]);
   const cart = useCart();
   const buy = (it) => cart.add({ id: it.id, title: it.title, price: it.price, kind: it.kind, image_url: it.preview_url, scope: slug });
   if (!items?.length) return null;
   return (
     <section className="mt-8" data-testid="match-center-shop">
-      <div className="flex items-end justify-between mb-3"><h2 className="fsl-section-title">Foto e video della gara</h2><span className="text-xs text-fsl-slate">Video 0,99 € · Foto professionale 0,49 € · pagamento sicuro Stripe</span></div>
+      <div className="flex items-end justify-between mb-3"><h2 className="fsl-section-title">Foto e video della gara</h2><span className="text-xs text-fsl-slate" data-testid="match-center-shop-prices">Video {fmtPrice(prices?.video ?? 0.99)} · Foto professionale {fmtPrice(prices?.photo ?? 0.49)} · pagamento sicuro Stripe</span></div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">{items.map((it) => <ShopItemCard key={it.id} it={it} onBuy={buy} busy={busy === it.id} />)}</div>
     </section>
   );
@@ -52,6 +53,8 @@ export function ShopManager({ tournamentId, matchId }) {
   const [editTags, setEditTags] = useState(null);
   const [rosterMissing, setRosterMissing] = useState(false);
   const [played, setPlayed] = useState(false);
+  const [prices, setPrices] = useState(null);
+  useEffect(() => { api.get(`/tournaments/${tournamentId}/shop/prices`).then((r) => setPrices(r.data)).catch(() => {}); }, [tournamentId]);
   useEffect(() => {
     api.get(`/tournaments/${tournamentId}/matches/${matchId}`).then(async (r) => {
       const m = r.data;
@@ -85,7 +88,7 @@ export function ShopManager({ tournamentId, matchId }) {
     <div className="space-y-4" data-testid="shop-manager">
       {played && <SocialCaption tid={tournamentId} matchId={matchId} compact />}
       <div className="fsl-card p-4 grid sm:grid-cols-[140px_1fr_auto] gap-3 items-center">
-        <select className="fsl-input" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} data-testid="shop-kind"><option value="photo">Foto · 0,49 €</option><option value="video">Video · 0,99 €</option></select>
+        <select className="fsl-input" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} data-testid="shop-kind"><option value="photo">Foto · {fmtPrice(prices?.photo ?? 0.49)}</option><option value="video">Video · {fmtPrice(prices?.video ?? 0.99)}</option></select>
         <input className="fsl-input" placeholder="Titolo (facoltativo, altrimenti nome file)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="shop-title" />
         <label className="btn-gold cursor-pointer"><Upload className="h-4 w-4" /> Carica e metti in vendita<input type="file" multiple accept={form.kind === "video" ? "video/*" : "image/*"} className="hidden" onChange={(e) => upload([...e.target.files])} data-testid="shop-file-input" /></label>
         <div className="sm:col-span-3" data-testid="shop-player-tags">

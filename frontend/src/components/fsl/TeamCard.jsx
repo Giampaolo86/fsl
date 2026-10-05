@@ -78,7 +78,7 @@ export function TeamCard({ data, preview = false, onBuy, buying }) {
         <div className="fsl-kicker">Cartolina squadra 1080 × 1350</div>
         <p className="text-sm text-fsl-slate">Stemma, rosa completa, classifica, marcatori e badge della stagione in un'unica immagine da condividere nel gruppo squadra.</p>
         {preview ? (
-          <button className="btn-gold" disabled={!ready || buying} onClick={onBuy} data-testid="team-card-buy">{buying ? "Reindirizzamento…" : "Acquista · 2,49 €"}</button>
+          <button className="btn-gold" disabled={!ready || buying} onClick={onBuy} data-testid="team-card-buy">{buying ? "Reindirizzamento…" : `Acquista · ${Number(data.prices?.team_card ?? 2.49).toFixed(2).replace(".", ",")} €`}</button>
         ) : (
           <div className="flex flex-wrap gap-2"><button className="btn-gold" disabled={!ready} onClick={download} data-testid="team-card-download"><Download className="h-4 w-4" /> Scarica PNG</button><button className="btn-primary" disabled={!ready} onClick={share} data-testid="team-card-share"><Share2 className="h-4 w-4" /> Condividi</button></div>
         )}

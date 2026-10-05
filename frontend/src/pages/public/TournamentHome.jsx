@@ -88,7 +88,7 @@ export default function TournamentHome() {
 
       <FeaturedNews slug={slug} posts={data.news || []} />
       <InterviewsBlock slug={slug} items={data.interviews || []} />
-      <ShopShowcase slug={slug} items={data.shop || []} />
+      <ShopShowcase slug={slug} items={data.shop || []} prices={data.prices} />
       <ShopStrip slug={slug} placement="tournament_home" className="mx-auto max-w-[1488px] px-6 mt-16" />
 
       <section className="mx-auto max-w-[1488px] px-6 mt-20" data-testid="home-dashboard">

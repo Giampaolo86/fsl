@@ -388,10 +388,13 @@ async def _make_preview(t_id: str, kind: str, media: MediaFile, user_id: str) ->
 
 
 async def _items_out(t_id: str, items: list[PaidMedia]) -> list[dict]:
+    from ..services import pricing
+
+    prices = await pricing.all_prices(t_id) if items else {}
     out = []
     for it in items:
         d = it.public()
-        d["price"] = it.price_cents / 100
+        d["price"] = prices[it.kind] if it.kind in prices else it.price_cents / 100
         d["preview_url"] = f"/api/media/{it.preview_media_id}" if it.preview_media_id else None
         d.pop("media_id", None)
         out.append(d)
@@ -451,6 +454,14 @@ async def regen_preview(tournament_id: str, item_id: str, user: CurrentUser = De
     return (await _items_out(tournament_id, [it2]))[0]
 
 
+@router.get("/shop/prices")
+async def shop_prices(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    from ..services import pricing
+
+    await require_tournament(tournament_id, user, roles=STAFF)
+    return await pricing.all_prices(tournament_id)
+
+
 @router.get("/shop/sales")
 async def sales(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user, roles=STAFF)
@@ -462,7 +473,9 @@ async def sales(tournament_id: str, user: CurrentUser = Depends(get_current_user
         it = items.get(p.item_id)
         m = matches.get(it.match_id) if it else None
         rows.append({"id": p.id, "created_at": p.created_at, "title": it.title if it else "—", "kind": it.kind if it else "", "match": m.round_name if m else "", "amount": p.amount, "currency": p.currency, "buyer_email": p.buyer_email})
-    return {"count": len(paid), "revenue": round(sum(p.amount for p in paid), 2), "videos": sum(1 for p in paid if items.get(p.item_id) and items[p.item_id].kind == "video"), "photos": sum(1 for p in paid if items.get(p.item_id) and items[p.item_id].kind == "photo"), "items": len(items), "sales": rows[:200]}
+    from ..services import pricing
+
+    return {"count": len(paid), "revenue": round(sum(p.amount for p in paid), 2), "videos": sum(1 for p in paid if items.get(p.item_id) and items[p.item_id].kind == "video"), "photos": sum(1 for p in paid if items.get(p.item_id) and items[p.item_id].kind == "photo"), "items": len(items), "prices": await pricing.all_prices(tournament_id), "sales": rows[:200]}
 
 
 @public_router.get("/matches/{match_id}/shop")

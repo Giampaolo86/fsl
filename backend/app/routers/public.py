@@ -190,6 +190,7 @@ async def tournament_home(slug: str, request: Request, category: Optional[str] =
         "news": await _home_news(t.id),
         "interviews": await __import__("app.routers.posts", fromlist=["public_posts"]).public_posts(t.id, "interview", limit=3),
         "shop": await _home_shop(t.id, all_matches, clubs),
+        "prices": await __import__("app.services.pricing", fromlist=["all_prices"]).all_prices(t.id),
     }
 
 
@@ -458,7 +459,7 @@ async def club_page(slug: str, club_slug: str, request: Request):
         row = next((r for r in rows if r["team_id"] == tm.id), None)
         if row:
             standings.append({"team_id": tm.id, "team": tm.name, "competition": c.name, "category": c.category, "pos": pos, "total": len(rows), "PT": row.get("PT", 0), "PG": row.get("PG", 0), "V": row.get("V", 0), "N": row.get("N", 0), "P": row.get("P", 0), "GF": row.get("GF", 0), "GS": row.get("GS", 0)})
-    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": _venue_pub(venue), "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "standings": standings, "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others, "history": history}
+    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": _venue_pub(venue), "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "standings": standings, "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others, "history": history, "prices": await __import__("app.services.pricing", fromlist=["all_prices"]).all_prices(t.id)}
 
 
 @router.get("/tournaments/{slug}/top11")

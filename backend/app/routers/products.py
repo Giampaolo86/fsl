@@ -202,7 +202,18 @@ async def team_card_preview(slug: str, team_id: str):
         raise not_found("Squadra")
     d = await team_card_payload(t, tm)
     d["preview"] = True
+    from ..services import pricing
+
+    d["prices"] = await pricing.all_prices(t.id)
     return d
+
+
+@router.get("/public/tournaments/{slug}/prices")
+async def public_prices(slug: str):
+    from ..services import pricing
+
+    t = await _tournament(slug)
+    return await pricing.all_prices(t.id)
 
 
 @router.get("/public/tournaments/{slug}/players/{player_id}/capsule")

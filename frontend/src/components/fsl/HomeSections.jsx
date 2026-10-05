@@ -99,18 +99,19 @@ export function InterviewsBlock({ slug, items }) {
   );
 }
 
-export function ShopShowcase({ slug, items }) {
+export function ShopShowcase({ slug, items, prices }) {
   const [busy, setBusy] = useState(null);
   const cart = useCart();
   const buy = (it) => cart.add({ id: it.id, title: it.title, price: it.price, kind: it.kind, image_url: it.preview_url, scope: slug });
+  const videoP = fmtPrice(prices?.video ?? 0.99), photoP = fmtPrice(prices?.photo ?? 0.49);
   return (
     <section className="mx-auto max-w-[1488px] px-6 mt-20" data-testid="home-shop">
-      <HomeHeading icon={Camera} kicker="Ricordi da portare a casa" title="Foto e video delle gare" right={<div className="text-right"><div className="font-display font-bold uppercase tracking-wider text-fsl-gold text-lg">Video 0,99 € · Foto 0,49 €</div><div className="text-xs text-fsl-slate">Originali in alta qualità, pagamento sicuro Stripe</div></div>} />
+      <HomeHeading icon={Camera} kicker="Ricordi da portare a casa" title="Foto e video delle gare" right={<div className="text-right"><div className="font-display font-bold uppercase tracking-wider text-fsl-gold text-lg" data-testid="home-shop-prices">Video {videoP} · Foto {photoP}</div><div className="text-xs text-fsl-slate">Originali in alta qualità, pagamento sicuro Stripe</div></div>} />
       {items.length === 0 ? (
         <div className="relative overflow-hidden rounded-2xl border border-fsl-gold/30 bg-navy-800 p-8 md:p-12 grid md:grid-cols-[1fr_auto] items-center gap-8" data-testid="home-shop-empty">
           <div className="absolute inset-0 grain opacity-40 pointer-events-none" />
           <div className="relative"><div className="fsl-kicker">Fotografi e videomaker FSL a bordo campo</div><h3 className="mt-2 text-3xl sm:text-4xl font-extrabold uppercase leading-[0.95]">Il gol di tuo figlio, in alta qualità</h3><p className="mt-3 text-sm md:text-base text-fsl-slate max-w-xl">Dopo ogni giornata carichiamo le foto professionali e i video delle gare. Segui la tua squadra e ricevi un avviso appena sono disponibili.</p></div>
-          <div className="relative flex flex-col gap-3">{[[Video, "Video della gara", "0,99 €"], [Camera, "Foto professionale", "0,49 €"]].map(([Icon, l, pr]) => <div key={l} className="h-14 px-5 rounded-xl bg-ink-950 border border-white/10 flex items-center gap-4"><Icon className="h-5 w-5 text-fsl-gold" /><span className="text-sm font-semibold">{l}</span><span className="ml-auto num font-display font-extrabold text-2xl text-fsl-gold">{pr}</span></div>)}<Link to={`/tornei/${slug}/partite`} className="btn-gold" data-testid="home-shop-cta">Vai alle partite <ArrowRight className="h-4 w-4" /></Link></div>
+          <div className="relative flex flex-col gap-3">{[[Video, "Video della gara", videoP, "video"], [Camera, "Foto professionale", photoP, "photo"]].map(([Icon, l, pr, k]) => <div key={l} className="h-14 px-5 rounded-xl bg-ink-950 border border-white/10 flex items-center gap-4" data-testid={`home-shop-price-${k}`}><Icon className="h-5 w-5 text-fsl-gold" /><span className="text-sm font-semibold">{l}</span><span className="ml-auto num font-display font-extrabold text-2xl text-fsl-gold">{pr}</span></div>)}<Link to={`/tornei/${slug}/partite`} className="btn-gold" data-testid="home-shop-cta">Vai alle partite <ArrowRight className="h-4 w-4" /></Link></div>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
