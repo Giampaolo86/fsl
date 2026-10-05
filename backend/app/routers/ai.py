@@ -89,6 +89,7 @@ class ChatIn(BaseModel):
     session_id: str = Field(min_length=6, max_length=80)
     message: str = Field(min_length=1, max_length=12000)
     display: Optional[str] = Field(default=None, max_length=400)
+    images: list[str] = Field(default=[], max_length=4, description="immagini base64 (senza prefisso data:), max 4")
 
 
 def _llm(system: str, session_id: str):
@@ -138,15 +139,25 @@ async def calendar_chat(tournament_id: str, body: ChatIn, user: CurrentUser = De
     transcript = "\n".join(f"{'Direttore' if h['role'] == 'user' else 'Assistente'}: {h['content']}" for h in hist[-16:])
     system = f"{CAL_SYSTEM}\n\n# Cervello FSL\n{await _brain_text()}\n\n# Stato attuale del torneo\n{await _context(tournament_id, cat)}"
     prompt = (f"Conversazione finora:\n{transcript}\n\n" if transcript else "") + f"Direttore: {body.message}"
+    from emergentintegrations.llm.chat import ImageContent
+
+    imgs = []
+    for b64 in body.images:
+        raw_b64 = b64.split(",", 1)[1] if b64.startswith("data:") else b64
+        if len(raw_b64) > 6_000_000:
+            raise bad_request("Immagine troppo grande: massimo ~4 MB")
+        imgs.append(ImageContent(image_base64=raw_b64))
+    if imgs:
+        prompt += "\n\n(In allegato " + ("un'immagine" if len(imgs) == 1 else f"{len(imgs)} immagini") + " con il programma/format: leggi orari, campi, gironi, pause e squadre direttamente da lì e riportali nel piano. Se qualcosa è illeggibile, chiedi.)"
     chat = _llm(system, f"{tournament_id}:{body.session_id}")
     try:
-        raw = await chat.send_message(UserMessage(text=prompt))
+        raw = await chat.send_message(UserMessage(text=prompt, file_contents=imgs or None))
     except Exception as e:  # noqa: BLE001
         raise bad_request(f"Assistente non disponibile: {e}")
     reply, plan = _extract_plan(raw or "")
     now = datetime.now(timezone.utc).isoformat()
     await db.ai_chats.insert_many([
-        {"session_id": body.session_id, "tournament_id": tournament_id, "user_id": user.id, "role": "user", "content": body.display or body.message, "created_at": now},
+        {"session_id": body.session_id, "tournament_id": tournament_id, "user_id": user.id, "role": "user", "content": (body.display or body.message) + (f"\n📎 {len(body.images)} immagine/i allegata/e" if body.images else ""), "created_at": now},
         {"session_id": body.session_id, "tournament_id": tournament_id, "user_id": user.id, "role": "assistant", "content": reply, "plan": plan, "created_at": now},
     ])
     return {"reply": reply, "plan": plan}

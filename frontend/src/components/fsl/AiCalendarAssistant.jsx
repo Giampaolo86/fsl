@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Check, History, Loader2, Send, Sparkles, X } from "lucide-react";
+import { Bot, Check, History, ImagePlus, Loader2, Send, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 
@@ -40,14 +40,23 @@ export function AiCalendarAssistant({ tid, board, onApplied, onClose }) {
   const [applied, setApplied] = useState({});
   const end = useRef(null);
   const [formats, setFormats] = useState([]);
+  const [images, setImages] = useState([]);
+  const addFiles = (files) => {
+    [...files].filter((f) => f.type.startsWith("image/")).slice(0, 4 - images.length).forEach((f) => {
+      if (f.size > 4 * 1024 * 1024) return toast.error(`${f.name}: massimo 4 MB`);
+      const fr = new FileReader(); fr.onload = () => setImages((im) => [...im, { name: f.name, data: fr.result }]); fr.readAsDataURL(f);
+    });
+  };
   useEffect(() => { api.get(`/ai/tournaments/${tid}/calendar/chat/${session}`).then((r) => setMsgs(r.data)).catch(() => {}); api.get(`/ai/tournaments/${tid}/calendar/formats`).then((r) => setFormats(r.data)).catch(() => {}); }, [tid, session]);
   useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, busy]);
   const sendMessage = async (message, display) => {
-    if (!message || busy) return;
-    setText(""); setBusy(true);
-    setMsgs((m) => [...m, { role: "user", content: display || message }]);
+    if ((!message && !images.length) || busy) return;
+    const imgs = images.map((i) => i.data);
+    const msg = message || "Ecco il programma in immagine: leggilo e proponimi il piano.";
+    setText(""); setImages([]); setBusy(true);
+    setMsgs((m) => [...m, { role: "user", content: (display || msg) + (imgs.length ? `\n📎 ${imgs.length} immagine/i allegata/e` : ""), images: imgs }]);
     try {
-      const { data } = await api.post(`/ai/tournaments/${tid}/calendar/chat`, { category: board.category, session_id: session, message, display: display || null });
+      const { data } = await api.post(`/ai/tournaments/${tid}/calendar/chat`, { category: board.category, session_id: session, message: msg, display: display || null, images: imgs });
       setMsgs((m) => [...m, { role: "assistant", content: data.reply, plan: data.plan }]);
     } catch (err) { toast.error(apiError(err)); } finally { setBusy(false); }
   };
@@ -86,6 +95,7 @@ export function AiCalendarAssistant({ tid, board, onApplied, onClose }) {
         {msgs.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`} data-testid={`ai-msg-${m.role}`}>
             <div className={`max-w-[92%] rounded-xl px-3 py-2 whitespace-pre-wrap leading-relaxed ${m.role === "user" ? "bg-fsl-gold text-ink-950 rounded-br-sm" : "bg-ink-950/60 border border-white/10 rounded-bl-sm"}`}>
+              {m.images?.length > 0 && <div className="flex gap-1 mb-1">{m.images.map((src, k) => <img key={k} src={src} alt="" className="h-14 w-14 object-cover rounded border border-ink-950/20" />)}</div>}
               {m.content}
               {m.plan && <div className="mt-3"><PlanCard plan={m.plan} busy={applying} applied={applied[i]} onApply={() => apply(m.plan, i)} /></div>}
             </div>
@@ -94,9 +104,13 @@ export function AiCalendarAssistant({ tid, board, onApplied, onClose }) {
         {busy && <div className="flex items-center gap-2 text-xs text-fsl-slate"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Sto ragionando sul format…</div>}
         <div ref={end} />
       </div>
-      <form onSubmit={send} className="p-3 border-t border-white/10 flex gap-2">
-        <textarea className="fsl-input flex-1 min-h-[44px] max-h-32 py-2 resize-none" rows={2} placeholder="Descrivi il format o rispondi alle domande…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) send(e); }} data-testid="ai-input" />
-        <button type="submit" className="btn-gold h-11 w-11 p-0 shrink-0" disabled={busy || !text.trim()} aria-label="Invia" data-testid="ai-send"><Send className="h-4 w-4" /></button>
+      <form onSubmit={send} className="p-3 border-t border-white/10 space-y-2" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files); }}>
+        {images.length > 0 && <div className="flex flex-wrap gap-2" data-testid="ai-attachments">{images.map((im, k) => <div key={k} className="relative"><img src={im.data} alt={im.name} className="h-16 w-16 object-cover rounded-md border border-fsl-gold/50" /><button type="button" onClick={() => setImages((a) => a.filter((_, j) => j !== k))} className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-ink-950 border border-white/20 inline-flex items-center justify-center" aria-label="Rimuovi immagine" data-testid={`ai-attachment-remove-${k}`}><X className="h-3 w-3" /></button></div>)}</div>}
+        <div className="flex gap-2">
+          <label className="btn-ghost h-11 w-11 p-0 shrink-0 cursor-pointer" title="Allega foto o screenshot del programma (anche incollando)" data-testid="ai-attach"><ImagePlus className="h-4 w-4" /><input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} data-testid="ai-attach-input" /></label>
+          <textarea className="fsl-input flex-1 min-h-[44px] max-h-32 py-2 resize-none" rows={2} placeholder="Descrivi il format, incolla/allega una foto del programma, o rispondi…" value={text} onChange={(e) => setText(e.target.value)} onPaste={(e) => { const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); addFiles(fs); } }} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) send(e); }} data-testid="ai-input" />
+          <button type="submit" className="btn-gold h-11 w-11 p-0 shrink-0" disabled={busy || (!text.trim() && !images.length)} aria-label="Invia" data-testid="ai-send"><Send className="h-4 w-4" /></button>
+        </div>
       </form>
     </aside>
   );
