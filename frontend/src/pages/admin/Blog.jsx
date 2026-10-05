@@ -25,21 +25,25 @@ export default function BlogManager({ clubMode = false }) {
   const [editing, setEditing] = useState(undefined);
   const [preview, setPreview] = useState(null);
   const [storyMatch, setStoryMatch] = useState("");
+  const [comps, setComps] = useState([]);
+  const [recap, setRecap] = useState({ competition_id: "", match_day: 1 });
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => { if (tid) api.get(`/tournaments/${tid}/posts`, { params: filter ? { status: filter } : {} }).then((r) => setList(r.data)).catch((e) => toast.error(apiError(e))); }, [tid, filter]);
   useEffect(load, [load]);
-  useEffect(() => { if (!tid) return; if (!clubMode) api.get(`/tournaments/${tid}/clubs`).then((r) => setClubs(r.data)).catch(() => {}); api.get(`/tournaments/${tid}/matches`, { params: { status: "official,rectified" } }).then((r) => setMatches(r.data)).catch(() => {}); }, [tid, clubMode]);
+  useEffect(() => { if (!tid) return; if (!clubMode) { api.get(`/tournaments/${tid}/clubs`).then((r) => setClubs(r.data)).catch(() => {}); api.get(`/tournaments/${tid}/competitions`).then((r) => setComps(r.data.filter((c) => c.kind !== "knockout"))).catch(() => {}); } api.get(`/tournaments/${tid}/matches`, { params: { status: "official,rectified" } }).then((r) => setMatches(r.data)).catch(() => {}); }, [tid, clubMode]);
   if (!tid) return <EmptyState icon={Newspaper} title="Nessuna società assegnata" />;
   const act = async (fn, ok) => { setBusy(true); try { await fn(); toast.success(ok); load(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); } };
   const status = (p, action) => act(() => api.post(`/tournaments/${tid}/posts/${p.id}/status`, { action }), action === "withdraw" ? "Contenuto ritirato" : action === "publish" ? "Pubblicato" : "Riportato in bozza");
   const remove = (p) => act(() => api.delete(`/tournaments/${tid}/posts/${p.id}`), "Contenuto eliminato");
   const story = () => act(async () => { const r = await api.post(`/tournaments/${tid}/matches/${storyMatch}/story`); setEditing(r.data); }, "Match story generata: rivedi e pubblica");
+  const recapAi = () => act(async () => { const r = await api.post(`/ai/tournaments/${tid}/weekly/recap`, { ...recap, match_day: Number(recap.match_day), force: true }); setEditing(r.data); }, "Recap IA pronto in bozza: rileggi, modifica e pubblica");
   const counts = (list || []).reduce((a, p) => { a[p.status] = (a[p.status] || 0) + 1; return a; }, {});
 
   return (
     <div>
       <PageHeader kicker="Portale pubblico" title="Blog e interviste" subtitle={clubMode ? "Notizie, interviste, gallery e video della tua società. I contenuti programmati diventano pubblici alla data stabilita." : "Notizie, interviste, gallery e video collegati a società e partite. Bozza, programmazione e pubblicazione immediata."} actions={<>
         <div className="flex items-center gap-1"><select className="fsl-input h-10 w-56" value={storyMatch} onChange={(e) => setStoryMatch(e.target.value)} data-testid="story-match-select"><option value="">Match story da gara…</option>{matches.map((m) => <option key={m.id} value={m.id}>{m.home.club?.short_name} {m.score.home}-{m.score.away} {m.away.club?.short_name} · {m.round_name}</option>)}</select><button className="btn-ghost h-10" disabled={!storyMatch || busy} onClick={story} data-testid="story-generate"><Sparkles className="h-4 w-4" /> Genera</button></div>
+        {!clubMode && comps.length > 0 && <div className="flex items-center gap-1" data-testid="recap-ai"><select className="fsl-input h-10 w-44" value={recap.competition_id} onChange={(e) => setRecap({ ...recap, competition_id: e.target.value })} data-testid="recap-comp-select"><option value="">Recap IA giornata…</option>{comps.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>{recap.competition_id && <><input type="number" min={1} max={60} className="fsl-input h-10 w-16" value={recap.match_day} onChange={(e) => setRecap({ ...recap, match_day: e.target.value })} aria-label="Giornata" data-testid="recap-day-input" /><button className="btn-ghost h-10" disabled={busy} onClick={recapAi} data-testid="recap-generate"><Sparkles className="h-4 w-4" /> Scrivi</button></>}</div>}
         <button className="btn-gold" onClick={() => setEditing(null)} data-testid="post-new"><Plus className="h-4 w-4" /> Nuovo contenuto</button>
       </>} />
       <div className="flex flex-wrap gap-1 mb-4" role="tablist">{FILTERS.map(([k, l]) => <button key={k} role="tab" aria-selected={filter === k} onClick={() => setFilter(k)} className={`h-9 px-3 rounded-full text-xs font-semibold uppercase ${filter === k ? "bg-fsl-blue" : "border border-white/15 text-fsl-slate hover:text-fsl-white"}`} data-testid={`post-filter-${k || "all"}`}>{l}{k && counts[k] ? <span className="num ml-1 text-fsl-gold">{counts[k]}</span> : null}</button>)}</div>

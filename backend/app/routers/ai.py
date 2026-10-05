@@ -426,3 +426,93 @@ async def match_caption(tournament_id: str, match_id: str, regenerate: bool = Fa
     if not out:
         raise bad_request("Didascalia non disponibile: la gara deve avere un risultato")
     return out
+
+
+# ---------- recap giornata (FSL Weekly) ----------
+RECAP_SYSTEM = """Sei la redazione di FSL Weekly, il magazine di Future Stars League. Scrivi il recap di una giornata di campionato nel tono del Cervello FSL.
+Struttura del body (Markdown leggero): un attacco di 2–3 frasi; poi «## I risultati» con una riga per gara (Squadra A 2–1 Squadra B, marcatori se forniti); «## I protagonisti» (squadre e, SOLO se forniti, i marcatori: mai inventare nomi); «## La classifica in breve» con le prime 3–4 posizioni e il quadro di coda in modo gentile; chiusura breve sul prossimo turno. Niente pressione sul risultato, complimenti anche a chi ha perso.
+Rispondi SOLO con JSON: {"title": "max 70 caratteri", "excerpt": "1–2 frasi", "body": "Markdown"}"""
+
+
+async def _matchday_payload(tournament_id: str, comp, match_day: int) -> tuple[str, list]:
+    from ..services import engine
+
+    ms = await scoped("matches", tournament_id).list({"competition_id": comp.id, "match_day": match_day, "stage": "qualification", "status": {"$ne": "cancelled"}}, sort=[("kickoff_at", 1)], limit=200)
+    names = {x.id: x.name for x in await scoped("teams", tournament_id).list({"competition_id": comp.id}, limit=200)}
+    lines = []
+    for m in ms:
+        sc = m.score if isinstance(m.score, dict) else (m.score.model_dump() if m.score else {})
+        scorers = [((e if isinstance(e, dict) else e.model_dump())).get("player_name") for e in (m.events or []) if ((e if isinstance(e, dict) else e.model_dump())).get("type") == "goal"]
+        scorers = [x for x in scorers if x]
+        lines.append(f"- {names.get(m.home_team_id, '?')} {sc.get('home')}–{sc.get('away')} {names.get(m.away_team_id, '?')} ({m.status})" + (f" · gol: {', '.join(scorers)}" if scorers else ""))
+    table = await engine.compute_standings(tournament_id, comp)
+    tl = [f"{i + 1}. {r['name']} {r.get('PT', '')} pt" for i, r in enumerate(table[:8])]
+    t = await db.tournaments.find_one({"_id": __import__("bson").ObjectId(tournament_id)}, {"name": 1})
+    return (f"Torneo: {(t or {}).get('name', '')}. Competizione: {comp.name}. Giornata {match_day} di {comp.rounds}.\nGare:\n" + "\n".join(lines) + "\nClassifica dopo la giornata:\n" + "\n".join(tl)), ms
+
+
+async def generate_recap(tournament_id: str, competition_id: str, match_day: int, user_id: str | None = None, force: bool = False) -> dict | None:
+    """Crea (o aggiorna) la BOZZA del recap FSL Weekly della giornata; non pubblica mai da sola."""
+    from emergentintegrations.llm.chat import UserMessage
+
+    from .posts import slugify
+
+    comp = await scoped("competitions", tournament_id).get(competition_id)
+    if not comp:
+        return None
+    posts = scoped("posts", tournament_id)
+    key = f"recap:{competition_id}:{match_day}"
+    existing = await posts.find_one({"auto_key": key})
+    if existing and existing.status != "draft":
+        return None
+    if existing and not force:
+        return existing.public()
+    payload, ms = await _matchday_payload(tournament_id, comp, match_day)
+    chat = _llm(f"{RECAP_SYSTEM}\n\n# Cervello FSL\n{await _brain_text()}", f"{tournament_id}:recap:{key}")
+    try:
+        raw = await chat.send_message(UserMessage(text=payload + "\nProduci il JSON."))
+        mm = re.search(r"\{.*\}", raw or "", re.S)
+        out = json.loads(mm.group(0)) if mm else {}
+    except Exception:  # noqa: BLE001
+        return None
+    if not out.get("body"):
+        return None
+    from ..models.domain import Post
+
+    team_ids = sorted({m.home_team_id for m in ms} | {m.away_team_id for m in ms})
+    club_ids = sorted({x.club_id for x in await scoped("teams", tournament_id).list({"_id": {"$in": team_ids}}, limit=200) if x.club_id})
+    fields = {"title": str(out["title"])[:120], "excerpt": str(out.get("excerpt", ""))[:300], "body": str(out["body"]), "category": comp.category, "club_ids": club_ids, "team_ids": team_ids, "auto": True, "auto_key": key}
+    if existing:
+        p = await posts.update(existing.id, fields, user_id)
+    else:
+        base = slugify(fields["title"]) or f"recap-{match_day}"
+        slug = base if not await posts.find_one({"slug": base}) else f"{base}-{match_day}"
+        p = await posts.insert(Post(tournament_id=tournament_id, kind="weekly", status="draft", slug=slug, author_name="Redazione IA FSL", **fields), user_id)
+    return p.public()
+
+
+async def maybe_recap_after_official(tournament_id: str, m) -> None:
+    """Se tutte le gare della giornata sono ufficiali, prepara la bozza del recap."""
+    if m.stage != "qualification" or not m.match_day:
+        return
+    repo = scoped("matches", tournament_id)
+    ms = await repo.list({"competition_id": m.competition_id, "match_day": m.match_day, "stage": "qualification", "status": {"$ne": "cancelled"}}, limit=200)
+    if ms and all(x.status in ("official", "rectified") for x in ms):
+        await generate_recap(tournament_id, m.competition_id, m.match_day, None, force=False)
+
+
+class RecapIn(BaseModel):
+    competition_id: str
+    match_day: int = Field(ge=1, le=60)
+    force: bool = True
+
+
+@router.post("/tournaments/{tournament_id}/weekly/recap")
+async def weekly_recap(tournament_id: str, body: RecapIn, user: CurrentUser = Depends(get_current_user)):
+    t, role = await require_tournament(tournament_id, user, writable=True)
+    if role not in STAFF:
+        raise bad_request("Riservato allo staff")
+    p = await generate_recap(tournament_id, body.competition_id, body.match_day, user.id, force=body.force)
+    if not p:
+        raise bad_request("Recap non generabile: la giornata ha un recap già pubblicato oppure l'IA non ha risposto")
+    return p
