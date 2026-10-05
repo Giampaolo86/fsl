@@ -282,7 +282,7 @@ async def public_match(slug: str, match_id: str):
         raise not_found("Partita")
     d = (await _public_matches(t.id, [m]))[0]
     c = await scoped("competitions", t.id).get(m.competition_id)
-    d["standings"] = await engine.compute_standings(t.id, c) if c else []
+    d["standings"] = await engine.compute_standings(t.id, c) if c and c.kind != "knockout" else []
     if m.status in FINAL:
         from .extras import fanta_rows
 

@@ -666,7 +666,7 @@ async def reopen(tournament_id: str, match_id: str, body: dict, user: CurrentUse
 @router.get("/standings")
 async def standings(tournament_id: str, competition_id: Optional[str] = None, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user)
-    comps = await scoped("competitions", tournament_id).list({"_id": __import__("bson").ObjectId(competition_id)} if competition_id else {}, sort=[("category", 1), ("series", 1)])
+    comps = await scoped("competitions", tournament_id).list({"_id": __import__("bson").ObjectId(competition_id)} if competition_id else {"kind": {"$ne": "knockout"}}, sort=[("category", 1), ("series", 1)])
     return [{"competition": c.public(), "rows": await engine.compute_standings(tournament_id, c)} for c in comps]
 
 
