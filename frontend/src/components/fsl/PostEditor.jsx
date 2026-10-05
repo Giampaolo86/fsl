@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { KIND_LABEL } from "@/components/fsl/Article";
 import { api, apiError } from "@/lib/api";
 import { PlayerTagPicker } from "@/components/fsl/PlayerTagPicker";
+import { AiBlogWriter } from "@/components/fsl/AiBlogWriter";
 import { mediaUrl, uploadMedia } from "@/lib/upload";
 
 const EMPTY = { kind: "news", title: "", excerpt: "", body: "", cover_url: null, media: [], club_ids: [], player_ids: [], match_id: "", publish_at: "" };
@@ -49,6 +50,7 @@ export function PostEditor({ tournamentId, post, clubMode, clubs, matches, onClo
           <select className="fsl-input" value={form.kind} onChange={(e) => set("kind", e.target.value)} data-testid="post-kind">{Object.entries(KIND_LABEL).filter(([k]) => k !== "badge").map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
           <input className="fsl-input" placeholder="Titolo" value={form.title} onChange={(e) => set("title", e.target.value)} data-testid="post-title" />
         </div>
+        <AiBlogWriter tournamentId={tournamentId} form={form} onApply={(d) => setForm((f) => ({ ...f, title: d.title || f.title, excerpt: d.excerpt || f.excerpt, body: d.body || f.body }))} />
         <input className="fsl-input" placeholder="Sommario (una frase)" value={form.excerpt} onChange={(e) => set("excerpt", e.target.value)} data-testid="post-excerpt" />
         <textarea className="fsl-input h-48 py-2 leading-relaxed" placeholder="Testo dell'articolo. Separa i paragrafi con una riga vuota." value={form.body} onChange={(e) => set("body", e.target.value)} data-testid="post-body" />
         <div className="grid sm:grid-cols-2 gap-3">

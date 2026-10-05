@@ -7,6 +7,8 @@ import { CalendarBlock } from "@/components/fsl/simple/CalendarBlock";
 import { FinalsBlock } from "@/components/fsl/simple/FinalsBlock";
 import { SimpleMatchEdit } from "@/components/fsl/SimpleMatchEdit";
 import { SimpleMatchCreate } from "@/components/fsl/SimpleMatchCreate";
+import { AiCalendarAssistant } from "@/components/fsl/AiCalendarAssistant";
+import { Sparkles } from "lucide-react";
 import { useTournamentDetail } from "@/hooks/useTournamentData";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
@@ -20,6 +22,7 @@ export default function SimpleEngine() {
   const [error, setError] = useState(null);
   const [editM, setEditM] = useState(null);
   const [createM, setCreateM] = useState(null);
+  const [ai, setAi] = useState(false);
 
   const load = useCallback(() => {
     api.get(`/tournaments/${tid}/simple/board`, { params: category ? { category } : {} }).then((r) => { setBoard(r.data); setError(null); }).catch(setError);
@@ -59,15 +62,19 @@ export default function SimpleEngine() {
         kicker="Una pagina, tre passi"
         title="Gironi e Calendario"
         subtitle={`${board.groups.length} gironi · ${board.teams.filter((x) => board.groups.some((g) => g.id === x.competition_id)).length} squadre · ${total} partite`}
-        actions={board.categories.length > 1 && (
-          <select className="fsl-input h-10 w-44" value={board.category} onChange={(e) => { const p = new URLSearchParams(params); p.set("cat", e.target.value); setParams(p); }} data-testid="simple-category-select">
-            {board.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        )}
+        actions={<div className="flex flex-wrap items-center gap-2">
+          {canWrite && <button type="button" className={`h-10 px-4 inline-flex items-center gap-2 rounded-md font-semibold text-sm border transition-colors ${ai ? "bg-fsl-gold text-ink-950 border-fsl-gold" : "border-fsl-gold/60 text-fsl-gold hover:bg-fsl-gold/10"}`} onClick={() => setAi((v) => !v)} data-testid="ai-toggle"><Sparkles className="h-4 w-4" /> Assistente IA</button>}
+          {board.categories.length > 1 && (
+            <select className="fsl-input h-10 w-44" value={board.category} onChange={(e) => { const p = new URLSearchParams(params); p.set("cat", e.target.value); setParams(p); }} data-testid="simple-category-select">
+              {board.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
+        </div>}
       />
       <GroupsBlock tid={tid} board={board} reload={load} canWrite={canWrite} />
       <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} onMove={move} onBreaks={saveBreaks} onSlots={saveSlots} onQuickTeam={quickTeam} onCreate={setCreateM} />
       <FinalsBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} onCreate={setCreateM} />
+      {ai && <AiCalendarAssistant tid={tid} board={board} onApplied={(data) => setBoard(data)} onClose={() => setAi(false)} />}
       {createM && <SimpleMatchCreate tid={tid} board={board} defaults={createM} onClose={() => setCreateM(null)} onDone={load} />}
       {editM && <SimpleMatchEdit tid={tid} m={editM} teams={board.teams} fields={board.fields} onClose={() => setEditM(null)} onDone={load} />}
     </div>

@@ -7,6 +7,7 @@ import { useTournamentDetail } from "@/hooks/useTournamentData";
 import { useTournaments } from "@/context/TournamentContext";
 import { api, apiError } from "@/lib/api";
 import { mediaUrl, uploadMedia } from "@/lib/upload";
+import { BrainEditor } from "@/components/fsl/BrainEditor";
 import { DAYS, FORMULA, TIEBREAK_LABELS, fmtNum } from "@/lib/format";
 import { GroupsPlanner, planGroups } from "@/components/fsl/GroupsPlanner";
 import { HospitalityEditor } from "@/components/fsl/HospitalityEditor";
@@ -271,6 +272,8 @@ export default function Settings() {
         </section>
 
         <section className="fsl-card p-6" data-testid="settings-hospitality">
+          <SectionTitle>Cervello FSL (memoria dell'assistente IA)</SectionTitle>
+          <BrainEditor />
           <SectionTitle>Ospitalità e logistica</SectionTitle>
           <div className="mb-5 rounded-lg border border-white/10 bg-ink-950/40 p-4" data-testid="settings-hospitality-visibility">
             <div className="fsl-label mb-2">Chi vede prezzi e servizi e può richiedere la prenotazione</div>
