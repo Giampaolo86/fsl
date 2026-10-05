@@ -1,0 +1,22 @@
+{
+  "summary": "Full regression on Impersonation flow, DELETE users / access-requests, guided-accounts direct login, Control Room → Utenti UI (impersonation hint, access-requests empty state, impersonate buttons scoped to non-super-admin, delete buttons not on own row), and Hub purge-data dialog copy. Backend pytest 9/9 passed; frontend Playwright flow 100% passing (club & referee impersonation open in new tab with banner, nav inside club keeps banner, admin tab remains authenticated, exit returns to /admin/utenti, purge dialog shows updated copy mentioning @fsl.demo and 'richieste di accesso').",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_impersonation_and_delete.py",
+    "/app/test_reports/pytest/iteration41.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Impersonation blocked actions (password change, nested impersonate, MFA ops) correctly return 403 IMPERSONATION; end-session properly revokes the token (401 SESSION_REVOKED).",
+    "Access-request POST schema uses tournament_slug + requires privacy_accepted=true (good UX validation message in IT)."
+  ],
+  "updated_files": ["/app/backend/tests/test_impersonation_and_delete.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! (MFA TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C); societa.prova@futurestarsleague.com / Societa-cf13d0-FSL26; arbitro.prova@futurestarsleague.com / Arbitro-e3f3e4-FSL31",
+  "seed_data_creation": "Each test run creates and deletes a throwaway fan e2e_del_<ts>@test.it and an access-request e2e_ar_<ts>@test.it. Cleaned up by the test itself (no residue).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite at /app/backend/tests/test_impersonation_and_delete.py (9 tests, ~5s). It uses pyotp with QA TOTP secret and the X-Client: api login. For access-request POST remember payload needs tournament_slug + privacy_accepted. Playwright flow verified: impersonate opens new tab via context.expect_page(), banner data-testid=impersonation-banner, exit data-testid=impersonation-exit-button. The purge dialog uses role=dialog; dismiss with 'Annulla' button — do NOT confirm or qa.superadmin will be deleted.",
+  "rca of the issue": "None — all flows green."
+}
