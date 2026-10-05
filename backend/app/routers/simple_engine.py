@@ -668,6 +668,26 @@ async def move_match(tournament_id: str, body: MoveMatchIn, user: CurrentUser = 
     return {"swapped": bool(other), **await _board(tournament_id, m.category)}
 
 
+@router.delete("/matches/{match_id}")
+async def delete_match(tournament_id: str, match_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Elimina una gara non ancora giocata (gironi o fase finale). Le squadre segnaposto senza altre gare vengono rimosse."""
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    repo = scoped("matches", tournament_id)
+    m = await repo.get(match_id)
+    if not m or m.status == "cancelled":
+        raise not_found("Gara")
+    if m.status in PLAYED:
+        raise conflict("La gara è già stata giocata: usa una rettifica invece di eliminarla")
+    await repo.soft_delete(m.id, user.id)
+    teams_repo = scoped("teams", tournament_id)
+    for tid_ in (m.home_team_id, m.away_team_id):
+        tm = await teams_repo.get(tid_) if tid_ else None
+        if tm and tm.placeholder and not await repo.count({"status": {"$ne": "cancelled"}, "$or": [{"home_team_id": tm.id}, {"away_team_id": tm.id}]}):
+            await teams_repo.soft_delete(tm.id, user.id)
+    await audit.record(user, "simple.delete_match", "match", m.id, t.id, before={"kickoff_at": m.kickoff_at, "field": m.field_name, "round_name": m.round_name, "stage": m.stage})
+    return await _board(tournament_id, m.category)
+
+
 class BreakIn(BaseModel):
     date: str
     start_time: str

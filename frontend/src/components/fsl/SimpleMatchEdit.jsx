@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { api, apiError } from "@/lib/api";
@@ -25,6 +26,11 @@ export function SimpleMatchEdit({ tid, m, teams, fields, onClose, onDone }) {
       toast.error(apiError(e));
     } finally { setBusy(false); }
   };
+  const remove = async () => {
+    if (!window.confirm(`Eliminare questa partita (${m.round_name || "gara"} · ${f.date} ${f.time})? L'operazione non è reversibile.`)) return;
+    setBusy(true);
+    try { await api.delete(`/tournaments/${tid}/simple/matches/${m.id}`); toast.success("Partita eliminata"); onDone(); onClose(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
+  };
   const opt = (x) => <option key={x.id} value={x.id}>{x.name}{x.series && x.series !== "Fase finale" ? ` · ${x.series}` : ""}</option>;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -40,7 +46,7 @@ export function SimpleMatchEdit({ tid, m, teams, fields, onClose, onDone }) {
           <label><span className="fsl-label">Commento</span><input className="fsl-input mt-1" placeholder="es. Premiazione a seguire" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} data-testid="edit-note" /></label>
           {m.stage === "finals" && <label className="col-span-2 inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={f.is_grand_final} onChange={(e) => setF({ ...f, is_grand_final: e.target.checked })} data-testid="edit-grand-final" /> ★ Questa è la <b>finalissima</b> (una sola per categoria)</label>}
         </div>
-        <DialogFooter><button className="btn-ghost" onClick={onClose} data-testid="edit-cancel">Annulla</button><button className="btn-primary" disabled={busy || f.home_team_id === f.away_team_id} onClick={() => save(false)} data-testid="edit-save">Salva e chiudi</button></DialogFooter>
+        <DialogFooter className="sm:justify-between gap-2"><button className="btn-ghost text-fsl-danger sm:mr-auto" disabled={busy} onClick={remove} data-testid="edit-delete"><Trash2 className="h-4 w-4" /> Elimina partita</button><button className="btn-ghost" onClick={onClose} data-testid="edit-cancel">Annulla</button><button className="btn-primary" disabled={busy || f.home_team_id === f.away_team_id} onClick={() => save(false)} data-testid="edit-save">Salva e chiudi</button></DialogFooter>
       </DialogContent>
     </Dialog>
   );

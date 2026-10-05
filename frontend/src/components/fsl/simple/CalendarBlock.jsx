@@ -29,7 +29,8 @@ export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, t
               onDragOver={(e) => { if (draggable && !m.played) { e.preventDefault(); setOver(m.id); } }}
               onDragLeave={() => setOver((o) => (o === m.id ? null : o))}
               onDrop={(e) => drop(e, m)}
-              className={`${m.played ? "opacity-70" : draggable ? "cursor-grab active:cursor-grabbing" : ""} ${over === m.id ? "bg-fsl-gold/15 outline outline-1 outline-fsl-gold" : ""} transition-colors`}
+              onClick={() => { if (canWrite && !m.played) onEdit(m); }}
+              className={`${m.played ? "opacity-70" : draggable ? "cursor-grab active:cursor-grabbing" : canWrite ? "cursor-pointer" : ""} ${canWrite && !m.played ? "hover:bg-white/[0.04]" : ""} ${over === m.id ? "bg-fsl-gold/15 outline outline-1 outline-fsl-gold" : ""} transition-colors`}
               data-testid={`simple-match-${m.id}`}
             >
               {draggable && <td className="pl-2 text-fsl-slate/50" aria-hidden="true">{!m.played && <GripVertical className="h-4 w-4" />}</td>}
@@ -40,7 +41,7 @@ export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, t
               <td className="px-2 py-2 font-semibold">{m.home}</td>
               <td className="px-2 py-2 font-semibold">{m.away}</td>
               <td className="px-2 py-2 text-right whitespace-nowrap">
-                {m.played ? <span className="num text-fsl-gold font-bold">{m.score?.home} - {m.score?.away}</span> : canWrite ? <button className="btn-ghost h-8 px-3 text-xs" onClick={() => onEdit(m)} data-testid={`simple-edit-${m.id}`}><Pencil className="h-3.5 w-3.5" /> Modifica</button> : null}
+                {m.played ? <span className="num text-fsl-gold font-bold">{m.score?.home} - {m.score?.away}</span> : canWrite ? <button className="btn-ghost h-8 px-3 text-xs" onClick={(e) => { e.stopPropagation(); onEdit(m); }} data-testid={`simple-edit-${m.id}`}><Pencil className="h-3.5 w-3.5" /> Modifica</button> : null}
               </td>
             </tr>
           ))}

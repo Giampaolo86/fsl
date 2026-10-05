@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ClipboardList, PlayCircle, Timer } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ClipboardList, PlayCircle, Timer } from "lucide-react";
 import { MatchCard } from "@/components/fsl/MatchCard";
 import MatchWorkspace from "@/components/fsl/MatchWorkspace";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
