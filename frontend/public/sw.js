@@ -1,4 +1,4 @@
-const CACHE = "fsl-shell-v28";
+const CACHE = "fsl-shell-v29";
 const SHELL = ["/manifest.json", "/icon.svg", "/brand/logo.png"];
 
 self.addEventListener("install", (e) => {

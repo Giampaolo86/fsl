@@ -1,0 +1,25 @@
+{
+  "summary": "Iteration 42 testing: /api/clubs/overview, referee-guide video CRUD (YouTube/Vimeo/null/forbidden), club profile completeness update, and all frontend flows (Tutte le società page, sequence editor, Users 'Homepage società' link, PublicClubHome 'Modifica homepage' admin button, /guida-arbitri public animations + SA video edit + /arbitro/guida for referee). All 11 pytest tests passed and all UI flows passed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration42.py", "/app/test_reports/pytest/iteration42.xml"],
+  "action_items": [
+    "Minor: The review request mentions testid 'kpi-todo' but the actual implementation uses 'clubs-global-kpi-todo' (also 'clubs-global-kpi-total/complete/drafts'). Not a bug; the test request text was imprecise. The code value present on screen (27 Da sistemare) matches."
+  ],
+  "critical_code_review_comments": [
+    "guide.py set_video raises forbidden() for invalid step ('9'); semantically should be 422/400, but matches review request expectation of 403.",
+    "clubs/overview returns public() crest fields correctly; no _id leakage observed.",
+    "club_completeness correctly derives checks and missing[] labels in Italian; score computed as 0..100 integer."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration42.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100%"},
+  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C (created and DELETED at end). societa.prova@futurestarsleague.com, arbitro.prova@futurestarsleague.com used as per instructions, unchanged.",
+  "seed_data_creation": "None. Any referee-guide video set was removed; club profile edited and restored to prior values.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iteration 42 features (ClubsGlobal / sequence editor / Users link / PublicClubHome admin button / RefereeGuide public+SA/arbitro) are working end-to-end. Backend tests at /app/backend/tests/test_iteration42.py are reusable. QA admin created with scripts/qa_admin.py create and deleted after use. Note minor naming nitpick: testids in ClubsGlobal are 'clubs-global-kpi-*' (not just 'kpi-todo')."
+}
