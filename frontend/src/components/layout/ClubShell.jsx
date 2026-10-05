@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { BedDouble, CalendarDays, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, LogOut, Newspaper, Shield, Users, ShieldCheck } from "lucide-react";
+import { BedDouble, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, LogOut, Newspaper, Shield, Users, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { OfflineBanner } from "@/components/fsl/States";
@@ -16,6 +16,7 @@ const CLUB_NAV = [
   ["Ospitalità", "/societa/ospitalita", BedDouble],
   ["Blog", "/societa/blog", Newspaper],
   ["Profilo", "/societa/profilo", Shield],
+  ["Guida", "/societa/guida", BookOpenCheck],
 ];
 
 export default function ClubShell() {

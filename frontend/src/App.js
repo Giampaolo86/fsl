@@ -14,6 +14,7 @@ import Login from "@/pages/Login";
 import Impersonate from "@/pages/Impersonate";
 import ClubsGlobal from "@/pages/admin/ClubsGlobal";
 import RefereeGuide from "@/pages/public/RefereeGuide";
+import ClubGuide from "@/pages/public/ClubGuide";
 import { ImpersonationBanner } from "@/components/fsl/ImpersonationBanner";
 import ChildCodesSheet from "@/pages/admin/ChildCodesSheet";
 import ChangePassword, { SecurityPage } from "@/pages/Security";
@@ -181,6 +182,7 @@ function AppRoutes() {
                 <Route path="blog" element={<BlogManager clubMode />} />
                 <Route path="documenti" element={<Documents clubMode />} />
                 <Route path="profilo" element={<ClubHomeEditor />} />
+                <Route path="guida" element={<ClubGuide embedded />} />
                 <Route path="giocatori/:playerId" element={<PlayerProfile mode="club" />} />
               </Route>
 
@@ -199,6 +201,7 @@ function AppRoutes() {
                 <Route path="/club/:orgClubId" element={<PublicClubEntity />} />
                 <Route path="/codice-fsl" element={<CodiceFSL />} />
                 <Route path="/guida-arbitri" element={<RefereeGuide />} />
+                <Route path="/guida-societa" element={<ClubGuide />} />
                 <Route path="/albo-doro/:archiveSlug" element={<SeasonArchive />} />
                 <Route path="/account" element={<ProtectedRoute roles={["fan"]}><FanAccount /></ProtectedRoute>} />
               </Route>
