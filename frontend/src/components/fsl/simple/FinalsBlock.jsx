@@ -52,7 +52,7 @@ export function FinalsBlock({ tid, board, reload, canWrite, onEdit, onSwap, onCr
       ) : (
         <div className="space-y-3">
           {canWrite && <div className="flex flex-wrap items-center gap-3"><button className="btn-ghost h-10" disabled={busy} onClick={() => fill(false)} data-testid="finals-fill-button"><Users className="h-4 w-4" /> Inserisci le qualificate</button><span className="text-xs text-fsl-slate">Prende 1ª/2ª dalle classifiche e vincenti/perdenti dai risultati ufficiali. Puoi sempre correggere con Modifica.</span></div>}
-          <MatchTable rows={board.finals} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} testId="finals-table" />
+          <MatchTable rows={board.finals} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} testId="finals-table" tid={tid} onBulkDeleted={() => reload()} />
         </div>
       )}
     </section>

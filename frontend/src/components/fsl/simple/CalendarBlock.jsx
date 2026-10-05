@@ -1,24 +1,49 @@
 import { useState } from "react";
-import { FileDown, GripVertical, LayoutGrid, List, Pencil, Plus, Star, X } from "lucide-react";
+import { FileDown, GripVertical, LayoutGrid, List, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import { TimeGrid } from "./TimeGrid";
 
-export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, testId }) {
+export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, testId, tid, onBulkDeleted }) {
   const [over, setOver] = useState(null);
+  const [sel, setSel] = useState([]);
+  const [deleting, setDeleting] = useState(false);
   if (!rows.length) return null;
   const draggable = canWrite && !!onSwap;
+  const selectable = canWrite && !!tid && !!onBulkDeleted;
+  const deletable = rows.filter((m) => !m.played);
+  const selected = sel.filter((id) => rows.some((m) => m.id === id));
+  const toggle = (id) => setSel((x) => (x.includes(id) ? x.filter((y) => y !== id) : [...x, id]));
+  const toggleAll = () => setSel(selected.length === deletable.length ? [] : deletable.map((m) => m.id));
+  const bulkDelete = async () => {
+    if (!window.confirm(`Eliminare ${selected.length} partite selezionate? L'operazione non è reversibile.`)) return;
+    setDeleting(true);
+    try {
+      const { data } = await api.post(`/tournaments/${tid}/simple/matches/bulk-delete`, { ids: selected });
+      toast.success(`${data.deleted} partite eliminate${data.skipped ? ` · ${data.skipped} saltate (già giocate)` : ""}`);
+      setSel([]);
+      onBulkDeleted(data);
+    } catch (e) { toast.error(apiError(e)); } finally { setDeleting(false); }
+  };
   const drop = (e, target) => {
     e.preventDefault(); setOver(null);
     const src = e.dataTransfer.getData("text/fsl-match");
     if (src && src !== target.id && !target.played) onSwap(src, target.id);
   };
   return (
+    <div className="space-y-2">
+      {selectable && selected.length > 0 && (
+        <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-fsl-gold/50 bg-ink-950/95 px-3 py-2 text-sm shadow-xl" data-testid={`${testId}-bulk-bar`}>
+          <span><b className="num">{selected.length}</b> partite selezionate</span>
+          <button type="button" className="btn-ghost h-8 px-3 text-xs text-fsl-danger" disabled={deleting} onClick={bulkDelete} data-testid={`${testId}-bulk-delete`}><Trash2 className="h-3.5 w-3.5" /> Elimina selezionate</button>
+          <button type="button" className="btn-ghost h-8 px-3 text-xs" onClick={() => setSel([])} data-testid={`${testId}-bulk-clear`}>Annulla selezione</button>
+        </div>
+      )}
     <div className="overflow-x-auto rounded-lg border border-white/10" data-testid={testId}>
       <table className="w-full text-sm">
         <thead className="text-[11px] uppercase tracking-wider text-fsl-slate bg-ink-950/60">
-          <tr>{draggable && <th className="w-6" aria-label="Trascina" />}<th className="text-left px-3 py-2">Data</th><th className="text-left px-2 py-2">Ora</th><th className="text-left px-2 py-2">Campo</th>{showGroup && <th className="text-left px-2 py-2">Girone</th>}<th className="text-left px-2 py-2">Squadra casa</th><th className="text-left px-2 py-2">Squadra ospite</th><th className="px-2 py-2 text-right">{canWrite ? "Modifica" : "Esito"}</th></tr>
+          <tr>{selectable && <th className="w-8 px-2"><input type="checkbox" aria-label="Seleziona tutte" checked={deletable.length > 0 && selected.length === deletable.length} onChange={toggleAll} data-testid={`${testId}-select-all`} /></th>}{draggable && <th className="w-6" aria-label="Trascina" />}<th className="text-left px-3 py-2">Data</th><th className="text-left px-2 py-2">Ora</th><th className="text-left px-2 py-2">Campo</th>{showGroup && <th className="text-left px-2 py-2">Girone</th>}<th className="text-left px-2 py-2">Squadra casa</th><th className="text-left px-2 py-2">Squadra ospite</th><th className="px-2 py-2 text-right">{canWrite ? "Modifica" : "Esito"}</th></tr>
         </thead>
         <tbody className="divide-y divide-white/[0.06]">
           {rows.map((m) => (
@@ -33,6 +58,7 @@ export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, t
               className={`${m.played ? "opacity-70" : draggable ? "cursor-grab active:cursor-grabbing" : canWrite ? "cursor-pointer" : ""} ${canWrite && !m.played ? "hover:bg-white/[0.04]" : ""} ${over === m.id ? "bg-fsl-gold/15 outline outline-1 outline-fsl-gold" : ""} transition-colors`}
               data-testid={`simple-match-${m.id}`}
             >
+              {selectable && <td className="px-2" onClick={(e) => e.stopPropagation()}>{!m.played && <input type="checkbox" aria-label="Seleziona partita" checked={selected.includes(m.id)} onChange={() => toggle(m.id)} data-testid={`simple-select-${m.id}`} />}</td>}
               {draggable && <td className="pl-2 text-fsl-slate/50" aria-hidden="true">{!m.played && <GripVertical className="h-4 w-4" />}</td>}
               <td className="px-3 py-2 text-xs text-fsl-slate whitespace-nowrap">{fmtDate(m.kickoff_at)}</td>
               <td className="px-2 py-2 num font-semibold">{m.kickoff_at.slice(11, 16)}</td>
@@ -47,6 +73,7 @@ export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, t
           ))}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }

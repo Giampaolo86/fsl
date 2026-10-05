@@ -84,6 +84,7 @@ let webpackConfig = {
       '@': path.resolve(__dirname, 'src'),
     },
     configure: (webpackConfig) => {
+      webpackConfig.ignoreWarnings = [...(webpackConfig.ignoreWarnings || []), { module: /pdfjs-dist/, message: /Critical dependency/ }];
 
       // Add ignored patterns to reduce watched directories
         webpackConfig.watchOptions = {

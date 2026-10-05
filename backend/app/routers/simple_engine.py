@@ -743,6 +743,33 @@ async def delete_match(tournament_id: str, match_id: str, user: CurrentUser = De
     return await _board(tournament_id, m.category)
 
 
+class BulkDeleteIn(BaseModel):
+    ids: list[str]
+
+
+@router.post("/matches/bulk-delete")
+async def bulk_delete_matches(tournament_id: str, body: BulkDeleteIn, user: CurrentUser = Depends(get_current_user)):
+    """Elimina più gare non giocate in un colpo solo; ritorna quante eliminate e quante saltate (giocate/inesistenti)."""
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    repo, teams_repo = scoped("matches", tournament_id), scoped("teams", tournament_id)
+    deleted, skipped, cat, orphan_ids = 0, 0, None, set()
+    for mid in body.ids[:200]:
+        m = await repo.get(mid)
+        if not m or m.status == "cancelled" or m.status in PLAYED:
+            skipped += 1
+            continue
+        await repo.soft_delete(m.id, user.id)
+        orphan_ids.update(x for x in (m.home_team_id, m.away_team_id) if x)
+        cat, deleted = m.category, deleted + 1
+    for tid_ in orphan_ids:
+        tm = await teams_repo.get(tid_)
+        if tm and tm.placeholder and not await repo.count({"status": {"$ne": "cancelled"}, "$or": [{"home_team_id": tm.id}, {"away_team_id": tm.id}]}):
+            await teams_repo.soft_delete(tm.id, user.id)
+    await audit.record(user, "simple.bulk_delete_matches", "tournament", t.id, t.id, after={"deleted": deleted, "skipped": skipped, "ids": body.ids[:200]})
+    board = await _board(tournament_id, cat) if cat else {}
+    return {"deleted": deleted, "skipped": skipped, **board}
+
+
 class BreakIn(BaseModel):
     date: str
     start_time: str
