@@ -172,9 +172,40 @@ async def calendar_history(tournament_id: str, session_id: str, user: CurrentUse
     return hist
 
 
+class OverrideIn(BaseModel):
+    kind: str
+    home: str
+    away: str
+    label: str = ""
+    date: str
+    time: str
+    field: Optional[str] = None
+
+
 class ApplyIn(BaseModel):
     category: Optional[str] = None
     plan: dict
+    overrides: list[OverrideIn] = []
+
+
+async def _apply_overrides(tournament_id: str, cat: str, overrides: list[OverrideIn], user) -> int:
+    """Sposta le gare appena create secondo gli spostamenti fatti nell'anteprima (stesse etichette del simulatore)."""
+    if not overrides:
+        return 0
+    teams = {t.id: t.name for t in await scoped("teams", tournament_id).list({"category": cat}, limit=2000)}
+    fields = {f.name: f for f in await scoped("fields", tournament_id).list({"active": True}, sort=[("code", 1)])}
+    matches_repo = scoped("matches", tournament_id)
+    ms = await matches_repo.list({"category": cat, "status": {"$ne": "cancelled"}}, limit=5000)
+    moved = 0
+    for o in overrides:
+        base = o.label.split(" · ")[0].strip().lower()
+        m = next((m for m in ms if teams.get(m.home_team_id, "").strip() == o.home.strip() and teams.get(m.away_team_id, "").strip() == o.away.strip() and (not base or (m.round_name or "").strip().lower() == base)), None)
+        if not m:
+            continue
+        f = fields.get(o.field) if o.field else None
+        await matches_repo.update(m.id, {"kickoff_at": f"{o.date}T{o.time}", "field_id": f.id if f else m.field_id, "field_name": f.name if f else m.field_name}, user.id)
+        moved += 1
+    return moved
 
 
 @router.post("/tournaments/{tournament_id}/calendar/preview")
@@ -256,6 +287,9 @@ async def calendar_apply(tournament_id: str, body: ApplyIn, user: CurrentUser = 
             error = f"{tool}: {detail.get('message') if isinstance(detail, dict) else detail or e}"
             break
     if not error and done:
+        moved = await _apply_overrides(tournament_id, cat, body.overrides, user)
+        if moved:
+            done.append(f"Spostamenti dall'anteprima: {moved}")
         await save_format(tournament_id, cat, body.plan, user.id)
     return {"done": done, "error": error, **await se._board(tournament_id, cat)}
 

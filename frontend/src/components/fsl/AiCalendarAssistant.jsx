@@ -24,7 +24,7 @@ function PlanCard({ plan, onApply, busy, applied, tid, category }) {
           <button className="btn-gold h-9" disabled={busy} onClick={onApply} data-testid="ai-plan-apply">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Applica il piano</button>
         </div>
       )}
-      <PlanPreviewDialog open={preview} onOpenChange={setPreview} tid={tid} category={category} plan={plan} applying={busy} onApply={async () => { const ok = await onApply(true); if (ok) setPreview(false); }} />
+      <PlanPreviewDialog open={preview} onOpenChange={setPreview} tid={tid} category={category} plan={plan} applying={busy} onApply={async (overrides) => { const ok = await onApply(true, overrides); if (ok) setPreview(false); }} />
     </div>
   );
 }
@@ -73,11 +73,11 @@ export function AiCalendarAssistant({ tid, board, onApplied, onClose }) {
     const same = f.tournament_id === tid && f.category === board.category;
     sendMessage(`Riproponi il formato salvato «${f.name}»${same ? "" : ` (usato in ${f.tournament_name || "un torneo precedente"}, categoria ${f.category})`} per questa categoria, adattando le date al torneo attuale: se non conosci le date chiedimele, altrimenti dammi subito il piano. Piano di riferimento: ${JSON.stringify(f.plan)}`, `Riproponi il formato «${f.name.slice(0, 80)}» per questa categoria, adattando le date.`);
   };
-  const apply = async (plan, idx, fromPreview = false) => {
+  const apply = async (plan, idx, fromPreview = false, overrides = []) => {
     if (!fromPreview && !window.confirm("Applicare il piano? Gironi, calendario e fase finale verranno creati o rigenerati come descritto.")) return false;
     setApplying(true);
     try {
-      const { data } = await api.post(`/ai/tournaments/${tid}/calendar/apply`, { category: board.category, plan });
+      const { data } = await api.post(`/ai/tournaments/${tid}/calendar/apply`, { category: board.category, plan, overrides });
       if (data.error) toast.error(`Fermato a: ${data.error}${data.done.length ? ` · fatto: ${data.done.join(", ")}` : ""}`, { duration: 9000 }); else toast.success(`Piano applicato: ${data.done.join(" · ")}. Ogni gara resta modificabile a mano.`, { duration: 7000 });
       setApplied((a) => ({ ...a, [idx]: !data.error }));
       onApplied(data);
@@ -106,7 +106,7 @@ export function AiCalendarAssistant({ tid, board, onApplied, onClose }) {
             <div className={`max-w-[92%] rounded-xl px-3 py-2 whitespace-pre-wrap leading-relaxed ${m.role === "user" ? "bg-fsl-gold text-ink-950 rounded-br-sm" : "bg-ink-950/60 border border-white/10 rounded-bl-sm"}`}>
               {m.images?.length > 0 && <div className="flex gap-1 mb-1">{m.images.map((src, k) => <img key={k} src={src} alt="" className="h-14 w-14 object-cover rounded border border-ink-950/20" />)}</div>}
               {m.content}
-              {m.plan && <div className="mt-3"><PlanCard plan={m.plan} busy={applying} applied={applied[i]} tid={tid} category={board.category} onApply={(fromPreview) => apply(m.plan, i, fromPreview === true)} /></div>}
+              {m.plan && <div className="mt-3"><PlanCard plan={m.plan} busy={applying} applied={applied[i]} tid={tid} category={board.category} onApply={(fromPreview, overrides) => apply(m.plan, i, fromPreview === true, overrides || [])} /></div>}
             </div>
           </div>
         ))}
