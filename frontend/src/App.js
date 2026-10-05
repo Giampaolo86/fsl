@@ -12,6 +12,8 @@ import ClubShell from "@/components/layout/ClubShell";
 import RefereeShell from "@/components/layout/RefereeShell";
 import Login from "@/pages/Login";
 import Impersonate from "@/pages/Impersonate";
+import ClubsGlobal from "@/pages/admin/ClubsGlobal";
+import RefereeGuide from "@/pages/public/RefereeGuide";
 import { ImpersonationBanner } from "@/components/fsl/ImpersonationBanner";
 import ChildCodesSheet from "@/pages/admin/ChildCodesSheet";
 import ChangePassword, { SecurityPage } from "@/pages/Security";
@@ -54,7 +56,7 @@ import CodiceFSL from "@/pages/public/CodiceFSL";
 import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
 import ClubDashboard from "@/pages/club/ClubDashboard";
 import { ClubTeams } from "@/pages/club/ClubModules";
-import RefereeMatches, { RefereeModule } from "@/pages/referee/RefereeMatches";
+import RefereeMatches from "@/pages/referee/RefereeMatches";
 import PublicHub, { PublicTournamentsList } from "@/pages/public/PublicHub";
 import TournamentHome from "@/pages/public/TournamentHome";
 import { PublicClubs, PublicRules } from "@/pages/public/PublicPages";
@@ -132,6 +134,7 @@ function AppRoutes() {
                 <Route path="/admin" element={<Hub />} />
                 <Route path="/admin/tornei/nuovo" element={<NewTournament />} />
                 <Route path="/admin/utenti" element={<UsersPage />} />
+                <Route path="/admin/societa" element={<ClubsGlobal />} />
               </Route>
               <Route path="/admin/t/:tournamentId" element={<ProtectedRoute roles={ADMIN_ROLES}><AdminShell /></ProtectedRoute>}>
                 <Route index element={<Overview />} />
@@ -185,7 +188,7 @@ function AppRoutes() {
                 <Route index element={<RefereeMatches />} />
                 <Route path="partite/:tournamentId/:matchId" element={<RefereeMatch />} />
                 <Route path="referti" element={<RefereeMatches done />} />
-                <Route path="guida" element={<RefereeModule />} />
+                <Route path="guida" element={<RefereeGuide embedded />} />
               </Route>
 
               <Route element={<PublicShell />}>
@@ -195,6 +198,7 @@ function AppRoutes() {
                 <Route path="/albo-doro/societa/:orgClubId" element={<ClubHistory />} />
                 <Route path="/club/:orgClubId" element={<PublicClubEntity />} />
                 <Route path="/codice-fsl" element={<CodiceFSL />} />
+                <Route path="/guida-arbitri" element={<RefereeGuide />} />
                 <Route path="/albo-doro/:archiveSlug" element={<SeasonArchive />} />
                 <Route path="/account" element={<ProtectedRoute roles={["fan"]}><FanAccount /></ProtectedRoute>} />
               </Route>

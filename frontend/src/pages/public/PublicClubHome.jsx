@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ShopStrip } from "@/components/fsl/ShopStrip";
 import { useCart } from "@/context/CartContext";
-import { Award, BarChart3, Bus, CalendarDays, Camera, Clock, Globe, Image as ImageIcon, Instagram, Mail, MapPin, Medal, MessageCircle, Newspaper, Phone, Shield, ShieldCheck, Sparkles, Star, Target, Trophy, Users, Zap } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Award, BarChart3, Bus, CalendarDays, Camera, Clock, Globe, Image as ImageIcon, Instagram, Mail, MapPin, Medal, MessageCircle, Newspaper, Pencil, Phone, Shield, ShieldCheck, Sparkles, Star, Target, Trophy, Users, Zap } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
 import { PlayerCardDialog } from "@/components/fsl/PlayerCard";
@@ -48,6 +49,8 @@ function MatchesTable({ recent, upcoming, teamIds, slug }) {
 export default function PublicClubHome() {
   const { slug, clubSlug } = useParams();
   const cart = useCart();
+  const { user } = useAuth();
+  const isStaff = !!user && (user.is_super_admin || ["director", "secretary"].includes(user.role));
   const [d, setD] = useState(null);
   const [error, setError] = useState(null);
   const [openPlayer, setOpenPlayer] = useState(null);
@@ -78,7 +81,7 @@ export default function PublicClubHome() {
               <h1 className="mt-4 font-display font-extrabold uppercase leading-[0.85] text-5xl sm:text-6xl lg:text-7xl" data-testid="club-home-name" style={{ textShadow: "0 8px 24px rgba(0,0,0,0.6)" }}><span className="block text-white">{first}</span>{last && <span className="block" style={{ background: "linear-gradient(180deg,#FFF0B8 0%,#F4AE2B 55%,#C8811A 100%)", WebkitBackgroundClip: "text", color: "transparent" }}>{last}</span>}</h1>
               {c.motto && <Signature className="mt-4 !rotate-0 !text-2xl sm:!text-3xl" testId="club-home-motto"><span style={{ color: secondary }}>«{c.motto}»</span></Signature>}
               <p className="mt-4 text-sm sm:text-base text-white/85 font-medium" data-testid="club-tagline">{tagline.join(" · ")}</p>
-              <div className="mt-5 flex flex-wrap gap-2">{d.teams.map((tm) => <FavButton key={tm.id} kind="teams" id={tm.id} label={`Segui ${tm.name}`} small />)}</div>
+              <div className="mt-5 flex flex-wrap gap-2">{d.teams.map((tm) => <FavButton key={tm.id} kind="teams" id={tm.id} label={`Segui ${tm.name}`} small />)}{isStaff && <Link to={`/admin/t/${d.tournament.id}/societa/${c.id}`} className="h-8 px-3 rounded-full bg-fsl-gold text-ink-950 text-xs font-bold inline-flex items-center gap-1.5 hover:brightness-110" data-testid="club-home-admin-edit"><Pencil className="h-3.5 w-3.5" /> Modifica homepage</Link>}</div>
             </div>
             <div className="relative flex justify-center min-h-[280px] items-center">
               <span className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 num font-display font-extrabold text-[200px] sm:text-[260px] leading-none text-white/[0.07] select-none pointer-events-none" aria-hidden>{c.founded_year || (c.short_name || c.name).slice(0, 3).toUpperCase()}</span>

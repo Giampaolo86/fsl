@@ -432,6 +432,41 @@ async def fan_notifications_read(body: dict = None, user: CurrentUser = Depends(
 
 # ---------- profilo società (homepage) ----------
 PROFILE_KEYS = {"motto", "description", "colors", "crest_url", "cover_url", "founded_year", "website", "phone", "whatsapp", "email", "instagram", "facebook", "address", "hours_office", "hours_field", "directions", "services", "manager", "gallery_urls"}
+COMPLETENESS = [("crest", "Stemma"), ("cover", "Copertina"), ("description", "Descrizione"), ("contacts", "Contatti"), ("manager", "Responsabile"), ("venue", "Sede"), ("gallery", "Gallery")]
+
+
+def club_completeness(c, has_venue: bool) -> dict:
+    p = c.profile or {}
+    checks = {
+        "crest": bool(c.crest_url) and not c.crest_is_placeholder,
+        "cover": bool(c.cover_url),
+        "description": len((c.description or "").strip()) >= 40,
+        "contacts": any(p.get(k) for k in ("phone", "whatsapp", "email")),
+        "manager": bool((p.get("manager") or {}).get("name")),
+        "venue": has_venue or bool(p.get("address")),
+        "gallery": any(p.get("gallery_urls") or []),
+    }
+    missing = [label for key, label in COMPLETENESS if not checks[key]]
+    return {"checks": checks, "missing": missing, "score": round(100 * (len(COMPLETENESS) - len(missing)) / len(COMPLETENESS))}
+
+
+@router.get("/clubs/overview")
+async def clubs_overview(user: CurrentUser = Depends(get_current_user)):
+    """Tutte le società di tutti i tornei (non archiviati) con lo stato di completezza della homepage."""
+    if not (user.is_super_admin or user.role in STAFF):
+        raise forbidden()
+    out = []
+    for t in await tournaments.list({"status": {"$ne": "archived"}}, sort=[("name", 1)]):
+        if not user.is_super_admin and user.role_in(t.id) not in STAFF:
+            continue
+        clubs = await scoped("clubs", t.id).list(sort=[("name", 1)])
+        teams = await scoped("teams", t.id).list({"club_id": {"$ne": None}}, limit=2000)
+        counts = {}
+        for tm in teams:
+            counts[tm.club_id] = counts.get(tm.club_id, 0) + 1
+        for c in clubs:
+            out.append({"id": c.id, "tournament_id": t.id, "tournament_name": t.name, "tournament_slug": t.slug, "name": c.name, "slug": c.slug, "city": c.city, "crest_url": c.crest_url, "crest_is_placeholder": c.crest_is_placeholder, "colors": c.colors, "org_club_id": c.org_club_id, "teams_count": counts.get(c.id, 0), "approval_status": c.approval_status, "has_draft": bool(c.profile_draft), **club_completeness(c, bool(c.venue_id))})
+    return {"items": out, "labels": dict(COMPLETENESS)}
 
 
 @router.get("/tournaments/{tournament_id}/clubs/{club_id}/profile")

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, ClipboardList, ListChecks, PlayCircle, ShieldAlert, Timer } from "lucide-react";
+import { ArrowLeft, ClipboardList, PlayCircle, Timer } from "lucide-react";
 import { MatchCard } from "@/components/fsl/MatchCard";
 import MatchWorkspace from "@/components/fsl/MatchWorkspace";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
@@ -61,20 +61,3 @@ export function RefereeMatch() {
   );
 }
 
-const STEPS = [
-  [ListChecks, "1 · Prepara la distinta", "Prima del fischio d'inizio tocca il numero dei giocatori presenti per ciascuna squadra e salva le distinte. Le società possono averle già preparate: verifica e correggi."],
-  [ClipboardList, "2 · Compila la gara", "Durante o dopo la gara passa a «Compila gara»: tocca il logo per «tutti presenti», il numero per presente/assente/da confermare; usa + e − per gol, assist, ammonizioni, espulsioni e voto. Il punteggio si calcola dal tabellino."],
-  [ShieldAlert, "3 · Checklist e note", "Spunta squadre presenti, distinte verificate e firme acquisite. Scrivi eventuali note (infortuni, comportamento, ritardi). Nelle finali con parità inserisci i rigori."],
-  [CheckCircle2, "4 · Invia il referto", "«Chiudi gara e invia» rende il referto definitivo: classifiche, marcatori e badge si aggiornano solo con i risultati ufficiali. Per correzioni successive contatta il Direttore (rettifica)."],
-];
-
-export function RefereeModule() {
-  return (
-    <div className="space-y-4" data-testid="referee-guide">
-      <h1 className="text-3xl font-extrabold">Guida rapida</h1>
-      <p className="text-sm text-fsl-slate">Come compilare il referto FSL da telefono, in quattro passaggi.</p>
-      <ol className="space-y-3">{STEPS.map(([Icon, title, text]) => <li key={title} className="fsl-card p-4 flex gap-3"><Icon className="h-5 w-5 text-fsl-gold shrink-0 mt-0.5" /><div><div className="font-display font-bold uppercase">{title}</div><p className="text-sm text-fsl-slate mt-1">{text}</p></div></li>)}</ol>
-      <div className="rounded-md bg-navy-700/50 border border-white/10 p-3 text-xs text-fsl-slate">Se manca la connessione compare un avviso: salva di nuovo appena torna la rete. Aggiungi l'app alla schermata Home di iPhone per un accesso rapido.</div>
-    </div>
-  );
-}

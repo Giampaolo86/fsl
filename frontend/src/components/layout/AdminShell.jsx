@@ -10,6 +10,7 @@ import { ROLE_LABELS } from "@/lib/format";
 
 const HUB_NAV = [
   { to: "/admin", label: "Tornei", icon: Trophy, end: true },
+  { to: "/admin/societa", label: "Tutte le società", icon: Shield, roles: ["super_admin", "director", "secretary"] },
   { to: "/admin/utenti", label: "Utenti", icon: UserCog, roles: ["super_admin", "director", "secretary"] },
 ];
 

@@ -144,6 +144,7 @@ export default function Login() {
             </div>
           )}
           {(area === "staff" || area === "arbitri") && <p className="mt-6 text-xs text-fsl-slate">Accesso riservato: le credenziali sono rilasciate dall'organizzazione. Sei un genitore o un tifoso? <Link to="/login?area=genitori" className="text-fsl-gold hover:underline">Vai all'area genitori e tifosi</Link>.</p>}
+          {area === "arbitri" && <p className="mt-2 text-xs text-fsl-slate">Prima gara? <Link to="/guida-arbitri" className="text-fsl-gold hover:underline" data-testid="login-referee-guide-link">Guarda la Guida Arbitri: come compilare il tabellino dal telefono</Link>.</p>}
         </form>
         )}
       </section>
