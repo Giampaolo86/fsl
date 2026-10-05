@@ -38,7 +38,7 @@ export default function ClubsGlobal() {
   const first = rows.find((c) => c.missing.length) || todo[0];
   return (
     <div className="space-y-6" data-testid="clubs-global">
-      <PageHeader kicker="Tutti i tornei · Società" title="Società" subtitle="Tutte le società di tutti i tornei con lo stato della homepage pubblica. Sistema in sequenza quelle incomplete: ogni modifica dell'admin è pubblicata subito." actions={first && <button className="btn-gold" onClick={() => navigate(`/admin/t/${first.tournament_id}/societa/${first.id}?seq=1`)} data-testid="clubs-global-fix-sequence"><Wand2 className="h-4 w-4" /> Sistema in sequenza ({todo.length})</button>} />
+      <PageHeader kicker="Tutti i tornei · Società" title="Società" subtitle="Tutte le società di tutti i tornei: stato della homepage pubblica e checklist pre-torneo (rosa, foto, documenti, convocazioni, saldo, spunte del Responsabile). Sistema in sequenza quelle incomplete: ogni modifica dell'admin è pubblicata subito." actions={first && <button className="btn-gold" onClick={() => navigate(`/admin/t/${first.tournament_id}/societa/${first.id}?seq=1`)} data-testid="clubs-global-fix-sequence"><Wand2 className="h-4 w-4" /> Sistema in sequenza ({todo.length})</button>} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiTile icon={Shield} value={items.length} label="Società" testId="clubs-global-kpi-total" />
         <KpiTile icon={CheckCircle2} value={items.length - todo.length} label="Homepage complete" gold testId="clubs-global-kpi-complete" />
@@ -57,7 +57,7 @@ export default function ClubsGlobal() {
       {rows.length === 0 ? <EmptyState title="Nessuna società" description="Nessuna società corrisponde ai filtri." /> : (
         <div className="fsl-card overflow-x-auto">
           <table className="w-full table-dark" data-testid="clubs-global-table">
-            <thead><tr><th>Società</th><th>Torneo</th><th>Squadre</th><th>Completezza</th><th>Cosa manca</th><th className="text-right">Azioni</th></tr></thead>
+            <thead><tr><th>Società</th><th>Torneo</th><th>Squadre</th><th>Homepage</th><th>Cosa manca</th><th>Pre-torneo</th><th className="text-right">Azioni</th></tr></thead>
             <tbody>
               {rows.map((c) => (
                 <tr key={c.id} data-testid={`clubs-global-row-${c.id}`}>
@@ -66,6 +66,7 @@ export default function ClubsGlobal() {
                   <td className="num">{c.teams_count}</td>
                   <td><ScoreBar score={c.score} /></td>
                   <td><Checks c={c} labels={data.labels} /></td>
+                  <td title={c.readiness?.todo?.length ? `Da fare: ${c.readiness.todo.join(", ")}` : "Pronta"} data-testid={`clubs-global-readiness-${c.id}`}><ScoreBar score={c.readiness?.score ?? 0} /><div className="text-[10px] text-fsl-slate mt-0.5">{c.readiness ? `${c.readiness.done}/${c.readiness.total} fatte` : ""}</div></td>
                   <td className="text-right">
                     <div className="inline-flex gap-1">
                       <Link to={`/admin/t/${c.tournament_id}/societa/${c.id}?seq=1`} className="btn-gold h-9" data-testid={`clubs-global-edit-${c.id}`}><Pencil className="h-4 w-4" /> Modifica</Link>

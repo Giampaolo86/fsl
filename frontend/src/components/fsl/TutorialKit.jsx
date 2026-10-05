@@ -4,7 +4,7 @@ import { Pause, Play, Plus, RotateCcw } from "lucide-react";
 export const STEP_MS = 1500;
 
 export const Tap = ({ on, children, className = "", ring = "rounded-full" }) => (
-  <span className={`relative inline-flex ${className}`}>{children}{on && <span className={`pointer-events-none absolute -inset-1.5 ${ring} border-2 border-fsl-gold animate-ping`} aria-hidden="true" />}{on && <span className={`pointer-events-none absolute -inset-1.5 ${ring} border-2 border-fsl-gold/80`} aria-hidden="true" />}</span>
+  <span className={`relative inline-flex ${className}`}>{children}{on && <span className={`pointer-events-none absolute -inset-1.5 ${ring} border-2 border-fsl-gold ${ring === "rounded-full" ? "animate-ping" : "animate-pulse"}`} aria-hidden="true" />}{on && <span className={`pointer-events-none absolute -inset-1.5 ${ring} border-2 border-fsl-gold/80`} aria-hidden="true" />}</span>
 );
 
 export const Num = ({ n, state, tap }) => (

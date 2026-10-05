@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Baby, Download, Flag, Heart, Trophy, Users, Sparkles, Newspaper } from "lucide-react";
+import { Baby, BookOpenCheck, Download, Flag, Heart, Trophy, Users, Sparkles, Newspaper } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
 import { LinkChildButton } from "@/components/fsl/AccountTools";
@@ -60,7 +60,7 @@ export default function FanAccount() {
   return (
     <div className="text-fsl-white">
       <div className="mx-auto max-w-[1200px] px-6 py-8 space-y-8" data-testid="fan-account">
-        <div><div className="fsl-kicker">Area genitori e tifosi</div><h1 className="text-4xl sm:text-5xl font-extrabold leading-[0.95]">Ciao {user.full_name.split(" ")[0]}, i tuoi preferiti</h1><p className="mt-2 text-sm text-fsl-slate max-w-2xl">Scorciatoie immediate alle prossime partite di tornei, squadre e giocatori che segui. Naviga liberamente il portale e aggiungi preferiti con il cuore ♥ da tornei, società e schede giocatore.</p><div className="mt-4 flex flex-wrap gap-2"><LinkChildButton onLinked={(d) => { api.get("/me/children").then((r) => setChildren(r.data)).catch(() => {}); if (d.tournament_slug) navigate(`/tornei/${d.tournament_slug}/giocatori/${d.player_id}`); }} /><Link to="/" className="btn-ghost" data-testid="fan-explore"><Trophy className="h-4 w-4" /> Esplora i tornei</Link></div></div>
+        <div><div className="fsl-kicker">Area genitori e tifosi</div><h1 className="text-4xl sm:text-5xl font-extrabold leading-[0.95]">Ciao {user.full_name.split(" ")[0]}, i tuoi preferiti</h1><p className="mt-2 text-sm text-fsl-slate max-w-2xl">Scorciatoie immediate alle prossime partite di tornei, squadre e giocatori che segui. Naviga liberamente il portale e aggiungi preferiti con il cuore ♥ da tornei, società e schede giocatore.</p><div className="mt-4 flex flex-wrap gap-2"><LinkChildButton onLinked={(d) => { api.get("/me/children").then((r) => setChildren(r.data)).catch(() => {}); if (d.tournament_slug) navigate(`/tornei/${d.tournament_slug}/giocatori/${d.player_id}`); }} /><Link to="/" className="btn-ghost" data-testid="fan-explore"><Trophy className="h-4 w-4" /> Esplora i tornei</Link><Link to="/guida-genitori" className="btn-ghost" data-testid="fan-guide-link"><BookOpenCheck className="h-4 w-4" /> Guida Genitori</Link></div></div>
         {feed && (feed.upcoming.length > 0 || feed.timeline.length > 0) && <MyFeed feed={feed} />}
         <PushSettings />
         <FanShop />

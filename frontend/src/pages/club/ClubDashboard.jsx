@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CalendarDays, CreditCard, FileText, Shield, Users } from "lucide-react";
+import { ReadinessCard } from "@/components/fsl/ReadinessCard";
 import { KpiTile, PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { RosterModulePanel } from "@/components/fsl/RosterImport";
@@ -41,6 +42,7 @@ export default function ClubDashboard() {
           </div>
         </div>
       </section>
+      <ReadinessCard tid={membership.tournament_id} cid={membership.club_id} />
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiTile icon={Users} value={teams.length} label="Squadre iscritte" testId="club-kpi-teams" to="/societa/squadre" />
         <KpiTile icon={FileText} value={data.roster.players} label="Giocatori in rosa" hint={data.roster.expiring_documents ? `${data.roster.expiring_documents} documenti in scadenza` : "Rose e documenti"} testId="club-kpi-players" to="/societa/rose" />

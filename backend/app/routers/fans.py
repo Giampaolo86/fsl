@@ -10,6 +10,7 @@ from ..core.errors import bad_request, conflict, forbidden, not_found
 from ..models.domain import ErrorReport
 from ..repositories.registry import Repository, scoped, tournaments, users
 from ..services import audit
+from ..services.readiness import MANUAL, club_readiness, toggle_manual
 
 router = APIRouter(tags=["fans"])
 STAFF = {"super_admin", "director", "secretary"}
@@ -465,8 +466,41 @@ async def clubs_overview(user: CurrentUser = Depends(get_current_user)):
         for tm in teams:
             counts[tm.club_id] = counts.get(tm.club_id, 0) + 1
         for c in clubs:
-            out.append({"id": c.id, "tournament_id": t.id, "tournament_name": t.name, "tournament_slug": t.slug, "name": c.name, "slug": c.slug, "city": c.city, "crest_url": c.crest_url, "crest_is_placeholder": c.crest_is_placeholder, "colors": c.colors, "org_club_id": c.org_club_id, "teams_count": counts.get(c.id, 0), "approval_status": c.approval_status, "has_draft": bool(c.profile_draft), **club_completeness(c, bool(c.venue_id))})
+            comp = club_completeness(c, bool(c.venue_id))
+            ready = await club_readiness(t.id, c, comp["missing"])
+            out.append({"id": c.id, "tournament_id": t.id, "tournament_name": t.name, "tournament_slug": t.slug, "name": c.name, "slug": c.slug, "city": c.city, "crest_url": c.crest_url, "crest_is_placeholder": c.crest_is_placeholder, "colors": c.colors, "org_club_id": c.org_club_id, "teams_count": counts.get(c.id, 0), "approval_status": c.approval_status, "has_draft": bool(c.profile_draft), "readiness": {"score": ready["score"], "done": ready["done"], "total": ready["total"], "todo": [i["label"] for i in ready["items"] if not i["info"] and i["done"] is False]}, **comp})
     return {"items": out, "labels": dict(COMPLETENESS)}
+
+
+@router.get("/tournaments/{tournament_id}/clubs/{club_id}/readiness")
+async def get_readiness(tournament_id: str, club_id: str, user: CurrentUser = Depends(get_current_user)):
+    t, role = await require_tournament(tournament_id, user, roles=STAFF | {"club_manager"})
+    c = await scoped("clubs", tournament_id).get(club_id)
+    if not c:
+        raise not_found("Società")
+    if role == "club_manager" and user.club_in(tournament_id) != c.id:
+        raise forbidden()
+    return await club_readiness(tournament_id, c, club_completeness(c, bool(c.venue_id))["missing"])
+
+
+class ChecklistIn(BaseModel):
+    done: bool = True
+
+
+@router.post("/tournaments/{tournament_id}/clubs/{club_id}/readiness/{key}")
+async def set_readiness_item(tournament_id: str, club_id: str, key: str, body: ChecklistIn, user: CurrentUser = Depends(get_current_user)):
+    t, role = await require_tournament(tournament_id, user, roles=STAFF | {"club_manager"}, writable=True)
+    c = await scoped("clubs", tournament_id).get(club_id)
+    if not c:
+        raise not_found("Società")
+    if role == "club_manager" and user.club_in(tournament_id) != c.id:
+        raise forbidden()
+    if key not in {k for k, *_ in MANUAL}:
+        raise bad_request("Voce non valida")
+    checklist = await toggle_manual(tournament_id, c, key, body.done)
+    await audit.record(user, "club.checklist", "club", c.id, tournament_id, after={"key": key, "done": body.done})
+    c.checklist = checklist
+    return await club_readiness(tournament_id, c, club_completeness(c, bool(c.venue_id))["missing"])
 
 
 @router.get("/tournaments/{tournament_id}/clubs/{club_id}/profile")

@@ -8,7 +8,7 @@ from ..models.base import utcnow
 from ..services import audit
 
 router = APIRouter(tags=["guide"])
-GUIDES = {"referee": "referee_guide", "club": "club_guide"}
+GUIDES = {"referee": "referee_guide", "club": "club_guide", "parent": "parent_guide"}
 STEPS = ("1", "2", "3", "4")
 
 

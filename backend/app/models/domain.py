@@ -289,6 +289,7 @@ class Club(BaseDocument):
     profile_draft: Optional[dict] = None
     review_note: str = ""
     org_club_id: Optional[str] = None
+    checklist: dict = {}
 
 
 class Team(BaseDocument):

@@ -66,6 +66,7 @@ export default function Register() {
           <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-fsl-slate"><span className="h-px flex-1 bg-white/10" />oppure, se preferisci<span className="h-px flex-1 bg-white/10" /></div>
           <GoogleButton />
           <p className="text-xs text-fsl-slate">Hai già un account? <Link to="/login?area=genitori" className="text-fsl-gold hover:underline" data-testid="register-login-link">Accedi all'area genitori e tifosi</Link> · Sei una società o staff? <Link to="/login" className="text-fsl-gold hover:underline">Altri accessi</Link></p>
+          <p className="text-xs text-fsl-slate">Prima volta? <Link to="/guida-genitori" className="text-fsl-gold hover:underline" data-testid="register-parent-guide-link">Guarda la Guida Genitori</Link> (codice figlio, preferiti, notifiche e acquisti).</p>
         </form>
       </section>
     </div>

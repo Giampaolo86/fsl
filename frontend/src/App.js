@@ -15,6 +15,7 @@ import Impersonate from "@/pages/Impersonate";
 import ClubsGlobal from "@/pages/admin/ClubsGlobal";
 import RefereeGuide from "@/pages/public/RefereeGuide";
 import ClubGuide from "@/pages/public/ClubGuide";
+import ParentGuide from "@/pages/public/ParentGuide";
 import { ImpersonationBanner } from "@/components/fsl/ImpersonationBanner";
 import ChildCodesSheet from "@/pages/admin/ChildCodesSheet";
 import ChangePassword, { SecurityPage } from "@/pages/Security";
@@ -202,6 +203,7 @@ function AppRoutes() {
                 <Route path="/codice-fsl" element={<CodiceFSL />} />
                 <Route path="/guida-arbitri" element={<RefereeGuide />} />
                 <Route path="/guida-societa" element={<ClubGuide />} />
+                <Route path="/guida-genitori" element={<ParentGuide />} />
                 <Route path="/albo-doro/:archiveSlug" element={<SeasonArchive />} />
                 <Route path="/account" element={<ProtectedRoute roles={["fan"]}><FanAccount /></ProtectedRoute>} />
               </Route>
