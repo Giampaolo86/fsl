@@ -40,9 +40,23 @@ def _venue_pub(venue):
     return d
 
 
-def _public_club(c) -> dict:
+PRIVATE_PROFILE = {"phone", "whatsapp", "email", "manager", "manager_name"}
+
+
+def _sees_private(user, c) -> bool:
+    """Dati personali della società: solo staff del torneo o la società stessa."""
+    return bool(user and (user.is_super_admin or user.role_in(c.tournament_id) in ("super_admin", "director", "secretary") or user.club_in(c.tournament_id) == c.id))
+
+
+def _public_club(c, user=None) -> dict:
     d = c.public()
-    d["contacts"] = [ct for ct in d.get("contacts", []) if ct.get("is_public")]
+    full = _sees_private(user, c)
+    for k in ("profile_draft", "review_note", "checklist"):
+        d.pop(k, None)
+    d["contacts"] = d.get("contacts", []) if full else []
+    if not full:
+        d["profile"] = {k: v for k, v in (d.get("profile") or {}).items() if k not in PRIVATE_PROFILE}
+    d["private_visible"] = full
     cover, gallery = _default_images(c.slug)
     d["cover_is_default"] = not bool(c.cover_url)
     d["cover_url"] = c.cover_url or cover
@@ -156,6 +170,7 @@ async def list_public():
 @router.get("/tournaments/{slug}")
 async def tournament_home(slug: str, request: Request, category: Optional[str] = None):
     t = await _published(slug, request)
+    viewer = await _staff(request)
     s = await settings_repo.find_one({"tournament_id": t.id})
     comps = await scoped("competitions", t.id).list(sort=[("category", 1), ("series", 1)])
     clubs = await scoped("clubs", t.id).list(sort=[("name", 1)])
@@ -181,7 +196,7 @@ async def tournament_home(slug: str, request: Request, category: Optional[str] =
         "program_pdf_public": bool((s.program_pdf or {}).get("public")),
         "summary": compute_summary(s),
         "competitions": comp_out,
-        "clubs": [_public_club(c) for c in clubs],
+        "clubs": [_public_club(c, viewer) for c in clubs],
         "numbers": {"clubs": len(clubs), "teams": await teams.count(), "competitions": len(comps), "fields": await scoped("fields", t.id).count(), "matches_total": len(all_matches), "matches_official": sum(1 for m in all_matches if m.status in FINAL)},
         "upcoming_matches": await _public_matches(t.id, upcoming),
         "recent_results": await _public_matches(t.id, recent),
@@ -343,7 +358,7 @@ async def club_entity(org_club_id: str, request: Request):
         parts.append({"tournament": {"id": t.id, "slug": t.slug, "name": t.name, "season_label": t.season_label, "status": t.status, "published": t.published, "start_date": t.start_date, "end_date": t.end_date}, "club_slug": c.slug, "groups": groups, "players": len(players)})
     if not club:
         raise not_found("Società")
-    return {"club": _public_club(club), "org_club_id": org_club_id, "participations": parts, "kpis": {"tournaments": len(parts), "teams": sum(len(p["groups"]) for p in parts), "players": sum(p["players"] for p in parts)}, "history": await legacy_svc.club_history(org_club_id)}
+    return {"club": _public_club(club, user), "org_club_id": org_club_id, "participations": parts, "kpis": {"tournaments": len(parts), "teams": sum(len(p["groups"]) for p in parts), "players": sum(p["players"] for p in parts)}, "history": await legacy_svc.club_history(org_club_id)}
 
 
 @router.get("/tournaments/{slug}/bracket")
@@ -422,6 +437,7 @@ async def public_program_pdf(slug: str, request: Request, category: Optional[str
 @router.get("/tournaments/{slug}/clubs/{club_slug}")
 async def club_page(slug: str, club_slug: str, request: Request):
     t = await _published(slug, request)
+    viewer = await _staff(request)
     club = await scoped("clubs", t.id).find_one({"slug": club_slug})
     if not club:
         raise not_found("Società")
@@ -459,7 +475,7 @@ async def club_page(slug: str, club_slug: str, request: Request):
         row = next((r for r in rows if r["team_id"] == tm.id), None)
         if row:
             standings.append({"team_id": tm.id, "team": tm.name, "competition": c.name, "category": c.category, "pos": pos, "total": len(rows), "PT": row.get("PT", 0), "PG": row.get("PG", 0), "V": row.get("V", 0), "N": row.get("N", 0), "P": row.get("P", 0), "GF": row.get("GF", 0), "GS": row.get("GS", 0)})
-    return {"tournament": t.public(), "club": _public_club(club), "teams": [tm.public() for tm in teams], "venue": _venue_pub(venue), "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "standings": standings, "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others, "history": history, "prices": await __import__("app.services.pricing", fromlist=["all_prices"]).all_prices(t.id)}
+    return {"tournament": t.public(), "club": _public_club(club, viewer), "teams": [tm.public() for tm in teams], "venue": _venue_pub(venue), "upcoming_matches": await _public_matches(t.id, upcoming), "recent_matches": await _public_matches(t.id, recent), "standings": standings, "rosters": rosters, "kpis": {"players": len(players), "teams": len(teams), "founded_year": club.founded_year, "tournaments": 1 + len(others)}, "posts": posts, "shop": [{"id": s.id, "kind": s.kind, "title": s.title, "price": s.price_cents / 100, "preview_url": f"/api/media/{s.preview_media_id}" if s.preview_media_id else None, "match_id": s.match_id} for s in shop], "other_tournaments": others, "history": history, "prices": await __import__("app.services.pricing", fromlist=["all_prices"]).all_prices(t.id)}
 
 
 @router.get("/tournaments/{slug}/top11")
