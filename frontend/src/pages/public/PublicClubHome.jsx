@@ -101,6 +101,30 @@ export default function PublicClubHome() {
           <div className="grid grid-cols-4 lg:grid-cols-8 gap-3">{stats.map(([Icon, v, l]) => <StatTile key={l} icon={Icon} value={v} label={l} testId={`club-stat-${l.toLowerCase().replace(/\s+/g, "-")}`} />)}</div>
         </section>
 
+        <section data-testid="club-groups-public">
+          <SectionHead icon={Users} title="I nostri gruppi" count={(d.groups || []).length} />
+          {(d.groups || []).length === 0 ? <p className="text-sm text-fsl-slate">Nessun gruppo iscritto a questo torneo.</p> : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {d.groups.map((g) => (
+                <div key={g.id} className={`fsl-card p-4 flex items-start gap-3 ${g.status === "pending" ? "border-dashed border-fsl-warning/40" : ""}`} data-testid={`club-group-public-${g.id}`}>
+                  <div className="font-display font-extrabold text-3xl num text-fsl-gold leading-none">{g.category}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold truncate">{g.name}</div>
+                    <div className="text-xs text-fsl-slate truncate">{[g.birth_year && `Anno ${g.birth_year}`, g.level].filter(Boolean).join(" · ") || "—"}</div>
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold uppercase">
+                      {g.status === "pending" ? <span className="h-5 px-2 rounded bg-fsl-warning/20 text-fsl-warning border border-fsl-warning/40 inline-flex items-center">In attesa di invito</span>
+                        : g.competition_name ? <span className="h-5 px-2 rounded bg-fsl-gold text-ink-950 inline-flex items-center">{g.competition_name}</span>
+                        : <span className="h-5 px-2 rounded border border-white/15 text-fsl-slate inline-flex items-center">Iscritto · girone da assegnare</span>}
+                      {g.players_count > 0 && <span className="h-5 px-2 rounded bg-white/10 text-fsl-white inline-flex items-center num">{g.players_count} giocatori</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+
         <section data-testid="club-palmares">
           <SectionHead icon={Award} title="Palmarès e riconoscimenti" count={palmares.length} to={h.org_club_id ? `/albo-doro/societa/${h.org_club_id}` : undefined} linkLabel="Albo d'oro" />
           {palmares.length ? <BadgePills list={palmares} max={12} /> : <p className="text-sm text-fsl-slate">La storia della società si scrive stagione dopo stagione: i riconoscimenti compariranno qui.</p>}
