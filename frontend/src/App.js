@@ -53,6 +53,7 @@ import PlayerProfile from "@/pages/PlayerProfile";
 import DigitalProduct from "@/pages/DigitalProduct";
 import ClubHomeEditor from "@/pages/club/ClubHomeEditor";
 import PublicClubHome from "@/pages/public/PublicClubHome";
+import PublicTeam from "@/pages/public/PublicTeam";
 import PublicClubEntity from "@/pages/public/PublicClubEntity";
 import CodiceFSL from "@/pages/public/CodiceFSL";
 import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
@@ -211,6 +212,7 @@ function AppRoutes() {
                 <Route index element={<TournamentHome />} />
                 <Route path="squadre" element={<PublicClubs />} />
                 <Route path="squadre/:clubSlug" element={<PublicClubHome />} />
+                <Route path="squadre/:clubSlug/gruppi/:teamId" element={<PublicTeam />} />
                 <Route path="giocatori/:playerId" element={<PlayerProfile mode="public" />} />
                 <Route path="giocatori/:playerId/capsule" element={<TimeCapsule />} />
                 <Route path="prodotti/:token" element={<DigitalProduct />} />

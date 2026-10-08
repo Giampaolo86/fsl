@@ -19,8 +19,8 @@ import { TeamCardDialog } from "@/components/fsl/TeamCardDialog";
 const ord = (n) => (n ? `${n}°` : "—");
 const timeOf = (iso) => { try { return new Date(iso).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
 
-function MatchesTable({ recent, upcoming, teamIds, slug }) {
-  const rows = [...upcoming.slice(0, 3).map((m) => ({ ...m, _up: true })), ...recent];
+export function MatchesTable({ recent, upcoming, teamIds, slug, maxUpcoming = 3 }) {
+  const rows = [...upcoming.slice(0, maxUpcoming).map((m) => ({ ...m, _up: true })), ...recent];
   return (
     <div className="overflow-x-auto -mx-2">
       <table className="w-full text-xs min-w-[440px]">
@@ -106,7 +106,7 @@ export default function PublicClubHome() {
           {(d.groups || []).length === 0 ? <p className="text-sm text-fsl-slate">Nessun gruppo iscritto a questo torneo.</p> : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {d.groups.map((g) => (
-                <div key={g.id} className={`fsl-card p-4 flex items-start gap-3 ${g.status === "pending" ? "border-dashed border-fsl-warning/40" : ""}`} data-testid={`club-group-public-${g.id}`}>
+                <Link key={g.id} to={g.status === "pending" ? "#" : `/tornei/${slug}/squadre/${clubSlug}/gruppi/${g.id}`} onClick={(e) => g.status === "pending" && e.preventDefault()} className={`fsl-card p-4 flex items-start gap-3 transition-colors ${g.status === "pending" ? "border-dashed border-fsl-warning/40 cursor-default" : "hover:border-fsl-gold/60"}`} data-testid={`club-group-public-${g.id}`}>
                   <div className="font-display font-extrabold text-3xl num text-fsl-gold leading-none">{g.category}</div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold truncate">{g.name}</div>
@@ -117,8 +117,9 @@ export default function PublicClubHome() {
                         : <span className="h-5 px-2 rounded border border-white/15 text-fsl-slate inline-flex items-center">Iscritto · girone da assegnare</span>}
                       {g.players_count > 0 && <span className="h-5 px-2 rounded bg-white/10 text-fsl-white inline-flex items-center num">{g.players_count} giocatori</span>}
                     </div>
+                    {g.status !== "pending" && <div className="mt-2 text-[11px] text-fsl-gold">Rosa e calendario →</div>}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

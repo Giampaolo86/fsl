@@ -314,6 +314,28 @@ async def public_social(slug: str, match_id: str):
     return await social_payload(t.id, m, public=True)
 
 
+@router.get("/tournaments/{slug}/teams/{team_id}")
+async def public_team(slug: str, team_id: str, request: Request):
+    """Pagina gruppo: squadra, girone e posizione, rosa (con link alle home giocatore) e calendario."""
+    t = await _published(slug, request)
+    tm = await scoped("teams", t.id).get(team_id)
+    if not tm or tm.status == "pending":
+        raise not_found("Gruppo")
+    club = await scoped("clubs", t.id).get(tm.club_id) if tm.club_id else None
+    comp = await scoped("competitions", t.id).get(tm.competition_id) if tm.competition_id else None
+    standing = None
+    if comp and comp.kind != "knockout":
+        rows = await engine.compute_standings(t.id, comp)
+        row = next((r for r in rows if r["team_id"] == tm.id), None)
+        if row:
+            standing = {**row, "pos": rows.index(row) + 1, "total": len(rows), "competition": comp.name}
+    players = await scoped("players", t.id).list({"team_id": tm.id, "status": {"$ne": "inactive"}}, sort=[("shirt_number", 1), ("last_name", 1)], limit=200)
+    roster = [{"id": p.id, "name": p.public_name or f"{p.first_name} {p.last_name[:1]}.", "shirt_number": p.shirt_number, "role": p.role, "photo_url": p.photo_url if p.media_consent else None} for p in players]
+    ms = await scoped("matches", t.id).list({"$or": [{"home_team_id": tm.id}, {"away_team_id": tm.id}]}, sort=[("kickoff_at", 1)], limit=200)
+    matches = await _public_matches(t.id, ms)
+    return {"tournament": t.public(), "team": tm.public(), "club": {"id": club.id, "name": club.name, "slug": club.slug, "crest_url": club.crest_url, "colors": club.colors} if club else None, "competition": comp.public() if comp else None, "standing": standing, "roster": roster, "matches": matches}
+
+
 @router.get("/tournaments/{slug}/players/{player_id}")
 async def public_player(slug: str, player_id: str):
     t = await _published(slug)

@@ -50,7 +50,7 @@ function GroupCard({ tid, g, onChanged }) {
         {g.roster_import && <span className="ml-auto text-[10px] text-fsl-slate num">{fmtDate(g.roster_import.created_at)}</span>}
       </div>
       <div className="flex flex-wrap gap-2 mt-auto">
-        <button className="btn-ghost h-9 text-xs" onClick={() => downloadTemplate(tid, g.id).catch((e) => toast.error(apiError(e)))} data-testid={`group-template-${g.id}`}><Download className="h-3.5 w-3.5" /> Scarica modulo</button>
+        <button className="btn-ghost h-9 text-xs border-fsl-gold/60 text-fsl-gold hover:bg-fsl-gold/10" onClick={() => downloadTemplate(tid, g.id).catch((e) => toast.error(apiError(e)))} data-testid={`group-template-${g.id}`}><Download className="h-3.5 w-3.5" /> Scarica modulo rosa</button>
         <label className={`btn-gold h-9 text-xs cursor-pointer ${busy || g.roster_import?.status === "submitted" ? "opacity-60 pointer-events-none" : ""}`} data-testid={`group-upload-${g.id}`}><Upload className="h-3.5 w-3.5" /> {busy ? "Invio…" : "Carica rosa"}<input type="file" accept=".xlsx" className="hidden" onChange={(e) => { upload(e.target.files[0]); e.target.value = ""; }} data-testid={`group-upload-input-${g.id}`} /></label>
         {g.players_count > 0 && <Link to="/societa/rose" className="btn-ghost h-9 text-xs" data-testid={`group-roster-link-${g.id}`}><Users className="h-3.5 w-3.5" /> Rosa</Link>}
         {pending && g.players_count === 0 && <button className="btn-ghost h-9 text-xs text-fsl-danger ml-auto" onClick={remove} data-testid={`group-delete-${g.id}`}><Trash2 className="h-3.5 w-3.5" /></button>}
@@ -97,6 +97,7 @@ function TournamentBlock({ block, onChanged }) {
         <div className="min-w-0"><div className="fsl-kicker">Torneo</div><h3 className="font-display font-extrabold uppercase text-xl leading-none truncate">{t.name}</h3></div>
         <Link to={`/tornei/${t.slug}`} className="btn-ghost h-9 text-xs ml-auto" data-testid={`club-groups-public-${t.id}`}><BarChart3 className="h-3.5 w-3.5" /> Classifiche, marcatori e blog <ExternalLink className="h-3 w-3" /></Link>
       </div>
+      {groups.some((g) => g.players_count === 0 && g.roster_import?.status !== "submitted") && <p className="text-xs text-fsl-slate flex items-center gap-2" data-testid={`club-groups-howto-${t.id}`}><FileSpreadsheet className="h-4 w-4 text-fsl-gold shrink-0" /> Per ogni gruppo: <strong className="text-fsl-white">1</strong> Scarica modulo rosa (Excel) · <strong className="text-fsl-white">2</strong> compilalo con i tuoi giocatori · <strong className="text-fsl-white">3</strong> Carica rosa. L'organizzazione conferma e nascono le home dei giocatori.</p>}
       {groups.length === 0 ? (
         <div className="fsl-card p-6 text-sm text-fsl-slate" data-testid={`club-groups-empty-${t.id}`}>Nessun gruppo ancora iscritto a questo torneo.</div>
       ) : (
