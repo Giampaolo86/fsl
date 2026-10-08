@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import { usePageTracking } from "@/hooks/usePageTracking";
 import { Facebook, Heart, Instagram, LogOut, Menu, ShieldCheck, UserRound, X, Youtube } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { NotificationsBell } from "@/components/fsl/NotificationsBell";
@@ -94,6 +95,7 @@ function UserActions({ user, landing, onLogout, mobile = false, onNav }) {
 }
 
 export default function PublicShell() {
+  usePageTracking();
   const { slug } = useParams();
   const { user, landing, logout } = useAuth();
   const navigate = useNavigate();
