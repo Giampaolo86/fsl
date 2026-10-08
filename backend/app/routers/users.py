@@ -34,17 +34,17 @@ class MembershipIn(BaseModel):
 @router.get("")
 async def list_users(user: CurrentUser = Depends(require_roles("director", "secretary"))):
     if user.is_super_admin:
-        us = await users.list(sort=[("full_name", 1)])
+        us = await users.list(sort=[("full_name", 1)], limit=5000)
     else:
         ms = await memberships.list({"tournament_id": {"$in": user.tournament_ids()}})
         ids = {m.user_id for m in ms}
-        us = [u for u in await users.list(sort=[("full_name", 1)]) if u.id in ids]
+        us = [u for u in await users.list(sort=[("full_name", 1)], limit=5000) if u.id in ids]
     all_ms = await memberships.list({"user_id": {"$in": [u.id for u in us]}})
     t_names = {t.id: t.name for t in await tournaments.list()}
     out = []
     for u in us:
         d = u.safe()
-        d["role_label"] = ROLE_LABELS.get(u.role, u.role)
+        d["role_label"] = ROLE_LABELS.get(u.role, "Genitore / Tifoso" if u.role == "fan" else u.role)
         d["memberships"] = [{**m.public(), "tournament_name": t_names.get(m.tournament_id)} for m in all_ms if m.user_id == u.id]
         out.append(d)
     return out

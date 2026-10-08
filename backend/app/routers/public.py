@@ -343,7 +343,7 @@ async def club_entity(org_club_id: str, request: Request):
         c = Club.from_mongo(d)
         club = club or c
         comps = {x.id: x for x in await scoped("competitions", t.id).list()}
-        teams = await scoped("teams", t.id).list({"club_id": c.id}, sort=[("category", 1)])
+        teams = await scoped("teams", t.id).list({"club_id": c.id, "status": {"$ne": "pending"}}, sort=[("category", 1)])
         players = await scoped("players", t.id).list({"club_id": c.id, "status": {"$ne": "inactive"}}, sort=[("shirt_number", 1)], limit=1000)
         groups = []
         for tm in teams:
@@ -441,7 +441,7 @@ async def club_page(slug: str, club_slug: str, request: Request):
     club = await scoped("clubs", t.id).find_one({"slug": club_slug})
     if not club:
         raise not_found("Società")
-    teams = await scoped("teams", t.id).list({"club_id": club.id}, sort=[("category", 1)])
+    teams = await scoped("teams", t.id).list({"club_id": club.id, "status": {"$ne": "pending"}}, sort=[("category", 1)])
     venue = await scoped("venues", t.id).get(club.venue_id) if club.venue_id else None
     ids = [tm.id for tm in teams]
     upcoming = await scoped("matches", t.id).list({"$or": [{"home_team_id": {"$in": ids}}, {"away_team_id": {"$in": ids}}], "status": {"$in": ["scheduled", "confirmed"]}}, sort=[("kickoff_at", 1)], limit=6)

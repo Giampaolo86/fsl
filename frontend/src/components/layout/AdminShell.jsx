@@ -76,14 +76,20 @@ export default function AdminShell() {
   useEffect(() => setOpen(false), [location.pathname]);
 
   const [pendingAccess, setPendingAccess] = useState(0);
+  const [pendingRose, setPendingRose] = useState(0);
+  const [pendingOrg, setPendingOrg] = useState(0);
+  const scopeId = tournamentId || currentId;
   useEffect(() => {
-    const load = () => api.get("/access-requests/pending-count").then((r) => setPendingAccess(r.data.count)).catch(() => {});
+    const load = () => {
+      api.get("/access-requests/pending-count").then((r) => setPendingAccess(r.data.count)).catch(() => {});
+      api.get("/org-groups/pending-count").then((r) => setPendingOrg(r.data.count)).catch(() => {});
+      if (scopeId) api.get(`/tournaments/${scopeId}/club-groups/pending-count`).then((r) => setPendingRose(r.data.count)).catch(() => setPendingRose(0));
+    };
     load();
     const id = setInterval(load, 60000);
     return () => clearInterval(id);
-  }, [location.pathname]);
+  }, [location.pathname, scopeId]);
 
-  const scopeId = tournamentId || currentId;
   const hubNav = HUB_NAV.filter((n) => !n.roles || user.is_super_admin || n.roles.includes(user.role));
   const leaveScope = () => setCurrentId(null);
 
@@ -99,14 +105,14 @@ export default function AdminShell() {
       </div>
       <nav className="flex-1 overflow-y-auto py-3 fsl-scroll" aria-label="Navigazione amministrativa">
         <div className="px-4 pb-1 text-[10px] uppercase tracking-widest text-fsl-slate/70">Hub</div>
-        {hubNav.map((n) => (n.end && scopeId ? <NavItem key={n.to} to={n.to} label="Tutti i tornei" icon={LayoutGrid} end onClick={leaveScope} /> : <NavItem key={n.to} {...n} badge={n.to === "/admin/utenti" ? pendingAccess : 0} />))}
+        {hubNav.map((n) => (n.end && scopeId ? <NavItem key={n.to} to={n.to} label="Tutti i tornei" icon={LayoutGrid} end onClick={leaveScope} /> : <NavItem key={n.to} {...n} badge={n.to === "/admin/utenti" ? pendingAccess : n.to === "/admin/societa" ? pendingOrg : 0} />))}
         {scopeId && (
           <>
             <div className="px-4 pt-4 pb-1 text-[10px] uppercase tracking-widest text-fsl-slate/70 truncate" title={current?.name}>
               {current?.name || "Torneo"}
             </div>
             {TOURNAMENT_NAV(scopeId).map((n) => (
-              <NavItem key={n.to} {...n} />
+              <NavItem key={n.to} {...n} badge={n.label === "Rose" ? pendingRose : 0} />
             ))}
           </>
         )}

@@ -89,6 +89,8 @@ async def _out(t_id: str, items: list[RosterImport]) -> list[dict]:
         d = i.public()
         d["club_name"] = clubs[i.club_id].name if i.club_id in clubs else ""
         d["team_label"] = teams[i.team_id].name if i.team_id in teams else ""
+        d["team_status"] = teams[i.team_id].status if i.team_id in teams else ""
+        d["team_category"] = teams[i.team_id].category if i.team_id in teams else ""
         d["error_count"] = sum(1 for r in i.rows if r.get("errors"))
         out.append(d)
     return out
@@ -136,6 +138,12 @@ async def submit(tournament_id: str, team_id: str = Form(...), file: UploadFile 
     m = await _store(tournament_id, data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", file.filename, user.id, tm.club_id)
     imp = await repo.insert(RosterImport(tournament_id=tournament_id, club_id=tm.club_id, team_id=team_id, media_id=m.id, file_url=f"/api/media/{m.id}", filename=file.filename, submitted_by=user.id, **parsed), user.id)
     await audit.record(user, "roster_import.submit", "roster_import", imp.id, tournament_id, after={"team_id": team_id, "rows": len(parsed["rows"]), "errors": sum(1 for r in parsed["rows"] if r["errors"])})
+    if role == "club_manager":
+        from ..services import staff_notify
+
+        club = await scoped("clubs", tournament_id).get(tm.club_id)
+        pend = " · gruppo da confermare" if tm.status == "pending" else ""
+        await staff_notify.notify_staff(tournament_id, "roster", f"Rosa caricata: {club.name if club else ''} · {tm.category}", f"{tm.name} · {len(parsed['rows'])} giocatori{pend} · {t.name}. Rivedi e conferma da Rose.", f"/admin/t/{tournament_id}/rose", f"roster:{imp.id}")
     return (await _out(tournament_id, [imp]))[0]
 
 
@@ -237,6 +245,15 @@ async def approve(tournament_id: str, import_id: str, body: ApproveIn, user: Cur
             await players.insert(Player(link_code=new_code(), tournament_id=tournament_id, club_id=imp.club_id, team_id=imp.team_id, **c), user.id)
             created += 1
     imp2 = await repo.update(imp.id, {"status": "approved", "rows": rows, "note": body.note, "reviewed_by": user.id, "imported_count": created + updated}, user.id)
+    from ..services import staff_notify
+
+    await staff_notify.settle(f"roster:{imp.id}")
+    teams_repo = scoped("teams", tournament_id)
+    pending_tm = await teams_repo.get(imp.team_id)
+    if pending_tm and pending_tm.status == "pending":
+        await teams_repo.update(pending_tm.id, {"status": "active"}, user.id)
+        await staff_notify.settle(f"group:{pending_tm.id}")
+        await audit.record(user, "team.confirm", "team", pending_tm.id, tournament_id, after={"via": "roster_import"})
     await audit.record(user, "roster_import.approve", "roster_import", imp.id, tournament_id, after={"mode": body.mode, "created": created, "updated": updated})
     tm = await scoped("teams", tournament_id).get(imp.team_id)
     await notify(tournament_id, imp.club_id, "roster", f"Rosa «{tm.name if tm else imp.team_name}» caricata", f"{created} nuovi giocatori, {updated} aggiornati." + (f" Nota: {body.note}" if body.note else ""), "/societa/rose", f"rosterimp:{imp.id}:approved")
@@ -258,6 +275,9 @@ async def reject(tournament_id: str, import_id: str, body: dict, user: CurrentUs
     if not note:
         raise bad_request("Indica il motivo del rifiuto")
     imp2 = await repo.update(imp.id, {"status": "rejected", "note": note, "reviewed_by": user.id}, user.id)
+    from ..services import staff_notify
+
+    await staff_notify.settle(f"roster:{imp.id}")
     await audit.record(user, "roster_import.reject", "roster_import", imp.id, tournament_id, reason=note)
     await notify(tournament_id, imp.club_id, "roster", "Modulo rosa respinto", note, "/societa/rose", f"rosterimp:{imp.id}:rejected")
     return (await _out(tournament_id, [imp2]))[0]

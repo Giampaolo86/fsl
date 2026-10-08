@@ -55,3 +55,15 @@ export function ProgressBar({ value, label }) {
     </div>
   );
 }
+
+export function FilterChips({ value, onChange, options, counts, testId }) {
+  return (
+    <div className="flex flex-wrap gap-2" data-testid={testId}>
+      {options.map(([k, l]) => (
+        <button key={k} type="button" onClick={() => onChange(k)} className={`h-9 px-3 rounded-full border text-xs font-semibold uppercase tracking-wide transition-colors ${value === k ? "border-fsl-gold bg-fsl-gold text-ink-950" : "border-white/15 text-fsl-slate hover:text-fsl-white hover:border-white/40"}`} data-testid={`${testId}-${k}`}>
+          {l}{counts && counts[k] !== undefined && <span className={`ml-1.5 num ${value === k ? "text-ink-950/70" : "text-fsl-slate/70"}`}>{counts[k]}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}

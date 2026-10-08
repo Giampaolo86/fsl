@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckCircle2, ExternalLink, ListChecks, Pencil, Shield, Wand2 } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
+import { OrgGroupsInbox } from "@/components/fsl/OrgGroupsInbox";
 import { KpiTile, PageHeader } from "@/components/fsl/Primitives";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { api, apiError } from "@/lib/api";
@@ -39,6 +40,7 @@ export default function ClubsGlobal() {
   return (
     <div className="space-y-6" data-testid="clubs-global">
       <PageHeader kicker="Tutti i tornei · Società" title="Società" subtitle="Tutte le società di tutti i tornei: stato della homepage pubblica e checklist pre-torneo (rosa, foto, documenti, convocazioni, saldo, spunte del Responsabile). Sistema in sequenza quelle incomplete: ogni modifica dell'admin è pubblicata subito." actions={first && <button className="btn-gold" onClick={() => navigate(`/admin/t/${first.tournament_id}/societa/${first.id}?seq=1`)} data-testid="clubs-global-fix-sequence"><Wand2 className="h-4 w-4" /> Sistema in sequenza ({todo.length})</button>} />
+      <OrgGroupsInbox onChanged={load} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiTile icon={Shield} value={items.length} label="Società" testId="clubs-global-kpi-total" />
         <KpiTile icon={CheckCircle2} value={items.length - todo.length} label="Homepage complete" gold testId="clubs-global-kpi-complete" />

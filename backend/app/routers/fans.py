@@ -461,7 +461,7 @@ async def clubs_overview(user: CurrentUser = Depends(get_current_user)):
         if not user.is_super_admin and user.role_in(t.id) not in STAFF:
             continue
         clubs = await scoped("clubs", t.id).list(sort=[("name", 1)])
-        teams = await scoped("teams", t.id).list({"club_id": {"$ne": None}}, limit=2000)
+        teams = await scoped("teams", t.id).list({"club_id": {"$ne": None}, "status": {"$ne": "pending"}}, limit=2000)
         counts = {}
         for tm in teams:
             counts[tm.club_id] = counts.get(tm.club_id, 0) + 1

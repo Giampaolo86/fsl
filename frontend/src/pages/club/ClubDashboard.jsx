@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CalendarDays, CreditCard, FileText, Shield, Users } from "lucide-react";
 import { ReadinessCard } from "@/components/fsl/ReadinessCard";
-import { KpiTile, PageHeader, SectionTitle } from "@/components/fsl/Primitives";
+import { KpiTile } from "@/components/fsl/Primitives";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
-import { RosterModulePanel } from "@/components/fsl/RosterImport";
-import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
+import { ClubGroups } from "@/components/fsl/ClubGroups";
+import { ErrorState, LoadingState } from "@/components/fsl/States";
 import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -22,9 +22,30 @@ export function useMyClub() {
   return { data, error, membership };
 }
 
+function OrgOnlyDashboard() {
+  const { user, updateUser } = useAuth();
+  const [org, setOrg] = useState(null);
+  const onLoaded = (d) => { setOrg(d.org); if (d.tournaments?.length) api.get("/auth/me").then((r) => updateUser({ memberships: (r.data.user || r.data).memberships })).catch(() => {}); };
+  return (
+    <div className="space-y-8" data-testid="club-org-dashboard">
+      <section className="relative overflow-hidden rounded-xl border border-white/15 grain bg-navy-800">
+        <div className="relative p-6 md:p-8 flex flex-wrap items-center gap-6">
+          <div className="h-[88px] w-[88px] rounded-full bg-ink-950 border border-fsl-gold/40 flex items-center justify-center"><Shield className="h-10 w-10 text-fsl-gold" /></div>
+          <div className="min-w-0 flex-1">
+            <div className="fsl-kicker">Area Società</div>
+            <h1 className="text-4xl sm:text-5xl font-extrabold leading-[0.92]" data-testid="club-dashboard-name">{org?.name || user.full_name}</h1>
+            <p className="text-sm text-fsl-slate mt-2 max-w-2xl">Benvenuto! La tua società non è ancora iscritta a un torneo: aggiungi i gruppi (categoria e anno) che vuoi portare in campo e l'organizzazione li inviterà al torneo giusto. Nel frattempo puoi seguire i tornei dal <Link to="/" className="text-fsl-gold hover:underline">portale pubblico</Link>.</p>
+          </div>
+        </div>
+      </section>
+      <ClubGroups onLoaded={onLoaded} />
+    </div>
+  );
+}
+
 export default function ClubDashboard() {
   const { data, error, membership } = useMyClub();
-  if (!membership) return <EmptyState icon={Shield} title="Nessuna società assegnata" description="Il tuo account non è collegato a una società in nessun torneo. Contatta la segreteria." testId="club-no-membership" />;
+  if (!membership) return <OrgOnlyDashboard />;
   if (error) return <ErrorState message={apiError(error)} />;
   if (!data) return <LoadingState />;
   const { club, tournament, teams } = data;
@@ -49,23 +70,7 @@ export default function ClubDashboard() {
         <KpiTile icon={CreditCard} value={`${data.payments.due.toFixed(2)} €`} label="Da pagare" hint={`Pagato ${data.payments.paid.toFixed(2)} €`} testId="club-kpi-payments" to="/societa/pagamenti" />
         <KpiTile icon={CalendarDays} value={data.next_match ? fmtDate(data.next_match.kickoff_at, { time: true }) : "—"} label="Prossima gara" hint={data.next_match ? `${data.next_match.home?.club?.short_name || data.next_match.home?.name || ""} – ${data.next_match.away?.club?.short_name || data.next_match.away?.name || ""}` : "Nessuna gara programmata"} testId="club-kpi-next" to={data.next_match ? `/societa/partite/${data.next_match.id}` : "/societa/calendario"} />
       </div>
-      <section>
-        <SectionTitle right={<Link to="/societa/squadre" className="text-xs text-fsl-gold hover:underline">Tutte le squadre</Link>}>Le nostre squadre</SectionTitle>
-        {teams.length === 0 ? (
-          <EmptyState icon={Users} title="Nessuna squadra iscritta" description="La segreteria del torneo iscriverà le tue squadre alle competizioni." />
-        ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {teams.map((t) => (
-              <div key={t.id} className="fsl-card p-4" data-testid={`club-team-${t.id}`}>
-                <div className="font-display font-extrabold text-2xl num">{t.category}</div>
-                <div className="text-sm font-semibold">{t.name}</div>
-                <div className="text-xs text-fsl-slate">{t.competition_name}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-      <RosterModulePanel tid={membership.tournament_id} teams={teams} />
+      <ClubGroups />
     </div>
   );
 }

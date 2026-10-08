@@ -302,7 +302,11 @@ class Team(BaseDocument):
     series: str = ""
     placeholder: bool = False
     qualifier: Optional[dict] = None
-    status: Literal["active", "withdrawn", "disqualified"] = "active"
+    status: Literal["active", "withdrawn", "disqualified", "pending"] = "active"
+    birth_year: Optional[int] = None
+    level: str = ""
+    description: str = ""
+    proposed_by: Optional[str] = None
 
 
 class PlayerBadge(BaseDocument):
@@ -516,7 +520,7 @@ class ClubInvite(BaseDocument):
 
 
 class AccessRequest(BaseDocument):
-    tournament_id: str
+    tournament_id: Optional[str] = None
     club_name: str
     city: str = ""
     contact_name: str
@@ -527,3 +531,32 @@ class AccessRequest(BaseDocument):
     review_note: str = ""
     created_user_id: Optional[str] = None
     club_id: Optional[str] = None
+
+
+class OrgClub(BaseDocument):
+    """Anagrafica società indipendente dai tornei (creata all'approvazione della richiesta di accesso)."""
+
+    org_key: str
+    name: str
+    city: str = ""
+    contact_name: str = ""
+    email: str = ""
+    phone: str = ""
+    manager_user_id: Optional[str] = None
+
+
+class OrgGroup(BaseDocument):
+    """Gruppo (categoria/anno) dichiarato dalla società, in attesa che l'admin lo inviti a un torneo."""
+
+    org_key: str
+    user_id: str
+    club_name: str
+    category: str
+    name: str = ""
+    birth_year: Optional[int] = None
+    level: str = ""
+    description: str = ""
+    status: Literal["pending", "invited"] = "pending"
+    tournament_id: Optional[str] = None
+    team_id: Optional[str] = None
+    note: str = ""

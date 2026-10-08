@@ -53,17 +53,15 @@ export function RegisterClub() {
 }
 
 export function RequestAccess() {
-  const [tournaments, setTournaments] = useState([]);
-  const [f, setF] = useState({ tournament_slug: "", club_name: "", city: "", contact_name: "", email: "", phone: "", note: "", privacy_accepted: false });
+  const [f, setF] = useState({ club_name: "", city: "", contact_name: "", email: "", phone: "", note: "", privacy_accepted: false });
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { api.get("/public/tournaments").then((r) => { const rows = r.data.items || r.data; setTournaments(rows); if (rows[0]) setF((x) => ({ ...x, tournament_slug: rows[0].slug })); }).catch(() => {}); }, []);
   const submit = async (e) => { e.preventDefault(); setBusy(true); try { await api.post("/public/access-requests", f); setDone(true); } catch (err) { toast.error(apiError(err)); } finally { setBusy(false); } };
   if (done) return <Shell kicker="Area Società" title="Richiesta inviata" subtitle="L'organizzazione valuterà la richiesta e ti contatterà con le credenziali di accesso."><div className="flex items-center gap-3 text-sm" data-testid="request-access-done"><ShieldCheck className="h-6 w-6 text-fsl-success" /> Grazie {f.contact_name}: riceverai una comunicazione a {f.email}.</div><Link to="/" className="btn-ghost">Torna al portale</Link></Shell>;
   return (
-    <Shell kicker="Area Società" title="Richiedi l'accesso per la tua società" subtitle="Compila il modulo: l'organizzazione approva la richiesta e crea l'account del responsabile.">
+    <Shell kicker="Area Società" title="Registra la tua società" subtitle="Compila il modulo: l'organizzazione approva la richiesta e ti invia le credenziali del responsabile.">
       <form onSubmit={submit} className="space-y-4" data-testid="request-access-form">
-        <Field label="Torneo"><select className="fsl-input" value={f.tournament_slug} onChange={(e) => setF({ ...f, tournament_slug: e.target.value })} required data-testid="request-access-tournament">{tournaments.map((t) => <option key={t.slug} value={t.slug}>{t.name}</option>)}</select></Field>
+        <p className="text-xs text-fsl-slate" data-testid="request-access-hint">Non serve scegliere un torneo: una volta approvata la richiesta entri nell'Area Società, aggiungi i tuoi gruppi (categoria e anno) e sarà l'organizzazione a invitarli ai tornei.</p>
         <div className="grid grid-cols-2 gap-3"><Field label="Nome società"><input className="fsl-input" value={f.club_name} onChange={(e) => setF({ ...f, club_name: e.target.value })} required data-testid="request-access-club" /></Field><Field label="Città"><input className="fsl-input" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} data-testid="request-access-city" /></Field></div>
         <div className="grid grid-cols-2 gap-3"><Field label="Referente"><input className="fsl-input" value={f.contact_name} onChange={(e) => setF({ ...f, contact_name: e.target.value })} required data-testid="request-access-contact" /></Field><Field label="Telefono"><input className="fsl-input" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} data-testid="request-access-phone" /></Field></div>
         <Field label="Email"><input type="email" className="fsl-input" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required data-testid="request-access-email" /></Field>

@@ -59,7 +59,7 @@ async def _board(tid: str, cat: str) -> dict:
     s = await settings_repo.find_one({"tournament_id": tid})
     groups = await _groups(tid, cat)
     ko = await _knockout(tid, cat)
-    teams = await scoped("teams", tid).list({"category": cat}, sort=[("name", 1)], limit=2000)
+    teams = await scoped("teams", tid).list({"category": cat, "status": {"$ne": "pending"}}, sort=[("name", 1)], limit=2000)
     clubs = {c.id: c for c in await scoped("clubs", tid).list(limit=2000)}
     names = {tm.id: tm.name for tm in teams}
     ms = sorted(await scoped("matches", tid).list({"category": cat, "status": {"$ne": "cancelled"}}, limit=5000), key=lambda m: (m.kickoff_at, m.field_name))

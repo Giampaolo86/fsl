@@ -7,7 +7,7 @@ from bson import ObjectId
 from pydantic import BaseModel, EmailStr
 
 from ..core.deps import CurrentUser, get_current_user, load_current_user, require_tournament
-from ..core.errors import bad_request, conflict, not_found
+from ..core.errors import bad_request, conflict, forbidden, not_found
 from ..core.security import hash_password, password_problem
 from ..models.base import utcnow
 from ..models.domain import AccessRequest, Club, ClubInvite, TournamentMembership, User
@@ -102,7 +102,7 @@ async def register_club(body: RegisterClubIn, request: Request, response: Respon
 
 # ---------- richiesta libera ----------
 class AccessRequestIn(BaseModel):
-    tournament_slug: str
+    tournament_slug: Optional[str] = None
     club_name: str
     city: str = ""
     contact_name: str
@@ -118,41 +118,109 @@ async def create_access_request(body: AccessRequestIn):
         raise bad_request("Devi accettare l'informativa privacy")
     if len(body.club_name.strip()) < 2 or len(body.contact_name.strip()) < 2:
         raise bad_request("Compila nome società e referente")
-    t = await tournaments.find_one({"slug": body.tournament_slug})
-    if not t:
+    t = await tournaments.find_one({"slug": body.tournament_slug}) if body.tournament_slug else None
+    if body.tournament_slug and not t:
         raise not_found("Torneo")
-    if await requests_repo.find_one({"tournament_id": t.id, "email": body.email.lower(), "status": "pending"}):
-        raise conflict("Hai già una richiesta in attesa per questo torneo")
-    r = await requests_repo.insert(AccessRequest(tournament_id=t.id, club_name=body.club_name.strip(), city=body.city.strip(), contact_name=body.contact_name.strip(), email=body.email.lower(), phone=body.phone.strip(), note=body.note.strip()[:1000]))
+    if await requests_repo.find_one({"email": body.email.lower(), "status": "pending"}):
+        raise conflict("Hai già una richiesta in attesa: l'organizzazione ti contatterà a breve")
+    if await users.find_one({"email": body.email.lower()}):
+        raise conflict("Esiste già un account con questa email: accedi dall'Area Società")
+    r = await requests_repo.insert(AccessRequest(tournament_id=t.id if t else None, club_name=body.club_name.strip(), city=body.city.strip(), contact_name=body.contact_name.strip(), email=body.email.lower(), phone=body.phone.strip(), note=body.note.strip()[:1000]))
     await _notify_staff_access(t, r)
     return {"id": r.id, "status": r.status}
 
 
-async def _staff_user_ids(tournament_id: str) -> set[str]:
-    from ..core.db import db
-
-    ids = {str(u["_id"]) async for u in db.users.find({"$or": [{"is_super_admin": True}, {"role": "super_admin"}], "deleted_at": None}, {"_id": 1})}
-    ids |= {m.user_id for m in await memberships.list({"tournament_id": tournament_id, "role": {"$in": ["director", "secretary"]}, "status": "active"})}
-    return ids
-
-
 async def _notify_staff_access(t, r: AccessRequest) -> None:
-    from ..models.domain import Notification
-    from ..services import push
+    from ..services import staff_notify
 
-    repo = Repository("notifications", Notification)
     where = f" ({r.city})" if r.city else ""
     title = f"Nuova richiesta di accesso: {r.club_name}{where}"
-    body = f"Referente {r.contact_name} · {r.email} · {t.name}. Approva o rifiuta da Utenti."
-    for uid in await _staff_user_ids(t.id):
-        await repo.insert(Notification(tournament_id=t.id, user_id=uid, kind="access", title=title, body=body, link="/admin/utenti", dedupe_key=f"access:{r.id}:{uid}"))
-        await push.notify_user(t.id, uid, title, body, "/admin/utenti", tag="fsl-access")
+    if t:
+        await staff_notify.notify_staff(t.id, "access", title, f"Referente {r.contact_name} · {r.email} · {t.name}. Approva o rifiuta da Utenti.", "/admin/utenti", f"access:{r.id}")
+    else:
+        await staff_notify.notify_global("access", title, f"Referente {r.contact_name} · {r.email} · nuova società (nessun torneo). Approva da Utenti.", "/admin/utenti", f"access:{r.id}")
+
+
+def _can_handle(user: CurrentUser, r: AccessRequest, roles: set[str]) -> bool:
+    if user.is_super_admin:
+        return True
+    if r.tournament_id:
+        return user.role_in(r.tournament_id) in roles
+    return user.role in roles
+
+
+async def _ensure_org_club(r: AccessRequest, u: User, actor_id: str):
+    from ..models.domain import OrgClub
+    from ..services.legacy import org_key
+
+    repo = Repository("org_clubs", OrgClub)
+    key = org_key(r.club_name)
+    oc = await repo.find_one({"org_key": key})
+    if oc:
+        if not oc.manager_user_id:
+            await repo.update(oc.id, {"manager_user_id": u.id, "email": r.email, "contact_name": r.contact_name, "phone": r.phone}, actor_id)
+        return oc
+    return await repo.insert(OrgClub(org_key=key, name=r.club_name, city=r.city, contact_name=r.contact_name, email=r.email, phone=r.phone, manager_user_id=u.id), actor_id)
+
+
+@router.get("/access-requests")
+async def list_all_access_requests(user: CurrentUser = Depends(get_current_user)):
+    if not (user.is_super_admin or user.role in STAFF):
+        raise forbidden()
+    names = {t.id: t.name for t in await tournaments.list(limit=500)}
+    rows = [r for r in await requests_repo.list(sort=[("created_at", -1)], limit=1000) if _can_handle(user, r, STAFF)]
+    return [{**r.public(), "tournament_name": names.get(r.tournament_id, "") if r.tournament_id else ""} for r in rows]
+
+
+@router.post("/access-requests/{request_id}/approve")
+async def approve_any_access_request(request_id: str, body: dict = None, user: CurrentUser = Depends(get_current_user)):
+    r = await requests_repo.get(request_id)
+    if not r:
+        raise not_found("Richiesta")
+    if not _can_handle(user, r, {"super_admin", "director"}):
+        raise forbidden()
+    if r.tournament_id:
+        return await approve_access_request(r.tournament_id, request_id, body, user)
+    if r.status != "pending":
+        raise conflict("Richiesta già gestita")
+    if await users.find_one({"email": r.email}):
+        raise conflict("Esiste già un utente con questa email")
+    temp = secrets.token_urlsafe(9)
+    u = await users.insert(User(email=r.email, password_hash=hash_password(temp), full_name=r.contact_name, role="club_manager"), user.id)
+    oc = await _ensure_org_club(r, u, user.id)
+    await requests_repo.update(r.id, {"status": "approved", "created_user_id": u.id, "review_note": (body or {}).get("note", "")}, user.id)
+    await _settle_access_notifications(r.id)
+    await audit.record(user, "access_request.approve", "access_request", r.id, None, after={"user_id": u.id, "org_club": oc.org_key})
+    return {"ok": True, "email": u.email, "temp_password": temp, "club": {"id": oc.id, "name": oc.name}}
+
+
+@router.post("/access-requests/{request_id}/reject")
+async def reject_any_access_request(request_id: str, body: dict = None, user: CurrentUser = Depends(get_current_user)):
+    r = await requests_repo.get(request_id)
+    if not r or not _can_handle(user, r, STAFF):
+        raise not_found("Richiesta")
+    if r.status != "pending":
+        raise conflict("Richiesta già gestita")
+    await requests_repo.update(r.id, {"status": "rejected", "review_note": (body or {}).get("note", "")}, user.id)
+    await _settle_access_notifications(r.id)
+    return {"ok": True}
+
+
+@router.delete("/access-requests/{request_id}")
+async def delete_any_access_request(request_id: str, user: CurrentUser = Depends(get_current_user)):
+    r = await requests_repo.get(request_id)
+    if not r or not _can_handle(user, r, {"super_admin", "director"}):
+        raise not_found("Richiesta")
+    await requests_repo.col.delete_one({"_id": ObjectId(r.id)})
+    await _settle_access_notifications(r.id)
+    await audit.record(user, "access_request.delete", "access_request", r.id, r.tournament_id, before={"club_name": r.club_name, "email": r.email, "status": r.status})
+    return {"ok": True}
 
 
 async def _settle_access_notifications(request_id: str) -> None:
-    from ..core.db import db
+    from ..services import staff_notify
 
-    await db.notifications.update_many({"dedupe_key": {"$regex": f"^access:{request_id}:"}, "read": False}, {"$set": {"read": True, "updated_at": utcnow()}})
+    await staff_notify.settle(f"access:{request_id}")
 
 
 @router.get("/access-requests/pending-count")
@@ -160,9 +228,7 @@ async def pending_access_count(user: CurrentUser = Depends(get_current_user)):
     f = {"status": "pending"}
     if not user.is_super_admin:
         tids = [m["tournament_id"] for m in user.memberships if m["role"] in STAFF]
-        if not tids:
-            return {"count": 0}
-        f["tournament_id"] = {"$in": tids}
+        f["tournament_id"] = {"$in": tids + [None]} if user.role in STAFF else {"$in": tids}
     return {"count": await requests_repo.count(f)}
 
 
@@ -190,6 +256,7 @@ async def approve_access_request(tournament_id: str, request_id: str, body: dict
     temp = secrets.token_urlsafe(9)
     u = await users.insert(User(email=r.email, password_hash=hash_password(temp), full_name=r.contact_name, role="club_manager"), user.id)
     await memberships.insert(TournamentMembership(user_id=u.id, tournament_id=tournament_id, role="club_manager", club_id=club.id), user.id)
+    await _ensure_org_club(r, u, user.id)
     await requests_repo.update(r.id, {"status": "approved", "created_user_id": u.id, "club_id": club.id, "review_note": (body or {}).get("note", "")}, user.id)
     await _settle_access_notifications(r.id)
     await audit.record(user, "access_request.approve", "access_request", r.id, tournament_id, after={"user_id": u.id, "club_id": club.id})

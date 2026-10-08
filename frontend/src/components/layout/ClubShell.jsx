@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { BedDouble, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, Flag, LayoutGrid, LogOut, Newspaper, Shield, Users, ShieldCheck } from "lucide-react";
+import { BedDouble, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, Flag, Globe, LayoutGrid, LogOut, Newspaper, Shield, Users, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { OfflineBanner } from "@/components/fsl/States";
@@ -21,6 +21,8 @@ const CLUB_NAV = [
 
 export default function ClubShell() {
   const { user, logout } = useAuth();
+  const hasClub = user.memberships?.some((m) => m.role === "club_manager" && m.club_id);
+  const nav = hasClub ? CLUB_NAV : CLUB_NAV.filter(([, to]) => ["/societa", "/societa/guida"].includes(to));
   return (
     <div className="min-h-screen flex flex-col bg-navy-900">
       <OfflineBanner />
@@ -32,6 +34,7 @@ export default function ClubShell() {
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden sm:inline text-fsl-slate" data-testid="club-shell-user">{user.full_name}</span>
+            <Link to="/" className="btn-ghost h-11" title="Portale pubblico: classifiche, marcatori, blog" data-testid="club-shell-public-link"><Globe className="h-4 w-4" /> <span className="hidden md:inline">Portale</span></Link>
             <NotificationsBell />
             <Link to="/sicurezza" className="h-11 w-11 rounded-md inline-flex items-center justify-center text-fsl-slate hover:text-fsl-white" aria-label="Sicurezza account" title="Sicurezza account" data-testid="security-link"><ShieldCheck className="h-4 w-4" /></Link>
             <button onClick={logout} className="btn-ghost h-11" data-testid="logout-button">
@@ -42,7 +45,7 @@ export default function ClubShell() {
         <nav className="border-t border-white/10 bg-navy-900 relative" aria-label="Navigazione società">
           <span className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-navy-900 to-transparent lg:hidden" aria-hidden="true" />
           <div className="mx-auto max-w-[1488px] px-4 md:px-6 flex overflow-x-auto no-scrollbar snap-x">
-            {CLUB_NAV.map(([label, to, Icon]) => (
+            {nav.map(([label, to, Icon]) => (
               <NavLink
                 key={to}
                 to={to}
