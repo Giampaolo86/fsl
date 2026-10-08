@@ -316,15 +316,37 @@ async def list_media(tournament_id: str, user: CurrentUser = Depends(get_current
     return out
 
 
+async def _is_private_media(doc: MediaFile) -> bool:
+    """Privati: documenti società, file non immagine/video, originali in vendita (il preview resta pubblico)."""
+    from ..core.db import db
+
+    ct = (doc.content_type or "").lower()
+    if doc.kind == "file" or not (ct.startswith("image/") or ct.startswith("video/")):
+        return True
+    if await db.club_documents.find_one({"media_id": doc.id, "deleted_at": None}, {"_id": 1}):
+        return True
+    return bool(await db.paid_media.find_one({"media_id": doc.id, "deleted_at": None}, {"_id": 1}))
+
+
 @media_router.get("/media/{file_id}")
-async def serve_media(file_id: str):
+async def serve_media(file_id: str, request: Request):
     from ..repositories.registry import Repository
+    from .public import _staff
+    from .security_events import record_event
 
     doc = await Repository("media_files", MediaFile).get(file_id)
     if not doc:
         raise not_found("File")
+    cache = "public, max-age=86400"
+    if await _is_private_media(doc):
+        user = await _staff(request)
+        ok = bool(user and (user.is_super_admin or user.role_in(doc.tournament_id) in ("super_admin", "director", "secretary") or (doc.club_id and user.club_in(doc.tournament_id) == doc.club_id) or user.id == doc.uploaded_by))
+        if not ok:
+            await record_event("media_denied", request, user_id=user.id if user else None, severity="medium", detail={"media_id": doc.id, "tournament_id": doc.tournament_id})
+            raise forbidden("File riservato")
+        cache = "private, no-store"
     data, ct = await storage.get_object(doc.storage_path)
-    return Response(content=data, media_type=doc.content_type or ct, headers={"Cache-Control": "public, max-age=86400", "Content-Disposition": f'inline; filename="{doc.original_filename}"'})
+    return Response(content=data, media_type=doc.content_type or ct, headers={"Cache-Control": cache, "X-Content-Type-Options": "nosniff", "Content-Disposition": f'inline; filename="{doc.original_filename}"'})
 
 
 # ---------- public ----------

@@ -55,20 +55,20 @@ class Repository:
 
     async def update(self, id: str, patch: dict, actor_id: Optional[str] = None):
         patch = {**patch, "updated_at": utcnow(), "updated_by": actor_id}
-        await self.col.update_one({"_id": oid(id)}, {"$set": patch})
+        await self.col.update_one(self._base_filter({"_id": oid(id)}), {"$set": patch})
         return await self.get(id)
 
     async def update_versioned(self, id: str, expected_version: int, patch: dict, actor_id: Optional[str] = None):
         patch = {**patch, "updated_at": utcnow(), "updated_by": actor_id}
         res = await self.col.find_one_and_update(
-            {"_id": oid(id), "version": expected_version},
+            self._base_filter({"_id": oid(id), "version": expected_version}),
             {"$set": patch, "$inc": {"version": 1}},
             return_document=True,
         )
         return self.model.from_mongo(res)
 
     async def soft_delete(self, id: str, actor_id: Optional[str] = None):
-        await self.col.update_one({"_id": oid(id)}, {"$set": {"deleted_at": utcnow(), "updated_by": actor_id}})
+        await self.col.update_one(self._base_filter({"_id": oid(id)}), {"$set": {"deleted_at": utcnow(), "updated_by": actor_id}})
 
 
 class ScopedRepository(Repository):

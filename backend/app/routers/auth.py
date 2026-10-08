@@ -146,17 +146,23 @@ async def login(body: LoginIn, request: Request, response: Response):
     ident_email = f"email:{email}"
     if _demo_blocked(email):
         raise ApiError(401, "INVALID_CREDENTIALS", "Email o password non corretti")
+    from .security_events import record_event
+
     if await _locked(ident_ip, MAX_ATTEMPTS) or await _locked(ident_email, MAX_EMAIL_ATTEMPTS):
+        await record_event("lockout", request, email=email, severity="high", detail={"ip": _ip(request)})
         raise ApiError(429, "LOCKED", "Troppi tentativi. Riprova tra 15 minuti")
     user = await users.find_one({"email": email})
     if not user or not verify_password(body.password, user.password_hash):
         await _fail(ident_ip)
         await _fail(ident_email)
+        await record_event("login_fail", request, email=email, severity="low", detail={"known_user": bool(user)})
         raise ApiError(401, "INVALID_CREDENTIALS", "Email o password non corretti")
     if user.status != "active":
+        await record_event("disabled_login", request, user_id=user.id, email=email, severity="high")
         raise ApiError(403, "DISABLED", "Account disabilitato: contatta l'organizzazione")
     _check_area(user, body.area)
     await _clear(ident_ip, ident_email)
+    await record_event("login_ok", request, user_id=user.id, email=email, detail={"role": user.role, "mfa": bool(user.mfa_enabled)})
     return await _after_credentials(request, response, user, "login")
 
 
@@ -351,6 +357,9 @@ class MfaDisableIn(BaseModel):
 
 @router.post("/mfa/disable")
 async def mfa_disable(body: MfaDisableIn, user: CurrentUser = Depends(get_current_user)):
+    from .security_events import record_event
+
+    await record_event("mfa_disabled", None, user_id=user.id, email=user.email, severity="high")
     u = await users.get(user.id)
     if mfa_is_required(u):
         raise ApiError(403, "MFA_MANDATORY", "Per il tuo ruolo la verifica in due passaggi è obbligatoria")
@@ -417,6 +426,9 @@ async def logout(request: Request, response: Response):
 
 @router.post("/logout-all")
 async def logout_all(response: Response, user: CurrentUser = Depends(get_current_user)):
+    from .security_events import record_event
+
+    await record_event("logout_all", None, user_id=user.id, email=user.email, severity="low")
     n = await sessions.revoke_user_sessions(user.id, except_sid=user.sid, reason="logout_all")
     await forget_devices(user.id)
     await audit.record(user, "auth.logout_all", "user", user.id, after={"revoked": n})
@@ -459,6 +471,9 @@ async def impersonate_end(request: Request, user: CurrentUser = Depends(get_curr
 
 @router.post("/impersonate/{user_id}")
 async def impersonate(user_id: str, request: Request, user: CurrentUser = Depends(get_current_user)):
+    from .security_events import record_event
+
+    await record_event("impersonate", request, user_id=user.id, email=user.email, severity="high", detail={"target_user_id": user_id})
     if not user.is_super_admin:
         raise ApiError(403, "FORBIDDEN", "Solo il Super Admin può usare «Entra come»")
     s = await sessions.get_session(user.sid)

@@ -16,7 +16,7 @@ from app.core.deps import CurrentUser, require_roles  # noqa: E402
 from app.core.errors import forbidden  # noqa: E402
 from app.core.sessions import ensure_indexes  # noqa: E402
 from app.migrations import run_migrations  # noqa: E402
-from app.routers import ai, auth, club_extras, extras, fans, roster_imports, matches, me, posts, products, public, registration, structure, top11, tournaments, users, weekly, legacy, studio, push, stripe_catalog, shop, hospitality, groups, monetization, todos, simple_engine, guide, club_groups, integrations, analytics  # noqa: E402
+from app.routers import ai, auth, club_extras, extras, fans, roster_imports, matches, me, posts, products, public, registration, structure, top11, tournaments, users, weekly, legacy, studio, push, stripe_catalog, shop, hospitality, groups, monetization, todos, simple_engine, guide, club_groups, integrations, analytics, security_events  # noqa: E402
 from app.services import storage  # noqa: E402
 from app.seed import purge_demo, seed_all  # noqa: E402
 
@@ -50,15 +50,17 @@ async def seed_purge(user: CurrentUser = Depends(require_roles())):
     return {"ok": True}
 
 
-for r in (auth.router, tournaments.router, structure.router, matches.router, extras.router, users.router, public.router, me.router, posts.router, posts.media_router, posts.public_router, club_extras.router, club_extras.pay_router, club_extras.public_router, roster_imports.router, fans.router, registration.router, products.router, top11.router, weekly.router, legacy.router, studio.router, push.router, stripe_catalog.router, shop.router, hospitality.router, hospitality.public_router, groups.router, monetization.router, todos.router, simple_engine.router, simple_engine.comp_router, ai.router, guide.router, club_groups.router, integrations.router, integrations.public_router, analytics.router):
+for r in (auth.router, tournaments.router, structure.router, matches.router, extras.router, users.router, public.router, me.router, posts.router, posts.media_router, posts.public_router, club_extras.router, club_extras.pay_router, club_extras.public_router, roster_imports.router, fans.router, registration.router, products.router, top11.router, weekly.router, legacy.router, studio.router, push.router, stripe_catalog.router, shop.router, hospitality.router, hospitality.public_router, groups.router, monetization.router, todos.router, simple_engine.router, simple_engine.comp_router, ai.router, guide.router, club_groups.router, integrations.router, integrations.public_router, analytics.router, security_events.router):
     api.include_router(r)
 app.include_router(api)
 
 _origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip() and o.strip() != "*"]
 # Senza elenco esplicito (o con "*"): accetta qualsiasi origine https (dominio personalizzato, *.emergent.host, anteprima) e localhost.
-_origin_regex = os.environ.get("CORS_ORIGIN_REGEX") or (None if _origins else r"^https://[A-Za-z0-9.-]+(:\d+)?$|^https?://localhost(:\d+)?$")
+# Senza elenco esplicito: solo domini della piattaforma (anteprima/produzione Emergent) e localhost; dominio personalizzato → CORS_ORIGINS.
+_origin_regex = os.environ.get("CORS_ORIGIN_REGEX") or (None if _origins else r"^https://[A-Za-z0-9.-]+\.(emergentagent\.com|emergent\.host)(:\d+)?$|^https?://localhost(:\d+)?$")
 if not _origins and not os.environ.get("CORS_ORIGIN_REGEX"):
-    logger.warning("CORS_ORIGINS non impostato: accetto tutte le origini https (imposta CORS_ORIGINS in produzione per restringere)")
+    logger.warning("CORS_ORIGINS non impostato: accetto solo *.emergentagent.com / *.emergent.host / localhost (imposta CORS_ORIGINS per un dominio personalizzato)")
+app.add_middleware(security_events.RateLimiter)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -114,11 +116,29 @@ async def security_headers(request, call_next):
     return response
 
 
+from fastapi import HTTPException as _HTTPException  # noqa: E402
+from fastapi.exception_handlers import http_exception_handler as _default_http_handler  # noqa: E402
+
+ADMIN_PATHS = ("/api/users", "/api/analytics", "/api/security", "/api/org-groups", "/api/integrations/keys", "/api/access-requests", "/api/auth/impersonate", "/api/tournaments")
+
+
+@app.exception_handler(_HTTPException)
+async def _track_forbidden(request, exc):
+    if exc.status_code == 403 and request.url.path.startswith("/api/"):
+        from app.routers.public import _staff
+
+        u = await _staff(request)
+        admin = request.url.path.startswith(ADMIN_PATHS)
+        await security_events.record_event("admin_denied" if admin else "forbidden", request, user_id=u.id if u else None, email=u.email if u else None, severity="high" if admin and u else "medium", detail={"code": getattr(exc, "code", None) or (exc.detail.get("code") if isinstance(exc.detail, dict) else None)})
+    return await _default_http_handler(request, exc)
+
+
 @app.on_event("startup")
 async def startup():
     await run_migrations()
     await ensure_indexes()
     await analytics.ensure_indexes()
+    await security_events.ensure_indexes()
     from app.services.top11 import ensure_indexes as top11_indexes
 
     await top11_indexes()

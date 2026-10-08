@@ -34,6 +34,9 @@ async def rotate_session(sid: str, expected_jti: str) -> Optional[str]:
         return None
     if s["refresh_jti"] != expected_jti:
         await revoke_session(sid, reason="refresh_reuse")
+        from ..routers.security_events import record_event
+
+        await record_event("refresh_reuse", None, user_id=s.get("user_id"), severity="high", detail={"session": str(sid)[:8]})
         return None
     jti = new_id()
     await db.sessions.update_one({"_id": sid}, {"$set": {"refresh_jti": jti, "last_used_at": utcnow(), "expires_at": utcnow() + timedelta(days=REFRESH_DAYS)}})

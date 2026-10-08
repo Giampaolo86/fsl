@@ -1,5 +1,6 @@
 """Crea o elimina l'account QA Super Admin (solo sviluppo): python3 scripts/qa_admin.py create|delete"""
 import asyncio
+import os
 import sys
 
 sys.path.insert(0, "/app/backend")
@@ -15,6 +16,8 @@ EMAIL = "qa.superadmin@fsl.demo"
 
 
 async def main(cmd: str):
+    if os.environ.get("APP_ENV") == "production":
+        raise SystemExit("Rifiutato: account QA non consentiti in produzione")
     if cmd == "create":
         u = await upsert_user(EMAIL, "Demo1234!", "QA Super Admin (temp)", "super_admin", is_super_admin=True)
         await enroll_demo_mfa(u)

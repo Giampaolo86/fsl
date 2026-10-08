@@ -486,6 +486,24 @@ async def public_shop(slug: str, match_id: str):
     return await _items_out(t.id, await scoped("paid_media", t.id).list({"match_id": match_id, "active": True}, sort=[("kind", 1), ("created_at", 1)], limit=500))
 
 
+def _safe_origin(origin_url: str, request: Request) -> str:
+    """URL di ritorno Stripe solo verso il sito stesso (o origini in CORS_ORIGINS): evita redirect verso domini estranei."""
+    import os
+    import re
+    from urllib.parse import urlparse
+
+    u = urlparse(origin_url or "")
+    allowed = {o.strip().lower() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()}
+    req_origin = (request.headers.get("origin") or "").lower()
+    candidate = f"{u.scheme}://{u.netloc}".lower() if u.scheme in ("http", "https") and u.netloc else ""
+    ok = candidate and (candidate in allowed or candidate == req_origin or re.match(r"^https://[a-z0-9.-]+\.(emergentagent\.com|emergent\.host)$|^https?://localhost(:\d+)?$", candidate))
+    if ok:
+        return candidate
+    if req_origin:
+        return req_origin
+    raise ApiError(400, "BAD_ORIGIN", "Origine non consentita per il ritorno dal pagamento")
+
+
 class CheckoutIn(BaseModel):
     item_id: Optional[str] = None
     item_ids: list[str] = []
@@ -558,7 +576,8 @@ async def checkout(body: CheckoutIn, request: Request):
         else:
             lines.append({"price_data": {"currency": currency, "unit_amount": cents, "product_data": {"name": it.title, "tax_code": pricing.TAX_CODE}}, "quantity": 1})
     meta = {"item_ids": ",".join(it.id for it, _, _ in items)[:480], "tournament_id": first.tournament_id, "tournament_name": (t.name if t else "")[:100], "product_ids": ",".join(p.id for _, _, p in items if p)[:480], "product_names": " | ".join(it.title for it, _, _ in items)[:480], "user_id": buyer.id if buyer else "", "user_email": (buyer.email if buyer else "")[:100]}
-    kwargs = dict(line_items=lines, mode="payment", success_url=f"{body.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}", cancel_url=f"{body.origin_url}/payment/cancel", metadata=meta, payment_intent_data={"metadata": meta})
+    origin = _safe_origin(body.origin_url, request)
+    kwargs = dict(line_items=lines, mode="payment", success_url=f"{origin}/payment/success?session_id={{CHECKOUT_SESSION_ID}}", cancel_url=f"{origin}/payment/cancel", metadata=meta, payment_intent_data={"metadata": meta})
     try:
         session = stripe.checkout.Session.create(**kwargs, managed_payments={"enabled": True})
     except stripe.error.InvalidRequestError as e:

@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr
 
 from ..core import sessions
 from ..core.deps import CurrentUser, get_current_user, require_roles, require_tournament
-from ..core.errors import bad_request, conflict, forbidden, not_found
+from ..core.errors import ApiError, bad_request, conflict, forbidden, not_found
 from ..core.security import hash_password, password_problem, temporary_password
 from ..models.base import utcnow
 from ..models.domain import ROLE_LABELS, TournamentMembership, User
@@ -110,12 +110,21 @@ async def set_status(user_id: str, body: StatusIn, user: CurrentUser = Depends(r
 
 
 @router.delete("/{user_id}")
-async def delete_user_account(user_id: str, user: CurrentUser = Depends(require_roles("director"))):
+async def delete_user_account(user_id: str, confirm_email: str = "", user: CurrentUser = Depends(require_roles("director"))):
+    """Eliminazione definitiva: solo Super Admin, con conferma contestuale (email dell'utente) e mai l'ultimo Super Admin."""
     if not user.is_super_admin:
         raise forbidden("Solo un Super Admin può eliminare un utente")
     target = await _manageable(user, user_id)
+    if confirm_email.strip().lower() != target.email.lower():
+        raise ApiError(400, "CONFIRM_REQUIRED", "Per confermare l'eliminazione digita l'email esatta dell'utente")
+    if target.is_super_admin or target.role == "super_admin":
+        others = await users.count({"$or": [{"is_super_admin": True}, {"role": "super_admin"}], "_id": {"$ne": __import__("bson").ObjectId(target.id)}, "status": "active"})
+        if others == 0:
+            raise ApiError(409, "LAST_SUPER_ADMIN", "Non puoi eliminare l'ultimo Super Admin attivo")
     from ..services.cleanup import delete_user
+    from .security_events import record_event
 
+    await record_event("user_deleted", None, user_id=user.id, email=user.email, severity="high", detail={"target": target.email, "role": target.role})
     removed = await delete_user(target.id)
     await audit.record(user, "user.delete", "user", target.id, before={"email": target.email, "role": target.role, "full_name": target.full_name}, after=removed)
     return {"ok": True, "removed": removed}

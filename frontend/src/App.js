@@ -38,6 +38,7 @@ import Venues from "@/pages/admin/Venues";
 import Audit from "@/pages/admin/Audit";
 import UsersPage from "@/pages/admin/Users";
 import Traffic from "@/pages/admin/Traffic";
+import Security from "@/pages/admin/Security";
 import ModulePlaceholder from "@/pages/admin/ModulePlaceholder";
 import BlogManager from "@/pages/admin/Blog";
 import Documents from "@/pages/club/Documents";
@@ -140,6 +141,7 @@ function AppRoutes() {
                 <Route path="/admin/utenti" element={<UsersPage />} />
                 <Route path="/admin/societa" element={<ClubsGlobal />} />
                 <Route path="/admin/traffico" element={<Traffic />} />
+                <Route path="/admin/sicurezza" element={<Security />} />
               </Route>
               <Route path="/admin/t/:tournamentId" element={<ProtectedRoute roles={ADMIN_ROLES}><AdminShell /></ProtectedRoute>}>
                 <Route index element={<Overview />} />

@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 
-const ICONS = { badge: [Award, "text-fsl-gold"], match: [CalendarDays, "text-fsl-gold"], media: [Camera, "text-fsl-blue-light"], callup: [Shirt, "text-fsl-success"], top11: [Sparkles, "text-fsl-gold"], access: [KeyRound, "text-fsl-gold"] };
+const ICONS = { badge: [Award, "text-fsl-gold"], match: [CalendarDays, "text-fsl-gold"], media: [Camera, "text-fsl-blue-light"], callup: [Shirt, "text-fsl-success"], top11: [Sparkles, "text-fsl-gold"], access: [KeyRound, "text-fsl-gold"], security: [KeyRound, "text-fsl-danger"] };
 
 export function NotificationsBell({ fan = false, staff = false }) {
   const { user } = useAuth();

@@ -36,8 +36,9 @@ function UserActions({ u, me, onChanged }) {
     }
   };
   const remove = () => {
-    if (!window.confirm(`Eliminare DEFINITIVAMENTE ${u.full_name} (${u.email})? Verranno rimosse sessioni, membership e notifiche. L'operazione non è reversibile.`)) return;
-    act("Utente eliminato", () => api.delete(`/users/${u.id}`));
+    const typed = window.prompt(`Eliminazione DEFINITIVA di ${u.full_name}.\nVerranno rimosse sessioni, membership e notifiche; non è reversibile.\n\nPer confermare digita l'email esatta dell'utente:\n${u.email}`);
+    if (typed === null) return;
+    act("Utente eliminato", () => api.delete(`/users/${u.id}`, { params: { confirm_email: typed.trim() } }));
   };
   return (
     <div className="inline-flex flex-wrap justify-end gap-1.5">

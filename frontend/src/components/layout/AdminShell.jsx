@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useParams } from "react-router-dom";
-import { Archive, Award, BarChart3, Calendar, ClipboardList, CreditCard, FileText, Grid3X3, Image, LayoutGrid, LogOut, Menu, Phone, Settings, Shield, ShoppingBag, Ticket, Trophy, UserCog, Users, X, ShieldCheck, Sparkles, Newspaper, Palette, Activity } from "lucide-react";
+import { Archive, Award, BarChart3, Calendar, ClipboardList, CreditCard, FileText, Grid3X3, Image, LayoutGrid, LogOut, Menu, Phone, Settings, Shield, ShoppingBag, Ticket, Trophy, UserCog, Users, X, ShieldCheck, Sparkles, Newspaper, Palette, Activity, ShieldAlert } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { NotificationsBell } from "@/components/fsl/NotificationsBell";
 import { api } from "@/lib/api";
@@ -15,6 +15,7 @@ const HUB_NAV = [
   { to: "/admin/societa", label: "Tutte le società", icon: Shield, roles: ["super_admin", "director", "secretary"] },
   { to: "/admin/utenti", label: "Utenti", icon: UserCog, roles: ["super_admin", "director", "secretary"] },
   { to: "/admin/traffico", label: "Traffico", icon: Activity, superOnly: true },
+  { to: "/admin/sicurezza", label: "Sicurezza", icon: ShieldAlert, superOnly: true },
 ];
 
 const TOURNAMENT_NAV = (id) => [
