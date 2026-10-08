@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useParams } from "react-router-dom";
 import { Archive, Award, BarChart3, Calendar, ClipboardList, CreditCard, FileText, Grid3X3, Image, LayoutGrid, LogOut, Menu, Phone, Settings, Shield, ShoppingBag, Ticket, Trophy, UserCog, Users, X, ShieldCheck, Sparkles, Newspaper, Palette } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
+import { NotificationsBell } from "@/components/fsl/NotificationsBell";
+import { api } from "@/lib/api";
 import { TournamentSwitcher } from "@/components/fsl/TournamentSwitcher";
 import { OfflineBanner } from "@/components/fsl/States";
 import { useAuth } from "@/context/AuthContext";
@@ -37,7 +39,7 @@ const TOURNAMENT_NAV = (id) => [
   { to: `/admin/t/${id}/audit`, label: "Audit", icon: Archive },
 ];
 
-function NavItem({ to, label, icon: Icon, end, onClick, match }) {
+function NavItem({ to, label, icon: Icon, end, onClick, match, badge }) {
   const { pathname } = useLocation();
   const forced = match?.some((m) => pathname.split("/").includes(m));
   return (
@@ -54,6 +56,7 @@ function NavItem({ to, label, icon: Icon, end, onClick, match }) {
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="break-words">{label}</span>
+      {badge > 0 && <span className="ml-auto h-5 min-w-[20px] px-1.5 rounded-full bg-fsl-gold text-ink-950 text-[10px] font-bold num inline-flex items-center justify-center" data-testid={`sidebar-badge-${label.toLowerCase()}`}>{badge}</span>}
     </NavLink>
   );
 }
@@ -72,6 +75,14 @@ export default function AdminShell() {
 
   useEffect(() => setOpen(false), [location.pathname]);
 
+  const [pendingAccess, setPendingAccess] = useState(0);
+  useEffect(() => {
+    const load = () => api.get("/access-requests/pending-count").then((r) => setPendingAccess(r.data.count)).catch(() => {});
+    load();
+    const id = setInterval(load, 60000);
+    return () => clearInterval(id);
+  }, [location.pathname]);
+
   const scopeId = tournamentId || currentId;
   const hubNav = HUB_NAV.filter((n) => !n.roles || user.is_super_admin || n.roles.includes(user.role));
   const leaveScope = () => setCurrentId(null);
@@ -88,7 +99,7 @@ export default function AdminShell() {
       </div>
       <nav className="flex-1 overflow-y-auto py-3 fsl-scroll" aria-label="Navigazione amministrativa">
         <div className="px-4 pb-1 text-[10px] uppercase tracking-widest text-fsl-slate/70">Hub</div>
-        {hubNav.map((n) => (n.end && scopeId ? <NavItem key={n.to} to={n.to} label="Tutti i tornei" icon={LayoutGrid} end onClick={leaveScope} /> : <NavItem key={n.to} {...n} />))}
+        {hubNav.map((n) => (n.end && scopeId ? <NavItem key={n.to} to={n.to} label="Tutti i tornei" icon={LayoutGrid} end onClick={leaveScope} /> : <NavItem key={n.to} {...n} badge={n.to === "/admin/utenti" ? pendingAccess : 0} />))}
         {scopeId && (
           <>
             <div className="px-4 pt-4 pb-1 text-[10px] uppercase tracking-widest text-fsl-slate/70 truncate" title={current?.name}>
@@ -141,6 +152,7 @@ export default function AdminShell() {
           </div>
           <div className="flex items-center gap-2">
             <TournamentSwitcher />
+            <NotificationsBell staff />
           </div>
         </header>
         <main className="flex-1 px-4 md:px-6 py-6 max-w-[1488px] w-full mx-auto gold-skin">

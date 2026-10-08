@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Award, Bell, CalendarDays, Camera, FileText, Shirt, Sparkles } from "lucide-react";
+import { Award, Bell, CalendarDays, Camera, FileText, KeyRound, Shirt, Sparkles } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 
-const ICONS = { badge: [Award, "text-fsl-gold"], match: [CalendarDays, "text-fsl-gold"], media: [Camera, "text-fsl-blue-light"], callup: [Shirt, "text-fsl-success"], top11: [Sparkles, "text-fsl-gold"] };
+const ICONS = { badge: [Award, "text-fsl-gold"], match: [CalendarDays, "text-fsl-gold"], media: [Camera, "text-fsl-blue-light"], callup: [Shirt, "text-fsl-success"], top11: [Sparkles, "text-fsl-gold"], access: [KeyRound, "text-fsl-gold"] };
 
-export function NotificationsBell({ fan = false }) {
+export function NotificationsBell({ fan = false, staff = false }) {
   const { user } = useAuth();
   const membership = user.memberships?.find((m) => m.role === "club_manager");
   const tid = membership?.tournament_id;
-  const base = fan ? "/me/notifications" : tid ? `/tournaments/${tid}/notifications` : null;
-  const prefix = fan ? "fan" : "club";
+  const base = fan || staff ? "/me/notifications" : tid ? `/tournaments/${tid}/notifications` : null;
+  const prefix = staff ? "staff" : fan ? "fan" : "club";
+  const home = staff ? "/admin" : fan ? "/account" : "/societa";
   const [data, setData] = useState({ unread: 0, items: [] });
   const load = useCallback(() => { if (base) api.get(base).then((r) => setData(r.data)).catch(() => {}); }, [base]);
   useEffect(() => { load(); const id = setInterval(load, 60000); return () => clearInterval(id); }, [load]);
@@ -33,7 +34,7 @@ export function NotificationsBell({ fan = false }) {
           {data.items.map((n) => {
             const [Icon, tone] = ICONS[n.kind] || [FileText, "text-fsl-blue-light"];
             return (
-              <Link key={n.id} to={n.link || (fan ? "/account" : "/societa")} className={`block px-4 py-3 hover:bg-white/[0.04] ${n.read ? "opacity-70" : ""}`} data-testid={`notification-${n.id}`}>
+              <Link key={n.id} to={n.link || home} className={`block px-4 py-3 hover:bg-white/[0.04] ${n.read ? "opacity-70" : ""}`} data-testid={`notification-${n.id}`}>
                 <div className="flex items-start gap-2 text-sm"><Icon className={`h-4 w-4 shrink-0 mt-0.5 ${tone}`} /><div className="min-w-0"><div className="font-semibold leading-tight">{n.title}</div>{n.body && <div className="text-xs text-fsl-slate mt-0.5 line-clamp-2">{n.body}</div>}<div className="text-[10px] text-fsl-slate num mt-1">{fmtDate(n.created_at, { time: true })}</div></div>{!n.read && <span className="ml-auto h-2 w-2 rounded-full bg-fsl-gold shrink-0 mt-1.5" />}</div>
               </Link>
             );
