@@ -186,7 +186,7 @@ async def approve_any_access_request(request_id: str, body: dict = None, user: C
     if await users.find_one({"email": r.email}):
         raise conflict("Esiste già un utente con questa email")
     temp = secrets.token_urlsafe(9)
-    u = await users.insert(User(email=r.email, password_hash=hash_password(temp), full_name=r.contact_name, role="club_manager"), user.id)
+    u = await users.insert(User(email=r.email, password_hash=hash_password(temp), full_name=r.contact_name, role="club_manager", must_change_password=True), user.id)
     oc = await _ensure_org_club(r, u, user.id)
     await requests_repo.update(r.id, {"status": "approved", "created_user_id": u.id, "review_note": (body or {}).get("note", "")}, user.id)
     await _settle_access_notifications(r.id)
@@ -254,7 +254,7 @@ async def approve_access_request(tournament_id: str, request_id: str, body: dict
     if not club:
         club = await clubs.insert(Club(tournament_id=tournament_id, name=r.club_name, slug=slugify(r.club_name), short_name=r.club_name[:3].upper(), city=r.city, colors={"primary": "#0B57D9", "secondary": "#F4AE2B"}), user.id)
     temp = secrets.token_urlsafe(9)
-    u = await users.insert(User(email=r.email, password_hash=hash_password(temp), full_name=r.contact_name, role="club_manager"), user.id)
+    u = await users.insert(User(email=r.email, password_hash=hash_password(temp), full_name=r.contact_name, role="club_manager", must_change_password=True), user.id)
     await memberships.insert(TournamentMembership(user_id=u.id, tournament_id=tournament_id, role="club_manager", club_id=club.id), user.id)
     await _ensure_org_club(r, u, user.id)
     await requests_repo.update(r.id, {"status": "approved", "created_user_id": u.id, "club_id": club.id, "review_note": (body or {}).get("note", "")}, user.id)

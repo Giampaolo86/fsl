@@ -11,6 +11,7 @@ import { BrainEditor } from "@/components/fsl/BrainEditor";
 import { DAYS, FORMULA, TIEBREAK_LABELS, fmtNum } from "@/lib/format";
 import { GroupsPlanner, planGroups } from "@/components/fsl/GroupsPlanner";
 import { HospitalityEditor } from "@/components/fsl/HospitalityEditor";
+import { ContentApiKeys } from "@/components/fsl/ContentApiKeys";
 
 function Field({ label, children, hint }) {
   return (
@@ -305,6 +306,7 @@ export default function Settings() {
           </div>
         </section>
       </fieldset>
+      <ContentApiKeys tournamentId={data.id} tournamentSlug={data.slug} />
     </div>
   );
 }

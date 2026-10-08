@@ -161,6 +161,23 @@ class InviteIn(BaseModel):
     note: str = ""
 
 
+class BulkInviteIn(InviteIn):
+    group_ids: list[str] = Field(min_length=1, max_length=100)
+
+
+@router.post("/org-groups/invite-bulk")
+async def invite_org_groups_bulk(body: BulkInviteIn, user: CurrentUser = Depends(get_current_user)):
+    """Invita più gruppi in attesa allo stesso torneo (stesso girone facoltativo e messaggio)."""
+    done, errors = [], []
+    for gid in body.group_ids:
+        try:
+            r = await invite_org_group(gid, InviteIn(tournament_id=body.tournament_id, competition_id=body.competition_id, note=body.note), user)
+            done.append(r["team"]["name"])
+        except Exception as e:  # noqa: BLE001
+            errors.append({"id": gid, "error": getattr(e, "detail", str(e))})
+    return {"invited": done, "errors": errors}
+
+
 async def _club_in_tournament(tournament_id: str, g: OrgGroup, actor_id: str):
     """Società nel torneo: esistente (per org_club_id o slug) oppure creata copiando l'anagrafica più recente."""
     from ..core.db import db

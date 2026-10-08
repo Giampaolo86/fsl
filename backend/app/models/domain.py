@@ -560,3 +560,16 @@ class OrgGroup(BaseDocument):
     tournament_id: Optional[str] = None
     team_id: Optional[str] = None
     note: str = ""
+
+
+class ApiKey(BaseDocument):
+    """Chiave Content API per partner esterni (CMS/portali): il valore in chiaro è mostrato una sola volta."""
+
+    name: str
+    key_hash: str
+    prefix: str
+    tournament_id: Optional[str] = None
+    created_by: Optional[str] = None
+    last_used_at: Optional[str] = None
+    calls: int = 0
+    revoked: bool = False

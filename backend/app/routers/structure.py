@@ -162,20 +162,29 @@ async def create_club(tournament_id: str, body: ClubIn, user: CurrentUser = Depe
 
 
 @router.delete("/clubs/{club_id}")
-async def delete_club(tournament_id: str, club_id: str, user: CurrentUser = Depends(get_current_user)):
+async def delete_club(tournament_id: str, club_id: str, force: bool = False, user: CurrentUser = Depends(get_current_user)):
+    """Elimina la società dal torneo; con `force` elimina anche squadre, rose e gare programmate (mai gare giocate)."""
     t, _ = await require_tournament(tournament_id, user, roles=STRUCTURE_ROLES, writable=True)
     club = await scoped("clubs", tournament_id).get(club_id)
     if not club:
         raise not_found("Società")
-    n = await scoped("teams", tournament_id).count({"club_id": club_id})
-    if n:
-        raise conflict(f"La società ha {n} squadre iscritte: elimina prima le squadre dalla pagina Rose")
+    teams = await scoped("teams", tournament_id).list({"club_id": club_id}, limit=500)
+    if teams and not force:
+        raise conflict(f"La società ha {len(teams)} squadre iscritte: elimina prima le squadre dalla pagina Rose")
+    from ..services import cleanup
+
+    removed = {"teams": 0, "players": 0, "matches": 0}
+    for tm in teams:
+        r = await cleanup.delete_team(tournament_id, tm.id)
+        for k in removed:
+            removed[k] += r.get(k, 0)
+    await db.roster_imports.delete_many({"tournament_id": tournament_id, "club_id": club_id})
     await db.club_invites.delete_many({"tournament_id": tournament_id, "club_id": club_id})
     await db.club_documents.delete_many({"tournament_id": tournament_id, "club_id": club_id})
     await db.tournament_memberships.delete_many({"tournament_id": tournament_id, "club_id": club_id})
     await db.clubs.delete_one({"_id": __import__("bson").ObjectId(club_id)})
-    await audit.record(user, "club.delete", "club", club_id, tournament_id, before={"name": club.name})
-    return {"deleted": club.name}
+    await audit.record(user, "club.delete", "club", club_id, tournament_id, before={"name": club.name}, after=removed)
+    return {"deleted": club.name, **removed}
 
 
 @router.delete("/teams/{team_id}")

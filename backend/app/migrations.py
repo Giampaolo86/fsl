@@ -63,6 +63,15 @@ async def m007_teams_placeholders():
     await db.teams.create_index([("tournament_id", ASCENDING), ("competition_id", ASCENDING), ("club_id", ASCENDING)], unique=True, name="teams_unique_club_per_group", partialFilterExpression={"deleted_at": None, "club_id": {"$type": "string"}})
 
 
+async def m008_teams_unassigned():
+    """Una società può avere più gruppi non ancora assegnati a un girone: l'unicità vale solo con competition_id valorizzato."""
+    try:
+        await db.teams.drop_index("teams_unique_club_per_group")
+    except Exception:
+        pass
+    await db.teams.create_index([("tournament_id", ASCENDING), ("competition_id", ASCENDING), ("club_id", ASCENDING)], unique=True, name="teams_unique_club_per_group", partialFilterExpression={"deleted_at": None, "club_id": {"$type": "string"}, "competition_id": {"$type": "string"}})
+
+
 MIGRATIONS = [
     ("001_core_auth", m001_core_auth),
     ("002_tournaments", m002_tournaments),
@@ -71,6 +80,7 @@ MIGRATIONS = [
     ("005_audit", m005_audit),
     ("006_matches_placeholder", m006_matches_placeholder),
     ("007_teams_placeholders", m007_teams_placeholders),
+    ("008_teams_unassigned", m008_teams_unassigned),
 ]
 
 

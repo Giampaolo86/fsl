@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CheckCircle2, ExternalLink, ListChecks, Pencil, Shield, Wand2 } from "lucide-react";
+import { CheckCircle2, ExternalLink, ListChecks, Pencil, Shield, Trash2, Wand2 } from "lucide-react";
+import { toast } from "sonner";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { OrgGroupsInbox } from "@/components/fsl/OrgGroupsInbox";
 import { KpiTile, PageHeader } from "@/components/fsl/Primitives";
@@ -29,6 +30,20 @@ export default function ClubsGlobal() {
   const [tid, setTid] = useState("");
   const [onlyTodo, setOnlyTodo] = useState(false);
   const [q, setQ] = useState("");
+  const [sel, setSel] = useState([]);
+  const [deleting, setDeleting] = useState(false);
+  const removeClub = async (c) => {
+    if (!window.confirm(`Eliminare «${c.name}» da ${c.tournament_name}?${c.teams_count ? ` Verranno eliminate anche ${c.teams_count} squadre con rose e gare programmate.` : ""} Le gare già giocate bloccano l'operazione.`)) return;
+    try { await api.delete(`/tournaments/${c.tournament_id}/clubs/${c.id}`, { params: { force: true } }); toast.success(`«${c.name}» eliminata`); load(); } catch (e) { toast.error(apiError(e)); }
+  };
+  const removeSelected = async () => {
+    const chosen = (data?.items || []).filter((c) => sel.includes(c.id));
+    if (!chosen.length || !window.confirm(`Eliminare ${chosen.length} società selezionate con squadre, rose e gare programmate? Le gare già giocate bloccano la singola società.`)) return;
+    setDeleting(true);
+    let ok = 0;
+    for (const c of chosen) { try { await api.delete(`/tournaments/${c.tournament_id}/clubs/${c.id}`, { params: { force: true } }); ok += 1; } catch (e) { toast.error(`${c.name}: ${apiError(e)}`); } }
+    setDeleting(false); setSel([]); toast.success(`${ok} società eliminate`); load();
+  };
   const load = () => api.get("/clubs/overview").then(({ data: d }) => setData(d)).catch(setError);
   useEffect(() => { load(); }, []);
   const tournaments = useMemo(() => Array.from(new Map((data?.items || []).map((c) => [c.tournament_id, c.tournament_name])).entries()), [data]);
@@ -55,14 +70,16 @@ export default function ClubsGlobal() {
         </select>
         <label className="inline-flex items-center gap-2 text-sm text-fsl-slate cursor-pointer"><input type="checkbox" checked={onlyTodo} onChange={(e) => setOnlyTodo(e.target.checked)} data-testid="clubs-global-only-todo" /> Solo da sistemare</label>
         <span className="ml-auto text-xs text-fsl-slate num">{rows.length} società</span>
+        {sel.length > 0 && <button className="btn-ghost h-10 text-fsl-danger border-fsl-danger/40" disabled={deleting} onClick={removeSelected} data-testid="clubs-global-delete-selected"><Trash2 className="h-4 w-4" /> Elimina {sel.length} selezionate</button>}
       </div>
       {rows.length === 0 ? <EmptyState title="Nessuna società" description="Nessuna società corrisponde ai filtri." /> : (
         <div className="fsl-card overflow-x-auto">
           <table className="w-full table-dark" data-testid="clubs-global-table">
-            <thead><tr><th>Società</th><th>Torneo</th><th>Squadre</th><th>Homepage</th><th>Cosa manca</th><th>Pre-torneo</th><th className="text-right">Azioni</th></tr></thead>
+            <thead><tr><th className="w-8"><input type="checkbox" aria-label="Seleziona tutte" checked={rows.length > 0 && rows.every((c) => sel.includes(c.id))} onChange={(e) => setSel(e.target.checked ? rows.map((c) => c.id) : [])} data-testid="clubs-global-select-all" /></th><th>Società</th><th>Torneo</th><th>Squadre</th><th>Homepage</th><th>Cosa manca</th><th>Pre-torneo</th><th className="text-right">Azioni</th></tr></thead>
             <tbody>
               {rows.map((c) => (
                 <tr key={c.id} data-testid={`clubs-global-row-${c.id}`}>
+                  <td><input type="checkbox" aria-label="Seleziona" checked={sel.includes(c.id)} onChange={(e) => setSel(e.target.checked ? [...sel, c.id] : sel.filter((x) => x !== c.id))} data-testid={`clubs-global-select-${c.id}`} /></td>
                   <td><div className="flex items-center gap-3"><ClubCrest club={c} size={32} /><div><div className="font-semibold">{c.name}</div><div className="text-xs text-fsl-slate">{c.city || "—"}{c.has_draft && <span className="ml-2 text-fsl-warning">bozza in attesa</span>}</div></div></div></td>
                   <td className="text-xs text-fsl-slate">{c.tournament_name}</td>
                   <td className="num">{c.teams_count}</td>
@@ -73,6 +90,7 @@ export default function ClubsGlobal() {
                     <div className="inline-flex gap-1">
                       <Link to={`/admin/t/${c.tournament_id}/societa/${c.id}?seq=1`} className="btn-gold h-9" data-testid={`clubs-global-edit-${c.id}`}><Pencil className="h-4 w-4" /> Modifica</Link>
                       <Link to={`/tornei/${c.tournament_slug}/squadre/${c.slug}`} target="_blank" rel="noreferrer" className="btn-ghost h-9" data-testid={`clubs-global-open-${c.id}`}><ExternalLink className="h-4 w-4" /> Apri</Link>
+                      <button className="btn-ghost h-9 text-fsl-danger" title="Elimina società dal torneo" onClick={() => removeClub(c)} data-testid={`clubs-global-delete-${c.id}`}><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </td>
                 </tr>
