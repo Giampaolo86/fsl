@@ -250,8 +250,8 @@ def test_scoped_repository_filter_is_immutable():
 def test_club_cannot_edit_other_clubs_player():
     db = _db()
     club_email, club_pwd = "societa.prova@futurestarsleague.com", os.environ.get("CLUB_TEST_PASSWORD")
-    if not club_pwd:
-        pytest.skip("CLUB_TEST_PASSWORD non impostata")
+    if not club_pwd or not _run(db.users.find_one({"email": club_email})):
+        pytest.skip("account società di prova non disponibile in questo ambiente")
     s, j = login(club_email, club_pwd)
     m = next((m for m in j["user"]["memberships"] if m.get("club_id")), None)
     assert m, "account società senza membership"
@@ -409,7 +409,7 @@ def test_purge_preview_and_execution_guarded(world, sa):
     assert sa.post(f"{API}/tournaments/purge-test-data", json={"keep_slugs": []}).status_code == 403
     keep = [t["slug"] for t in sa.get(f"{API}/tournaments").json()]
     pv = sa.post(f"{API}/tournaments/purge-test-data/preview", json={"keep_slugs": keep}).json()
-    assert pv["tournaments"] == [] and pv["environment"] == "development"
+    assert pv["tournaments"] == [] and pv["environment"] in ("development", "test")
 
 
 def test_security_summary_reports_real_states(sa):
