@@ -40,7 +40,7 @@ class User(BaseDocument):
 
     def safe(self) -> dict:
         d = self.public()
-        for k in ("password_hash", "mfa_secret", "mfa_pending_secret", "mfa_recovery_codes"):
+        for k in ("password_hash", "mfa_secret", "mfa_pending_secret", "mfa_recovery_codes", "is_owner", "owner_since"):
             d.pop(k, None)
         d["mfa_required"] = self.mfa_required or self.role in ("super_admin", "director") or self.is_super_admin
         return d

@@ -79,16 +79,16 @@ def require_owner(user) -> None:
 
 
 def assert_owner_protected(target, operation: str, actor=None) -> None:
-    """Nessuna operazione amministrativa ordinaria può toccare l'Owner (neppure l'Owner stesso per le distruttive)."""
+    """Nessuna operazione amministrativa ordinaria può toccare l'Owner. Risposta volutamente generica: non rivela chi è l'Owner."""
     if not is_owner(target):
         return
-    raise ApiError(403, "OWNER_PROTECTED", "Account fondatore protetto: operazione non consentita", {"operation": operation})
+    raise ApiError(403, "FORBIDDEN", "Operazione non consentita")
 
 
 async def assert_not_owner_id(user_id: str, operation: str) -> None:
     u = await db.users.find_one({"_id": ObjectId(user_id)}, {"is_owner": 1}) if ObjectId.is_valid(user_id) else None
     if u and u.get("is_owner"):
-        raise ApiError(403, "OWNER_PROTECTED", "Account fondatore protetto: operazione non consentita", {"operation": operation})
+        raise ApiError(403, "FORBIDDEN", "Operazione non consentita")
 
 
 def strip_owner_fields(data: dict) -> dict:

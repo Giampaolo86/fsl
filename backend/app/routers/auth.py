@@ -582,8 +582,8 @@ async def create_reset(u: User, requested_by: str = "user") -> str:
     if u.is_owner and requested_by != "user":
         from .security_events import record_event
 
-        await record_event("owner_protected", None, user_id=requested_by if requested_by not in ("user", "system") else None, severity="high", detail={"operation": "reset_link", "target": "owner"})
-        raise ApiError(403, "OWNER_PROTECTED", "Account fondatore protetto: nessun amministratore può emettere un reset per l'Owner", {"operation": "reset_link"})
+        await record_event("owner_protected", None, user_id=requested_by if requested_by not in ("user", "system") else None, severity="high", detail={"operation": "reset_link"})
+        raise ApiError(403, "FORBIDDEN", "Operazione non consentita")
     token = secrets.token_urlsafe(32)
     await db.password_resets.update_many({"user_id": u.id, "used_at": None}, {"$set": {"used_at": utcnow(), "superseded": True}})
     await db.password_resets.insert_one({"user_id": u.id, "email": u.email, "full_name": u.full_name, "role": u.role, "token_hash": _reset_hash(token), "created_at": utcnow(), "expires_at": utcnow() + timedelta(hours=RESET_HOURS), "used_at": None, "requested_by": requested_by, "emailed": False})
@@ -599,9 +599,9 @@ async def forgot_password(body: ForgotIn, request: Request):
     u = await users.find_one({"email": email})
     emailed = False
     if u and u.is_owner and not mailer.configured():
-        # senza email verificabile nessun token viene emesso né consegnato a terzi: resta solo la procedura tecnica riservata al fondatore
+        # senza email verificabile nessun token viene emesso; risposta identica a quella di un utente qualsiasi (nessuna enumerazione dell'Owner)
         await audit.record(None, "auth.forgot_password_owner_blocked", "user", u.id)
-        return {"ok": True, "emailed": False, "assisted": False, "owner_procedure": True}
+        return {"ok": True, "emailed": False, "assisted": True}
     if u and u.status == "active":
         token = await create_reset(u)
         link = f"{os.environ.get('FRONTEND_URL') or request.headers.get('origin') or ''}/reimposta-password?token={token}"
@@ -624,7 +624,7 @@ async def reset_password(body: ResetIn, request: Request, response: Response):
         raise ApiError(400, "INVALID_TOKEN", "Link non valido")
     if u.is_owner and doc.get("requested_by") != "user":  # difesa in profondità: un token amministrativo non completa mai un reset Owner
         await db.password_resets.update_one({"_id": doc["_id"]}, {"$set": {"used_at": utcnow(), "rejected": "owner_protected"}})
-        raise ApiError(403, "OWNER_PROTECTED", "Account fondatore protetto")
+        raise ApiError(400, "INVALID_TOKEN", "Link non valido o scaduto: richiedi un nuovo reset")
     await users.update(u.id, {"password_hash": hash_password(body.password), "password_changed_at": utcnow(), "must_change_password": False})
     await db.password_resets.update_one({"_id": doc["_id"]}, {"$set": {"used_at": utcnow()}})
     await sessions.revoke_user_sessions(u.id, reason="password_reset")

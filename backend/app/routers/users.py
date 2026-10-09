@@ -45,7 +45,7 @@ async def list_users(user: CurrentUser = Depends(require_roles("director", "secr
     out = []
     for u in us:
         d = u.safe()
-        d["role_label"] = "Owner — Fondatore FSL" if u.is_owner else ROLE_LABELS.get(u.role, "Genitore / Tifoso" if u.role == "fan" else u.role)
+        d["role_label"] = ROLE_LABELS.get(u.role, "Genitore / Tifoso" if u.role == "fan" else u.role)
         d["memberships"] = [{**m.public(), "tournament_name": t_names.get(m.tournament_id)} for m in all_ms if m.user_id == u.id]
         out.append(d)
     return out

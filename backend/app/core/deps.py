@@ -56,7 +56,6 @@ class CurrentUser:
             "full_name": self.full_name,
             "role": self.role,
             "is_super_admin": self.is_super_admin,
-            "is_owner": self.is_owner,
             "memberships": self.memberships,
             "picture": self.picture,
             "favorites": self.favorites,

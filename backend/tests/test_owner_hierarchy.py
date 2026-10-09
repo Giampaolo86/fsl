@@ -138,7 +138,8 @@ def test_super_admin_cannot_delete_disable_reset_or_impersonate_owner(sa, owner,
     for r in checks:
         assert r.status_code in (403, 404), (r.request.method, r.request.url, r.status_code, r.text)
         if r.status_code == 403:
-            assert r.json()["detail"]["code"] in ("OWNER_PROTECTED", "FORBIDDEN", "SCOPE_DENIED"), r.text
+            assert r.json()["detail"]["code"] in ("FORBIDDEN", "SCOPE_DENIED"), r.text
+            assert "fondatore" not in r.text.lower() and "owner" not in r.text.lower(), r.text  # il rifiuto non rivela chi è l'Owner
     after = _run(db.users.find_one({"_id": owner["_id"]}))
     for k in ("password_hash", "mfa_enabled", "mfa_secret", "status", "is_owner", "is_super_admin", "email"):
         assert before.get(k) == after.get(k), k
@@ -154,7 +155,7 @@ def test_owner_delete_blocked_even_from_owner_session_and_from_cleanup(owner, db
     assert r.status_code in (400, 403), r.text  # mai eliminabile, neppure da sé
     with pytest.raises(ApiError) as e:
         _run(delete_user(str(owner["_id"])))
-    assert e.value.detail["code"] == "OWNER_PROTECTED"
+    assert e.value.detail["code"] == "FORBIDDEN"
     # cancellazione massiva / disabilitazione account di test: l'Owner non rientra mai nei pattern e ha un guard esplicito
     from app.services.cleanup import is_test_account
 
@@ -208,13 +209,14 @@ def test_super_admins_keep_full_powers(sa, other_sa, db):
 def test_owner_manages_other_super_admins(owner, other_sa, db):
     s = session_for(owner)
     me = s.get(f"{API}/auth/me")
-    assert me.status_code == 200 and me.json()["user"]["is_owner"] is True
+    assert me.status_code == 200 and "is_owner" not in me.json()["user"]  # mai esposto, nemmeno a sé stesso
     uid = str(other_sa["_id"])
     assert s.patch(f"{API}/users/{uid}/status", json={"status": "disabled"}).status_code == 200
     assert s.patch(f"{API}/users/{uid}/status", json={"status": "active"}).status_code == 200
     assert s.post(f"{API}/users/{uid}/mfa/reset").status_code == 200
     users = s.get(f"{API}/users").json()
-    assert next(u for u in users if u["is_owner"])["role_label"] == "Owner — Fondatore FSL"
+    assert all("is_owner" not in u and "owner_since" not in u for u in users)
+    assert next(u for u in users if u["email"] == owner["email"])["role_label"] == "Super Admin"  # indistinguibile dagli altri Super Admin
 
 
 def test_user_delete_requires_recent_auth(sa, db):
@@ -236,7 +238,8 @@ def test_user_delete_requires_recent_auth(sa, db):
 def test_super_admin_cannot_obtain_reset_link_or_token_for_owner(sa, owner, db):
     before = _run(db.password_resets.count_documents({"user_id": str(owner["_id"]), "used_at": None}))
     r = sa.post(f"{API}/auth/reset-requests/link", json={"email": owner["email"]})
-    assert r.status_code == 403 and r.json()["detail"]["code"] == "OWNER_PROTECTED", r.text
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "FORBIDDEN", r.text
+    assert "fondatore" not in r.text.lower() and "owner" not in r.text.lower(), r.text
     assert _run(db.password_resets.count_documents({"user_id": str(owner["_id"]), "used_at": None})) == before
     # il servizio centrale rifiuta ogni emissione "assistita", da qualunque chiamante
     from app.core.errors import ApiError
@@ -245,7 +248,7 @@ def test_super_admin_cannot_obtain_reset_link_or_token_for_owner(sa, owner, db):
 
     with pytest.raises(ApiError) as e:
         _run(create_reset(User.from_mongo(owner), requested_by="qualsiasi-admin"))
-    assert e.value.detail["code"] == "OWNER_PROTECTED"
+    assert e.value.detail["code"] == "FORBIDDEN"
     # un token amministrativo inserito a forza nel DB non completa il reset dell'Owner
     import hashlib
     import secrets as sec
@@ -253,7 +256,8 @@ def test_super_admin_cannot_obtain_reset_link_or_token_for_owner(sa, owner, db):
     tok = sec.token_urlsafe(32)
     _run(db.password_resets.insert_one({"user_id": str(owner["_id"]), "email": owner["email"], "token_hash": hashlib.sha256(tok.encode()).hexdigest(), "created_at": datetime.now(timezone.utc), "expires_at": datetime.now(timezone.utc) + timedelta(hours=1), "used_at": None, "requested_by": "forzato"}))
     r = requests.post(f"{API}/auth/reset-password", json={"token": tok, "password": f"Nuova-{uuid.uuid4().hex[:8]}-9"})
-    assert r.status_code == 403, r.text
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "INVALID_TOKEN", r.text  # risposta identica a un token qualsiasi non valido
+    assert _run(db.password_resets.find_one({"token_hash": hashlib.sha256(tok.encode()).hexdigest()}))["used_at"] is not None  # token bruciato
     assert _run(db.users.find_one({"_id": owner["_id"]}))["password_hash"] == owner["password_hash"]
     # la lista delle richieste in attesa non rivela mai l'Owner
     assert all(d["email"] != owner["email"] for d in sa.get(f"{API}/auth/reset-requests").json())
@@ -282,7 +286,7 @@ def test_owner_self_service_channels_remain_available(owner, db, monkeypatch):
 
     monkeypatch.setattr(mailer, "configured", lambda: False)
     r = requests.post(f"{API}/auth/forgot-password", json={"email": owner["email"]})
-    assert r.status_code == 200 and r.json().get("owner_procedure") is True and r.json()["assisted"] is False
+    assert r.status_code == 200 and r.json() == {"ok": True, "emailed": False, "assisted": True}  # identica a un utente qualunque
     assert _run(db.password_resets.count_documents({"user_id": str(owner["_id"]), "used_at": None})) == 0
 
 

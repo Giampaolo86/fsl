@@ -63,7 +63,7 @@ async def record_event(kind: str, request: Optional[Request] = None, *, user_id:
         pass
 
 
-LABELS = {"lockout": "Account bloccato per troppi tentativi", "admin_denied": "Tentativo di accesso ad area amministrativa", "impersonate": "Accesso «Entra come» eseguito", "mfa_disabled": "MFA disattivata", "role_change": "Modifica permessi", "user_deleted": "Utente eliminato", "tournament_purged": "Dati torneo eliminati", "refresh_reuse": "Riutilizzo di una sessione già ruotata", "disabled_login": "Login da account disabilitato", "rate_limited": "Richieste automatizzate limitate", "cors_denied": "Origine web non autorizzata", "api_key_invalid": "Chiave Content API non valida", "payment_oversold": "Pagamento oltre lo stock disponibile", "webhook_bad_signature": "Webhook Stripe con firma non valida", "webhook_unconfigured": "Webhook Stripe senza segreto configurato", "purge_blocked": "Pulizia dati bloccata", "reauth_failed": "Conferma identità fallita", "owner_protected": "Tentativo di operazione sull'account fondatore"}
+LABELS = {"lockout": "Account bloccato per troppi tentativi", "admin_denied": "Tentativo di accesso ad area amministrativa", "impersonate": "Accesso «Entra come» eseguito", "mfa_disabled": "MFA disattivata", "role_change": "Modifica permessi", "user_deleted": "Utente eliminato", "tournament_purged": "Dati torneo eliminati", "refresh_reuse": "Riutilizzo di una sessione già ruotata", "disabled_login": "Login da account disabilitato", "rate_limited": "Richieste automatizzate limitate", "cors_denied": "Origine web non autorizzata", "api_key_invalid": "Chiave Content API non valida", "payment_oversold": "Pagamento oltre lo stock disponibile", "webhook_bad_signature": "Webhook Stripe con firma non valida", "webhook_unconfigured": "Webhook Stripe senza segreto configurato", "purge_blocked": "Pulizia dati bloccata", "reauth_failed": "Conferma identità fallita", "owner_protected": "Operazione amministrativa non consentita"}
 
 
 async def _alert_super_admins(kind: str, detail: dict, email: Optional[str]) -> None:
@@ -182,7 +182,7 @@ async def protections() -> list[dict]:
     add("mfa_admins", "MFA obbligatoria per Super Admin e Direttori", "verified" if not without and not unverified else "error", ("Tutti gli account privilegiati attivi hanno la MFA" if not without else f"Senza MFA (obbligo al prossimo accesso, operazioni admin bloccate): {', '.join(without)}") + (f" · {unverified} sessioni privilegiate senza MFA (bloccate)" if unverified else ""))
     owners = await db.users.count_documents({"is_owner": True})
     idx_ok = "uniq_owner" in await db.users.index_information()
-    add("owner", "Owner unico e protetto", "verified" if owners == 1 and idx_ok else "error", (f"1 fondatore, vincolo di unicità DB {'attivo' if idx_ok else 'MANCANTE'}; eliminazione/disabilitazione/reset/impersonazione bloccate lato server" if owners == 1 else f"{owners} account owner trovati (atteso 1)"))
+    add("critical_accounts", "Protezione account critici", "verified" if owners == 1 and idx_ok else "error", "Vincolo di unicità DB attivo; eliminazione, disabilitazione, reset e impersonazione bloccate lato server" if owners == 1 and idx_ok else "Configurazione da verificare")
     add("media_private", "File riservati protetti lato server", "active", "Documenti, file non pubblici e originali in vendita richiedono autorizzazione; streaming con Range")
     add("env_guard", "Account di test in produzione", "verified" if env == "production" else "active", "Login bloccato e account @fsl.demo / *.prova disabilitati all'avvio" if env == "production" else f"Ambiente {env}: account QA consentiti solo con QA_ALLOW_TEST_ACCOUNTS")
     add("purge_guard", "Pulizia dati e cancellazioni", "active", "Purge bloccata in produzione; eliminazione torneo con conferma, ri-autenticazione recente e backup su storage")
@@ -208,7 +208,7 @@ async def security_summary(user: CurrentUser = Depends(get_current_user)):
     high = await db.security_events.find({"severity": "high"}, {"_id": 0}).sort("ts", -1).limit(30).to_list(30)
     locked = await db.login_attempts.find({}, {"_id": 0}).sort("updated_at", -1).limit(20).to_list(20) if "login_attempts" in await db.list_collection_names() else []
     disabled = await db.users.count_documents({"status": {"$ne": "active"}, "deleted_at": None})
-    admins = await db.users.find({"$or": [{"is_super_admin": True}, {"role": {"$in": ["super_admin", "director"]}}], "deleted_at": None}, {"email": 1, "role": 1, "is_super_admin": 1, "is_owner": 1, "mfa_enabled": 1, "status": 1, "last_login_at": 1}).to_list(50)
+    admins = await db.users.find({"$or": [{"is_super_admin": True}, {"role": {"$in": ["super_admin", "director"]}}], "deleted_at": None}, {"email": 1, "role": 1, "is_super_admin": 1, "mfa_enabled": 1, "status": 1, "last_login_at": 1}).to_list(50)
     prots = await protections()
     config = {
         "cors_explicit": bool(os.environ.get("CORS_ORIGINS")),
