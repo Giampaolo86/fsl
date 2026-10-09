@@ -311,3 +311,6 @@ Provider email/SMS; policy retention; Pantone su mazzetta fisica. Stripe: sandbo
 - [x] UI: rimossi badge corona «OWNER — FONDATORE FSL» e «Account fondatore protetto» (Utenti) e corona in Sicurezza; la riga Owner ha gli stessi pulsanti degli altri Super Admin (il server rifiuta in modo generico)
 - [x] Test aggiornati: `test_owner_hierarchy.py` verifica assenza di `is_owner`/«owner»/«fondatore» nelle risposte; suite CI (`test_security_phase2.py` + `test_owner_hierarchy.py`) 43 passed in locale; verifica live API + screenshot Utenti OK
 - Nota: la protezione server resta integrale e identica (solo la *visibilità* è stata rimossa). `tests/test_impersonation_and_delete.py::test_delete_user_super_admin_only` fallisce da prima (non passa `confirm_email`), non è nella suite CI
+
+## BACKLOG MEMORIZZATO (richiesta utente 2026-10 — da fare DOPO che tutto funziona stabilmente)
+- [ ] **Apertura Pacchetti (gamification tifosi)**: i tifosi aprono pacchetti virtuali di figurine giornalieri (1 pacchetto/giorno per account, figurine = giocatori/squadre dei tornei seguiti) e scambiano i doppioni con altri supporter (proposta scambio → accettazione → swap atomico; anti-abuso: rate limit, nessun valore monetario). Collegato all'Album Figurine PDF (P0 in sospeso). Priorità: dopo stabilizzazione produzione.
