@@ -230,3 +230,126 @@ def test_user_delete_requires_recent_auth(sa, db):
     assert sa.delete(f"{API}/users/{uid}", params={"confirm_email": "wrong@test.it"}).status_code == 400
     assert sa.delete(f"{API}/users/{uid}", params={"confirm_email": email}).status_code == 200
     assert _run(db.audit_logs.find_one({"action": "user.delete", "entity_id": uid})) is not None
+
+
+# ---------- percorsi alternativi sulle credenziali: recupero assistito, token, email, MFA ----------
+def test_super_admin_cannot_obtain_reset_link_or_token_for_owner(sa, owner, db):
+    before = _run(db.password_resets.count_documents({"user_id": str(owner["_id"]), "used_at": None}))
+    r = sa.post(f"{API}/auth/reset-requests/link", json={"email": owner["email"]})
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "OWNER_PROTECTED", r.text
+    assert _run(db.password_resets.count_documents({"user_id": str(owner["_id"]), "used_at": None})) == before
+    # il servizio centrale rifiuta ogni emissione "assistita", da qualunque chiamante
+    from app.core.errors import ApiError
+    from app.models.domain import User
+    from app.routers.auth import create_reset
+
+    with pytest.raises(ApiError) as e:
+        _run(create_reset(User.from_mongo(owner), requested_by="qualsiasi-admin"))
+    assert e.value.detail["code"] == "OWNER_PROTECTED"
+    # un token amministrativo inserito a forza nel DB non completa il reset dell'Owner
+    import hashlib
+    import secrets as sec
+
+    tok = sec.token_urlsafe(32)
+    _run(db.password_resets.insert_one({"user_id": str(owner["_id"]), "email": owner["email"], "token_hash": hashlib.sha256(tok.encode()).hexdigest(), "created_at": datetime.now(timezone.utc), "expires_at": datetime.now(timezone.utc) + timedelta(hours=1), "used_at": None, "requested_by": "forzato"}))
+    r = requests.post(f"{API}/auth/reset-password", json={"token": tok, "password": f"Nuova-{uuid.uuid4().hex[:8]}-9"})
+    assert r.status_code == 403, r.text
+    assert _run(db.users.find_one({"_id": owner["_id"]}))["password_hash"] == owner["password_hash"]
+    # la lista delle richieste in attesa non rivela mai l'Owner
+    assert all(d["email"] != owner["email"] for d in sa.get(f"{API}/auth/reset-requests").json())
+    # sweep: i token assistiti residui vengono invalidati
+    from app.services.owner import sweep_owner_reset_tokens
+
+    _run(db.password_resets.insert_one({"user_id": str(owner["_id"]), "email": owner["email"], "token_hash": "x", "created_at": datetime.now(timezone.utc), "expires_at": datetime.now(timezone.utc) + timedelta(hours=1), "used_at": None, "requested_by": "altro-admin"}))
+    assert _run(sweep_owner_reset_tokens()) >= 1
+    assert _run(db.password_resets.count_documents({"user_id": str(owner["_id"]), "used_at": None, "requested_by": {"$ne": "user"}})) == 0
+
+
+def test_owner_self_service_channels_remain_available(owner, db, monkeypatch):
+    """L'Owner può cambiare password volontariamente (percorso autenticato) e il canale personale di recupero resta suo."""
+    from app.models.domain import User
+    from app.routers.auth import create_reset
+
+    s = session_for(owner)
+    r = s.post(f"{API}/auth/password/change", json={"current_password": "password-sbagliata", "new_password": f"Nuova-{uuid.uuid4().hex[:8]}-9"})
+    assert r.status_code in (400, 401), r.text  # percorso disponibile: rifiuta solo perché la password attuale non è corretta
+    assert _run(db.users.find_one({"_id": owner["_id"]}))["password_hash"] == owner["password_hash"]
+    tok = _run(create_reset(User.from_mongo(owner), requested_by="user"))  # canale personale (email verificata / procedura tecnica)
+    assert tok and _run(db.password_resets.find_one({"user_id": str(owner["_id"]), "used_at": None, "requested_by": "user"}))
+    _run(db.password_resets.update_many({"user_id": str(owner["_id"]), "used_at": None}, {"$set": {"used_at": datetime.now(timezone.utc)}}))
+    # senza SMTP il recupero pubblico per l'Owner non produce token consegnabili a terzi
+    from app.services import mailer
+
+    monkeypatch.setattr(mailer, "configured", lambda: False)
+    r = requests.post(f"{API}/auth/forgot-password", json={"email": owner["email"]})
+    assert r.status_code == 200 and r.json().get("owner_procedure") is True and r.json()["assisted"] is False
+    assert _run(db.password_resets.count_documents({"user_id": str(owner["_id"]), "used_at": None})) == 0
+
+
+def test_super_admin_can_still_assist_unprotected_users(sa, other_sa):
+    r = sa.post(f"{API}/auth/reset-requests/link", json={"email": other_sa["email"]})
+    assert r.status_code == 200 and "/reimposta-password?token=" in r.json()["link"]
+
+
+# ---------- controllo preventivo: inventario dei percorsi che toccano credenziali/account ----------
+# Ogni rotta non-GET sotto /auth e /users deve essere classificata qui. Una rotta nuova o rinominata fa fallire il test
+# finché non viene esaminata rispetto all'Owner: SELF = agisce solo sull'utente autenticato; PUBLIC = senza bersaglio scelto
+# dal chiamante (token/credenziali proprie); TARGET = agisce su un altro account → DEVE essere coperta da un test negativo Owner.
+ROUTE_INVENTORY = {
+    ("DELETE", "/api/auth/mfa/devices/{device_id}"): "SELF",
+    ("DELETE", "/api/auth/sessions/{sid}"): "SELF",
+    ("POST", "/api/auth/forgot-password"): "PUBLIC",  # Owner: solo email verificata; senza SMTP nessun token (test_owner_self_service_channels_remain_available)
+    ("POST", "/api/auth/google/session"): "PUBLIC",
+    ("POST", "/api/auth/impersonate/end"): "SELF",
+    ("POST", "/api/auth/login"): "PUBLIC",
+    ("POST", "/api/auth/logout"): "SELF",
+    ("POST", "/api/auth/logout-all"): "SELF",
+    ("POST", "/api/auth/mfa/disable"): "SELF",
+    ("POST", "/api/auth/mfa/enable/begin"): "SELF",
+    ("POST", "/api/auth/mfa/enable/confirm"): "SELF",
+    ("POST", "/api/auth/mfa/recovery/regenerate"): "SELF",
+    ("POST", "/api/auth/mfa/setup/begin"): "SELF",
+    ("POST", "/api/auth/mfa/setup/confirm"): "SELF",
+    ("POST", "/api/auth/mfa/verify"): "PUBLIC",
+    ("POST", "/api/auth/password/change"): "SELF",
+    ("POST", "/api/auth/reauth"): "SELF",
+    ("POST", "/api/auth/refresh"): "PUBLIC",
+    ("POST", "/api/auth/register"): "PUBLIC",
+    ("POST", "/api/auth/reset-password"): "PUBLIC",  # Owner: token amministrativi rifiutati (test_super_admin_cannot_obtain_reset_link_or_token_for_owner)
+    ("POST", "/api/auth/impersonate/{user_id}"): "TARGET",
+    ("POST", "/api/auth/reset-requests/link"): "TARGET",
+    ("POST", "/api/users"): "PUBLIC",  # crea nuovi account; is_owner nel payload ignorato (test_owner_field_cannot_be_set_via_repository_or_api)
+    ("POST", "/api/users/memberships"): "TARGET",
+    ("DELETE", "/api/users/memberships/{membership_id}"): "TARGET",
+    ("DELETE", "/api/users/{user_id}"): "TARGET",
+    ("PATCH", "/api/users/{user_id}/status"): "TARGET",
+    ("POST", "/api/users/{user_id}/mfa/reset"): "TARGET",
+    ("POST", "/api/users/{user_id}/temporary-password"): "TARGET",
+}
+
+
+def test_every_account_route_is_classified_and_target_routes_reject_owner(sa, owner, db):
+    from app.routers import auth, users
+
+    actual = {(m, "/api" + r.path) for rt in (auth.router, users.router) for r in rt.routes for m in r.methods if m in ("POST", "PATCH", "PUT", "DELETE")}
+    assert actual == set(ROUTE_INVENTORY), f"Rotte non classificate: {actual - set(ROUTE_INVENTORY)} / rimosse: {set(ROUTE_INVENTORY) - actual}"
+    oid = str(owner["_id"])
+    m_owner = _run(db.tournament_memberships.find_one({"user_id": oid})) or {"_id": "000000000000000000000000"}
+    calls = {
+        ("POST", "/api/auth/impersonate/{user_id}"): lambda: sa.post(f"{API}/auth/impersonate/{oid}"),
+        ("POST", "/api/auth/reset-requests/link"): lambda: sa.post(f"{API}/auth/reset-requests/link", json={"email": owner["email"]}),
+        ("POST", "/api/users/memberships"): lambda: sa.post(f"{API}/users/memberships", json={"user_id": oid, "tournament_id": "x", "role": "secretary"}),
+        ("DELETE", "/api/users/memberships/{membership_id}"): lambda: sa.delete(f"{API}/users/memberships/{m_owner['_id']}"),
+        ("DELETE", "/api/users/{user_id}"): lambda: sa.delete(f"{API}/users/{oid}", params={"confirm_email": owner["email"]}),
+        ("PATCH", "/api/users/{user_id}/status"): lambda: sa.patch(f"{API}/users/{oid}/status", json={"status": "disabled"}),
+        ("POST", "/api/users/{user_id}/mfa/reset"): lambda: sa.post(f"{API}/users/{oid}/mfa/reset"),
+        ("POST", "/api/users/{user_id}/temporary-password"): lambda: sa.post(f"{API}/users/{oid}/temporary-password"),
+    }
+    targets = {k for k, v in ROUTE_INVENTORY.items() if v == "TARGET"}
+    assert targets == set(calls), "ogni rotta TARGET deve avere una chiamata negativa contro l'Owner"
+    before = _run(db.users.find_one({"_id": owner["_id"]}))
+    for key, call in calls.items():
+        r = call()
+        assert r.status_code in (403, 404), (key, r.status_code, r.text)
+    after = _run(db.users.find_one({"_id": owner["_id"]}))
+    assert before == after, "il documento Owner non deve cambiare in alcun campo"

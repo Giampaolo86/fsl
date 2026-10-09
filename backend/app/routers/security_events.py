@@ -14,7 +14,7 @@ from ..core.errors import forbidden
 
 router = APIRouter(tags=["security"])
 RETENTION_DAYS = 90
-HIGH = {"lockout", "admin_denied", "impersonate", "mfa_disabled", "role_change", "user_deleted", "tournament_purged", "refresh_reuse", "disabled_login", "rate_limited", "cors_denied", "api_key_invalid", "payment_oversold", "webhook_bad_signature", "webhook_unconfigured", "purge_blocked", "reauth_failed"}
+HIGH = {"lockout", "admin_denied", "impersonate", "mfa_disabled", "role_change", "user_deleted", "tournament_purged", "refresh_reuse", "disabled_login", "rate_limited", "cors_denied", "api_key_invalid", "payment_oversold", "webhook_bad_signature", "webhook_unconfigured", "purge_blocked", "reauth_failed", "owner_protected"}
 
 # ---------- client IP dietro proxy fidati ----------
 _PRIVATE = [ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "fc00::/7", "::1/128")]
@@ -63,7 +63,7 @@ async def record_event(kind: str, request: Optional[Request] = None, *, user_id:
         pass
 
 
-LABELS = {"lockout": "Account bloccato per troppi tentativi", "admin_denied": "Tentativo di accesso ad area amministrativa", "impersonate": "Accesso «Entra come» eseguito", "mfa_disabled": "MFA disattivata", "role_change": "Modifica permessi", "user_deleted": "Utente eliminato", "tournament_purged": "Dati torneo eliminati", "refresh_reuse": "Riutilizzo di una sessione già ruotata", "disabled_login": "Login da account disabilitato", "rate_limited": "Richieste automatizzate limitate", "cors_denied": "Origine web non autorizzata", "api_key_invalid": "Chiave Content API non valida", "payment_oversold": "Pagamento oltre lo stock disponibile", "webhook_bad_signature": "Webhook Stripe con firma non valida", "webhook_unconfigured": "Webhook Stripe senza segreto configurato", "purge_blocked": "Pulizia dati bloccata", "reauth_failed": "Conferma identità fallita"}
+LABELS = {"lockout": "Account bloccato per troppi tentativi", "admin_denied": "Tentativo di accesso ad area amministrativa", "impersonate": "Accesso «Entra come» eseguito", "mfa_disabled": "MFA disattivata", "role_change": "Modifica permessi", "user_deleted": "Utente eliminato", "tournament_purged": "Dati torneo eliminati", "refresh_reuse": "Riutilizzo di una sessione già ruotata", "disabled_login": "Login da account disabilitato", "rate_limited": "Richieste automatizzate limitate", "cors_denied": "Origine web non autorizzata", "api_key_invalid": "Chiave Content API non valida", "payment_oversold": "Pagamento oltre lo stock disponibile", "webhook_bad_signature": "Webhook Stripe con firma non valida", "webhook_unconfigured": "Webhook Stripe senza segreto configurato", "purge_blocked": "Pulizia dati bloccata", "reauth_failed": "Conferma identità fallita", "owner_protected": "Tentativo di operazione sull'account fondatore"}
 
 
 async def _alert_super_admins(kind: str, detail: dict, email: Optional[str]) -> None:

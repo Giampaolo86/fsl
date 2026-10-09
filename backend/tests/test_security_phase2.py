@@ -123,15 +123,36 @@ def test_no_hardcoded_secrets_in_tracked_sources():
 
     root = BACKEND.parent
     files = [f for f in subprocess.check_output(["git", "ls-files"], cwd=root, text=True).split() if f.startswith(("backend/", "frontend/src", "test_reports/", "memory/", "docs/"))]
-    forbidden = [os.environ["QA_PASSWORD"], os.environ["QA_TOTP_SECRET"], os.environ["ADMIN_PASSWORD"], os.environ.get("CLUB_TEST_PASSWORD", "§"), "Demo" + "1234!", "GCB473SZ" + "YPJMXCDKMAB7G72HPJDGHY4C"]  # vecchi valori revocati, spezzati per non riproporli
+    # solo credenziali realmente valorizzate (min 8 caratteri) + i vecchi valori revocati, spezzati per non riproporli
+    env_secrets = [os.environ.get(k) for k in ("QA_PASSWORD", "QA_TOTP_SECRET", "ADMIN_PASSWORD", "CLUB_TEST_PASSWORD", "REFEREE_TEST_PASSWORD", "STRIPE_WEBHOOK_SECRET", "JWT_SECRET")]
+    forbidden = [v for v in env_secrets if v and len(v) >= 8 and not v.endswith("_placeholder") and not v.endswith("_placeholder_secret")] + ["Demo" + "1234!", "GCB473SZ" + "YPJMXCDKMAB7G72HPJDGHY4C"]
+    forbidden += [v for v in (os.environ.get("SYNTHETIC_LEAK_PROBE"),) if v]  # usato dal test di autodiagnosi
     hits = []
     for f in files:
         p = root / f
         if p.suffix not in (".py", ".js", ".jsx", ".json", ".md", ".yml", ".yaml", ".sh", ".txt", ".toml") or not p.exists():
             continue
         txt = p.read_text(errors="ignore")
-        hits += [f"{f}:{k[:4]}…" for k in forbidden if k and k in txt]
+        hits += [f"{f}:{k[:4]}…" for k in forbidden if k in txt]
     assert not hits, hits
+
+
+def test_secret_scan_detects_a_planted_secret(tmp_path, monkeypatch):
+    """Autodiagnosi: il controllo deve fallire se un segreto sintetico riconoscibile compare in un file tracciato."""
+    import subprocess
+
+    probe = "SYNTH-" + uuid.uuid4().hex
+    root = BACKEND.parent
+    target = root / "backend" / "tests" / f"_probe_{uuid.uuid4().hex[:6]}.py"
+    target.write_text(f"TOKEN = '{probe}'\n")
+    subprocess.check_call(["git", "add", "-N", str(target)], cwd=root)  # intent-to-add: compare in `git ls-files`
+    try:
+        monkeypatch.setenv("SYNTHETIC_LEAK_PROBE", probe)
+        with pytest.raises(AssertionError):
+            test_no_hardcoded_secrets_in_tracked_sources()
+    finally:
+        subprocess.call(["git", "reset", "-q", "--", str(target)], cwd=root)
+        target.unlink(missing_ok=True)
 
 
 # ---------- 2/3. sessioni: refresh monouso, concorrenza, revoca ----------
@@ -450,8 +471,8 @@ def test_interrupted_after_stock_reservation_does_not_double_increment(world):
 
     db, item_id, sess = _seed_purchase(world, stock=5)
     doc = _run(db.purchases.find_one({"session_id": sess}))
-    # simulazione: stock già prenotato da un tentativo interrotto, lock scaduto
-    _run(db.paid_media.update_one({"_id": __import__("bson").ObjectId(item_id)}, {"$inc": {"sold": 1}}))
+    # simulazione: stock già prenotato (operazione atomica sold+reserved_orders) da un tentativo interrotto, lock scaduto
+    _run(db.paid_media.update_one({"_id": __import__("bson").ObjectId(item_id)}, {"$inc": {"sold": 1}, "$addToSet": {"reserved_orders": str(doc["_id"])}}))
     _run(db.purchases.update_one({"_id": doc["_id"]}, {"$set": {"payment_status": "settling", "stock_reserved": True, "settling_at": datetime.now(timezone.utc) - timedelta(minutes=10), "settling_op": "op_morto"}}))
     p = Purchase.from_mongo(_run(db.purchases.find_one({"_id": doc["_id"]})))
     assert _run(_mark_paid(p, "pi_y", None, op_id="op_retry")) is True
@@ -502,3 +523,41 @@ def test_refund_processed_multiple_times_decrements_stock_once(world):
         assert requests.post(f"{API}/stripe/webhook", **_signed(refund())).status_code == 200
     assert _run(db.purchases.find_one({"session_id": sess}))["payment_status"] == "refunded"
     assert _run(db.paid_media.find_one({"_id": __import__("bson").ObjectId(item_id)}))["sold"] == 0
+
+
+def test_crash_between_stock_increment_and_order_update_is_safe(world, monkeypatch):
+    """Interruzione subito DOPO la prenotazione stock e PRIMA dell'aggiornamento dell'ordine: il retry non raddoppia nulla."""
+    from app.routers import club_extras
+    from app.models.domain import Purchase
+
+    db, item_id, sess = _seed_purchase(world, stock=3)
+    doc = _run(db.purchases.find_one({"session_id": sess}))
+    p = Purchase.from_mongo(doc)
+    real = club_extras._reserve_stock
+
+    async def crashing(item_oid, purchase_id):
+        out = await real(item_oid, purchase_id)
+        raise RuntimeError("crash simulato dopo l'incremento di sold")
+
+    monkeypatch.setattr(club_extras, "_reserve_stock", crashing)
+    with pytest.raises(RuntimeError):
+        _run(club_extras._mark_paid(p, "pi_crash", "a@b.it", op_id="op_1"))
+    item = _run(db.paid_media.find_one({"_id": __import__("bson").ObjectId(item_id)}))
+    order = _run(db.purchases.find_one({"_id": doc["_id"]}))
+    assert item["sold"] == 1 and order["payment_status"] == "settling" and not order.get("stock_reserved")  # stato parziale
+    monkeypatch.setattr(club_extras, "_reserve_stock", real)
+    # lock ancora valido: nessun altro worker lo prende; scaduto il lock, il recupero completa l'ordine
+    assert _run(club_extras._mark_paid(p, "pi_crash", "a@b.it", op_id="op_2")) is False
+    _run(db.purchases.update_one({"_id": doc["_id"]}, {"$set": {"settling_at": datetime.now(timezone.utc) - timedelta(minutes=10)}}))
+    assert _run(club_extras._mark_paid(p, "pi_crash", "a@b.it", op_id="op_3")) is True
+    item = _run(db.paid_media.find_one({"_id": __import__("bson").ObjectId(item_id)}))
+    order = _run(db.purchases.find_one({"_id": doc["_id"]}))
+    assert item["sold"] == 1 and item["reserved_orders"] == [p.id]
+    assert order["payment_status"] == "paid" and order["stock_reserved"] is True and order["voucher_code"]
+    v = order["voucher_code"]
+    assert _run(club_extras._mark_paid(Purchase.from_mongo(order), "pi_crash", None, op_id="op_4")) is False
+    assert _run(db.purchases.find_one({"_id": doc["_id"]}))["voucher_code"] == v
+    # riconciliazione: sold coerente con le prenotazioni; una corruzione artificiale viene corretta
+    assert _run(club_extras.reconcile_stock(item_id))["fixed"] is False
+    _run(db.paid_media.update_one({"_id": __import__("bson").ObjectId(item_id)}, {"$set": {"sold": 7}}))
+    assert _run(club_extras.reconcile_stock(item_id)) == {"item_id": item_id, "sold_before": 7, "sold": 1, "fixed": True}

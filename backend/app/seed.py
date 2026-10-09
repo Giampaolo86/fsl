@@ -129,10 +129,11 @@ async def seed_all():
     admin_email = os.environ["ADMIN_EMAIL"]
     admin_password = os.environ["ADMIN_PASSWORD"]
     admin = await upsert_user(admin_email, admin_password, "Giampaolo Castellani", "super_admin", is_super_admin=True)
-    from .services.owner import bootstrap_owner, ensure_owner_index
+    from .services.owner import bootstrap_owner, ensure_owner_index, sweep_owner_reset_tokens
 
     await ensure_owner_index()
     await bootstrap_owner()
+    await sweep_owner_reset_tokens()
 
     from .core.deps import load_current_user
 

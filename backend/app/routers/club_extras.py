@@ -594,14 +594,43 @@ async def checkout(body: CheckoutIn, request: Request):
 SETTLING_STALE_SECONDS = 300
 
 
+async def _reserve_stock(item_oid, purchase_id: str) -> str:
+    """Prenotazione stock in UNA sola operazione atomica sul documento prodotto, idempotente per ordine:
+    `reserved_orders` contiene l'id ordine → l'incremento di `sold` avviene al massimo una volta per ordine, anche in caso di
+    interruzione o retry. Ritorna reserved | already | soldout."""
+    items_col = Repository("paid_media", PaidMedia).col
+    r = await items_col.update_one(
+        {"_id": item_oid, "reserved_orders": {"$ne": purchase_id}, "$or": [{"stock": None}, {"$expr": {"$lt": [{"$ifNull": ["$sold", 0]}, "$stock"]}}]},
+        {"$inc": {"sold": 1}, "$addToSet": {"reserved_orders": purchase_id}},
+    )
+    if r.modified_count:
+        return "reserved"
+    if await items_col.find_one({"_id": item_oid, "reserved_orders": purchase_id}, {"_id": 1}):
+        return "already"
+    return "soldout"
+
+
+async def reconcile_stock(item_id: str) -> dict:
+    """Riconciliazione verificabile: `sold` deve coincidere con il numero di ordini prenotati (al netto dei rimborsi, che fanno $pull)."""
+    from bson import ObjectId
+
+    items_col = Repository("paid_media", PaidMedia).col
+    it = await items_col.find_one({"_id": ObjectId(item_id)}, {"sold": 1, "reserved_orders": 1})
+    expected = len(it.get("reserved_orders") or [])
+    fixed = False
+    if (it.get("sold") or 0) != expected:
+        await items_col.update_one({"_id": ObjectId(item_id)}, {"$set": {"sold": expected}})
+        fixed = True
+    return {"item_id": item_id, "sold_before": it.get("sold") or 0, "sold": expected, "fixed": fixed}
+
+
 async def _mark_paid(p: Purchase, pi=None, email=None, op_id: Optional[str] = None) -> bool:
     """Macchina a stati del pagamento: pending/processing → settling (lock atomico con op_id) → paid | oversold.
     Un ordine in `settling` non è acquisibile da un secondo worker finché il lock non è scaduto (recupero operazioni interrotte).
-    Idempotente: paid/oversold/refunded non vengono mai rielaborati; lo stock cresce al massimo una volta per ordine."""
+    Idempotente: paid/oversold/refunded non vengono mai rielaborati; lo stock cresce al massimo una volta per ordine (vedi _reserve_stock)."""
     from bson import ObjectId
 
     repo = Repository("purchases", Purchase)
-    items_col = Repository("paid_media", PaidMedia).col
     pid, item_oid = ObjectId(p.id), ObjectId(p.item_id)
     now = datetime.now(timezone.utc)
     op_id = op_id or f"op_{uuid.uuid4().hex}"
@@ -613,18 +642,15 @@ async def _mark_paid(p: Purchase, pi=None, email=None, op_id: Optional[str] = No
     if not claim.modified_count:
         return False
     owned = {"_id": pid, "payment_status": "settling", "settling_op": op_id}
-    if not p.stock_reserved:
-        inc = await items_col.update_one({"_id": item_oid, "$or": [{"stock": None}, {"$expr": {"$lt": [{"$ifNull": ["$sold", 0]}, "$stock"]}}]}, {"$inc": {"sold": 1}})
-        if not inc.modified_count:
-            from .security_events import record_event
+    outcome = await _reserve_stock(item_oid, p.id)
+    if outcome == "soldout":
+        from .security_events import record_event
 
-            await repo.col.update_one(owned, {"$set": {"status": "oversold", "payment_status": "oversold", "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": now}, "$unset": {"settling_op": ""}})
-            await record_event("payment_oversold", None, severity="high", detail={"purchase": p.id, "item": p.item_id, "payment_intent": pi})
-            return False
-        # lo stock è stato prenotato da questa operazione: anche se il passo successivo fallisse, il recupero non lo incrementerà di nuovo
-        await repo.col.update_one(owned, {"$set": {"stock_reserved": True}})
+        await repo.col.update_one(owned, {"$set": {"status": "oversold", "payment_status": "oversold", "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": now}, "$unset": {"settling_op": ""}})
+        await record_event("payment_oversold", None, severity="high", detail={"purchase": p.id, "item": p.item_id, "payment_intent": pi})
+        return False
     it = await _find_item(p.item_id)
-    patch = {"status": "completed", "payment_status": "paid", "paid_at": now, "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": now}
+    patch = {"status": "completed", "payment_status": "paid", "paid_at": now, "stock_reserved": True, "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": now}
     if it and it.kind == "custom" and it.delivery == "voucher" and not p.voucher_code:
         from .shop import new_voucher
 
@@ -750,7 +776,8 @@ async def _apply_refund(repo, payment_intent: str) -> int:
         r = await repo.col.update_one({"_id": p["_id"], "payment_status": "paid"}, {"$set": {"status": "refunded", "payment_status": "refunded", "refunded_at": datetime.now(timezone.utc), "updated_at": datetime.now(timezone.utc)}})
         if r.modified_count:
             n += 1
-            await Repository("paid_media", PaidMedia).col.update_one({"_id": ObjectId(p["item_id"]), "sold": {"$gt": 0}}, {"$inc": {"sold": -1}})
+            # rilascio atomico e idempotente della prenotazione: decremento solo se l'ordine è ancora tra i prenotati
+            await Repository("paid_media", PaidMedia).col.update_one({"_id": ObjectId(p["item_id"]), "reserved_orders": str(p["_id"]), "sold": {"$gt": 0}}, {"$inc": {"sold": -1}, "$pull": {"reserved_orders": str(p["_id"])}})
     return n
 
 

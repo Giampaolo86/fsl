@@ -56,6 +56,19 @@ async def bootstrap_owner() -> Optional[str]:
     return str(c["_id"])
 
 
+async def sweep_owner_reset_tokens() -> int:
+    """Invalida ogni token di recupero dell'Owner non emesso dal canale personale (assistenza amministrativa). Nessun token viene mostrato."""
+    from datetime import datetime, timezone
+
+    oid = await get_owner_id()
+    if not oid:
+        return 0
+    r = await db.password_resets.update_many({"user_id": oid, "used_at": None, "requested_by": {"$ne": "user"}}, {"$set": {"used_at": datetime.now(timezone.utc), "revoked_reason": "owner_protected_sweep"}})
+    if r.modified_count:
+        log.warning("Revocati %d token di recupero Owner emessi tramite assistenza amministrativa", r.modified_count)
+    return r.modified_count
+
+
 def is_owner(user) -> bool:
     return bool(getattr(user, "is_owner", False) or (isinstance(user, dict) and user.get("is_owner")))
 

@@ -297,3 +297,9 @@ Provider email/SMS; policy retention; Pantone su mazzetta fisica. Stripe: sandbo
 - [x] UI: badge «OWNER — FONDATORE FSL» (corona) e «Account fondatore protetto» in Utenti; Owner e protezione «Owner unico» in Sicurezza
 - [x] Test: `tests/test_owner_hierarchy.py` 10/10; `test_security_phase2.py` 27/27; report coerente `test_reports/iteration_46.json` ← `pytest/iteration46.xml` (69 passed)
 - [ ] Manuali: Save to GitHub + verifica run; ruleset `main` (block force push + restrict deletions); password Owner prod; MFA liviadm15/alessioodt; env prod pulito; commit yarn.lock
+
+## Iterazione 48 (2026-10) · CHIUSURA PERCORSI CREDENZIALI OWNER + STRIPE ATOMICO + CI (rapporto: `/app/memory/OWNER_CREDENTIALS_FIX_REPORT.md`)
+- [x] `create_reset()` guardia centrale (Owner solo `requested_by="user"`), `/auth/reset-requests/link` 403 OWNER_PROTECTED, `/auth/reset-password` rifiuta token amministrativi Owner, `/auth/reset-requests` nasconde l'Owner, `/auth/forgot-password` senza SMTP → `owner_procedure`, `sweep_owner_reset_tokens()` all'avvio, `scripts/owner_recovery.py` (procedura tecnica riservata)
+- [x] Stripe: `_reserve_stock` atomico (`reserved_orders` + `sold` in un solo update), `reconcile_stock`, rimborso `$inc -1`+`$pull` idempotente; `reserved_orders` non esposto
+- [x] Test: inventario rotte `ROUTE_INVENTORY` (fallisce su rotte nuove non classificate), test negativi reset link/token/lista, canali personali Owner, crash iniettato A→B, autodiagnosi scanner segreti; falso positivo `§` corretto. Anteprima 75/75; simulazione CI 40 passed/2 skipped; GitHub NON VERIFICATO; produzione NON VERIFICABILE
+- [ ] Manuali: Save to GitHub + run; ruleset `main`; MFA liviadm15/alessioodt; commit yarn.lock

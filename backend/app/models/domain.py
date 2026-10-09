@@ -386,6 +386,12 @@ class PaidMedia(BaseDocument):
     player_ids: list[str] = []
     active: bool = True
     sold: int = 0
+    reserved_orders: list[str] = []  # id ordini che hanno incrementato `sold` (prenotazione idempotente)
+
+    def public(self) -> dict:
+        d = super().public()
+        d.pop("reserved_orders", None)
+        return d
 
 
 class TournamentProduct(BaseDocument):

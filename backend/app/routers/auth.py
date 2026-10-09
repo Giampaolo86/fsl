@@ -577,6 +577,13 @@ def _reset_hash(token: str) -> str:
 
 
 async def create_reset(u: User, requested_by: str = "user") -> str:
+    """Unico punto di emissione dei token di reset. Per l'Owner è ammesso SOLO il canale personale (requested_by="user":
+    email verificata via /forgot-password o procedura tecnica `scripts/owner_recovery.py`); mai assistenza di altri admin."""
+    if u.is_owner and requested_by != "user":
+        from .security_events import record_event
+
+        await record_event("owner_protected", None, user_id=requested_by if requested_by not in ("user", "system") else None, severity="high", detail={"operation": "reset_link", "target": "owner"})
+        raise ApiError(403, "OWNER_PROTECTED", "Account fondatore protetto: nessun amministratore può emettere un reset per l'Owner", {"operation": "reset_link"})
     token = secrets.token_urlsafe(32)
     await db.password_resets.update_many({"user_id": u.id, "used_at": None}, {"$set": {"used_at": utcnow(), "superseded": True}})
     await db.password_resets.insert_one({"user_id": u.id, "email": u.email, "full_name": u.full_name, "role": u.role, "token_hash": _reset_hash(token), "created_at": utcnow(), "expires_at": utcnow() + timedelta(hours=RESET_HOURS), "used_at": None, "requested_by": requested_by, "emailed": False})
@@ -591,6 +598,10 @@ async def forgot_password(body: ForgotIn, request: Request):
     await _fail(f"forgot:{_ip(request)}")
     u = await users.find_one({"email": email})
     emailed = False
+    if u and u.is_owner and not mailer.configured():
+        # senza email verificabile nessun token viene emesso né consegnato a terzi: resta solo la procedura tecnica riservata al fondatore
+        await audit.record(None, "auth.forgot_password_owner_blocked", "user", u.id)
+        return {"ok": True, "emailed": False, "assisted": False, "owner_procedure": True}
     if u and u.status == "active":
         token = await create_reset(u)
         link = f"{os.environ.get('FRONTEND_URL') or request.headers.get('origin') or ''}/reimposta-password?token={token}"
@@ -611,6 +622,9 @@ async def reset_password(body: ResetIn, request: Request, response: Response):
     u = await users.get(doc["user_id"])
     if not u or u.status != "active":
         raise ApiError(400, "INVALID_TOKEN", "Link non valido")
+    if u.is_owner and doc.get("requested_by") != "user":  # difesa in profondità: un token amministrativo non completa mai un reset Owner
+        await db.password_resets.update_one({"_id": doc["_id"]}, {"$set": {"used_at": utcnow(), "rejected": "owner_protected"}})
+        raise ApiError(403, "OWNER_PROTECTED", "Account fondatore protetto")
     await users.update(u.id, {"password_hash": hash_password(body.password), "password_changed_at": utcnow(), "must_change_password": False})
     await db.password_resets.update_one({"_id": doc["_id"]}, {"$set": {"used_at": utcnow()}})
     await sessions.revoke_user_sessions(u.id, reason="password_reset")
@@ -623,7 +637,8 @@ async def reset_password(body: ResetIn, request: Request, response: Response):
 async def reset_requests(user: CurrentUser = Depends(get_current_user)):
     if user.role not in ("super_admin", "director", "secretary"):
         raise ApiError(403, "FORBIDDEN", "Non autorizzato")
-    docs = await db.password_resets.find({"used_at": None, "expires_at": {"$gt": utcnow()}}).sort([("created_at", -1)]).to_list(100)
+    owner_id = await __import__("app.services.owner", fromlist=["get_owner_id"]).get_owner_id()
+    docs = await db.password_resets.find({"used_at": None, "expires_at": {"$gt": utcnow()}, "user_id": {"$ne": owner_id}}).sort([("created_at", -1)]).to_list(100)
     return [{"id": str(d["_id"]), "email": d["email"], "full_name": d.get("full_name"), "role": d.get("role"), "created_at": d["created_at"], "expires_at": d["expires_at"], "emailed": d.get("emailed", False)} for d in docs]
 
 
@@ -639,6 +654,9 @@ async def reset_link_for_user(body: AssistIn, request: Request, user: CurrentUse
     u = await users.find_one({"email": body.email.lower().strip()})
     if not u:
         raise ApiError(404, "NOT_FOUND", "Utente non trovato")
+    from ..services.owner import assert_owner_protected
+
+    assert_owner_protected(u, "reset_link", user)
     if u.role in ("super_admin", "director") and user.role != "super_admin":
         raise ApiError(403, "FORBIDDEN", "Solo il super admin può assistere un altro amministratore")
     token = await create_reset(u, requested_by=user.id)
