@@ -13,7 +13,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "n/a", "frontend": "100%"},
-  "test_credentials": "Admin castellani.giampaolo@gmail.com / FSL-Admin-2026! and Fan fan.notifiche@test.it / Password123 both worked.",
+  "test_credentials": "Admin castellani.giampaolo@gmail.com / <ADMIN_PASSWORD> and Fan fan.notifiche@test.it / Password123 both worked.",
   "seed_data_creation": "None",
   "retest_needed": false,
   "should_main_agent_self_test": false,

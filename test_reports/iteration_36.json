@@ -20,7 +20,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "N/A (frontend-only run)", "frontend": "100% (7/7 scenarios)"},
-  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! (TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C); direttore@fsl.demo / Demo1234! (same TOTP)",
+  "test_credentials": "qa.superadmin@fsl.demo / <QA_PASSWORD> (TOTP <QA_TOTP_SECRET>); direttore@fsl.demo / <QA_PASSWORD> (same TOTP)",
   "seed_data_creation": "Created and then deleted the QA artifacts: club 'QA Elimina' (future-cup-weekend), club 'QA Rosa' + team 'QA Rosa 2016' (future-cup-weekend). After the run no residual QA data remains in any tournament. Production tournaments and existing clubs/teams were NOT modified. Sporting Eur 2014 and Academy Tuscolana left untouched (delete attempts refused by backend as expected).",
   "retest_needed": false,
   "should_main_agent_self_test": false,

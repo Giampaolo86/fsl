@@ -22,12 +22,12 @@ TID = "6a9b5b045d9e0985643d0a9f"
 SLUG = "la-serie-a-dei-bambini"
 CLUB_SPORTING = "6a9b5b045d9e0985643d0ab2"
 PLAYER_ID = "6aaa5ce2cfb606f5c0fb753b"
-TOTP_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
 
-STAFF = ("segreteria@fsl.demo", "Demo1234!")
-DIRECTOR = ("direttore@fsl.demo", "Demo1234!")
-SUPER = ("qa.superadmin@fsl.demo", "Demo1234!")
-CLUB_MGR = ("societa@fsl.demo", "Demo1234!")
+STAFF = ("segreteria@fsl.demo", os.environ["QA_PASSWORD"])
+DIRECTOR = ("direttore@fsl.demo", os.environ["QA_PASSWORD"])
+SUPER = ("qa.superadmin@fsl.demo", os.environ["QA_PASSWORD"])
+CLUB_MGR = ("societa@fsl.demo", os.environ["QA_PASSWORD"])
 FAN = ("fan.notifiche@test.it", "Password123")
 
 

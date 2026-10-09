@@ -17,7 +17,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "n/a", "frontend": "100%"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>",
   "seed_data_creation": "Created custom product 'TEST UI FSL' (currently 'Non attivo' at 2,49€) in La Serie A dei Bambini monetization catalog. Also copy operation ran against 'Torneo degli Amici'.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

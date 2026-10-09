@@ -13,7 +13,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "N/A", "frontend": "100% (7/7 test cases richiesti superati)"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>",
   "seed_data_creation": "Nessuna. Nessun download PNG persistito lato server, nessuna modifica dati.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

@@ -345,8 +345,62 @@ async def serve_media(file_id: str, request: Request):
             await record_event("media_denied", request, user_id=user.id if user else None, severity="medium", detail={"media_id": doc.id, "tournament_id": doc.tournament_id})
             raise forbidden("File riservato")
         cache = "private, no-store"
-    data, ct = await storage.get_object(doc.storage_path)
-    return Response(content=data, media_type=doc.content_type or ct, headers={"Cache-Control": cache, "X-Content-Type-Options": "nosniff", "Content-Disposition": f'inline; filename="{doc.original_filename}"'})
+    return await stream_media(doc, request, cache)
+
+
+def _parse_range(header: str, size: int):
+    import re
+
+    m = re.match(r"bytes=(\d*)-(\d*)$", header or "")
+    if not m or size <= 0:
+        return None
+    start, end = m.group(1), m.group(2)
+    if start == "" and end == "":
+        return None
+    if start == "":
+        start, end = max(size - int(end), 0), size - 1
+    else:
+        start, end = int(start), (min(int(end), size - 1) if end else size - 1)
+    if start > end or start >= size:
+        return None
+    return start, end
+
+
+async def stream_media(doc: MediaFile, request: Request, cache: str, disposition: str = "inline"):
+    """Distribuzione in streaming con supporto Range: niente caricamento dell'intero file in memoria."""
+    from starlette.responses import StreamingResponse
+
+    rng = request.headers.get("range")
+    headers = {"Cache-Control": cache, "X-Content-Type-Options": "nosniff", "Accept-Ranges": "bytes", "Content-Disposition": f'{disposition}; filename="{doc.original_filename}"'}
+    media_type = doc.content_type or "application/octet-stream"
+    try:
+        upstream = await storage.open_stream(doc.storage_path, rng)
+    except Exception:  # noqa: BLE001 - fallback compatibile (storage non in streaming)
+        data, ct = await storage.get_object(doc.storage_path)
+        return Response(content=data, media_type=doc.content_type or ct, headers=headers)
+    status = 200
+    if rng and upstream.status_code == 206:
+        status = 206
+        headers["Content-Range"] = upstream.headers.get("Content-Range", "")
+    elif rng and upstream.status_code == 200 and upstream.headers.get("Content-Length", "").isdigit():
+        size = int(upstream.headers["Content-Length"])
+        parsed = _parse_range(rng, size)
+        if parsed:
+            start, end = parsed
+            data = upstream.content[start : end + 1]
+            upstream.close()
+            headers.update({"Content-Range": f"bytes {start}-{end}/{size}", "Content-Length": str(len(data))})
+            return Response(content=data, status_code=206, media_type=media_type, headers=headers)
+    if upstream.headers.get("Content-Length"):
+        headers["Content-Length"] = upstream.headers["Content-Length"]
+
+    def _iter():
+        try:
+            yield from upstream.iter_content(chunk_size=256 * 1024)
+        finally:
+            upstream.close()
+
+    return StreamingResponse(_iter(), status_code=status, media_type=media_type, headers=headers)
 
 
 # ---------- public ----------

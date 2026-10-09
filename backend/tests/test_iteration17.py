@@ -32,17 +32,17 @@ def _login(email, pwd):
 
 @pytest.fixture(scope="module")
 def admin():
-    return _login("castellani.giampaolo@gmail.com", "FSL-Admin-2026!")
+    return _login("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"])
 
 
 @pytest.fixture(scope="module")
 def club():
-    return _login("societa@fsl.demo", "Demo1234!")
+    return _login("societa@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 @pytest.fixture(scope="module")
 def referee():
-    return _login("arbitro@fsl.demo", "Demo1234!")
+    return _login("arbitro@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 # ============ Deadline ============

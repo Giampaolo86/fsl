@@ -18,7 +18,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iteration32.py"],
   "success_rate": {"backend": "100% (19/19)", "frontend": "100% across all requested UI checks (cutout editor deferred — see context)"},
-  "test_credentials": "segreteria@fsl.demo / Demo1234! (staff, no MFA); direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C; societa@fsl.demo / Demo1234!; fan.notifiche@test.it / Password123",
+  "test_credentials": "segreteria@fsl.demo / <QA_PASSWORD> (staff, no MFA); direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>; societa@fsl.demo / <QA_PASSWORD>; fan.notifiche@test.it / Password123",
   "seed_data_creation": "Test roster import was rejected (cleanup). Fan push_passes/push_pass_purchases unset via Mongo after grant_pass test. gk_green.png demo photo RESTORED for player 6aaa5ce2cfb606f5c0fb753b at end of TestNotificationsPhotoHook. Any test push_subscriptions with endpoint containing 'iter32' or 'staff-fake-iter32' were deleted; none remain.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

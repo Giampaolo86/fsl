@@ -54,12 +54,14 @@ for r in (auth.router, tournaments.router, structure.router, matches.router, ext
     api.include_router(r)
 app.include_router(api)
 
-_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip() and o.strip() != "*"]
-# Senza elenco esplicito (o con "*"): accetta qualsiasi origine https (dominio personalizzato, *.emergent.host, anteprima) e localhost.
-# Senza elenco esplicito: solo domini della piattaforma (anteprima/produzione Emergent) e localhost; dominio personalizzato → CORS_ORIGINS.
-_origin_regex = os.environ.get("CORS_ORIGIN_REGEX") or (None if _origins else r"^https://[A-Za-z0-9.-]+\.(emergentagent\.com|emergent\.host)(:\d+)?$|^https?://localhost(:\d+)?$")
-if not _origins and not os.environ.get("CORS_ORIGIN_REGEX"):
-    logger.warning("CORS_ORIGINS non impostato: accetto solo *.emergentagent.com / *.emergent.host / localhost (imposta CORS_ORIGINS per un dominio personalizzato)")
+from app.core.origins import allowed_origins, cors_mode, platform_origin_regex  # noqa: E402
+
+_origins = sorted(allowed_origins())
+_origin_regex = platform_origin_regex()
+if cors_mode() == "platform_preview":
+    logger.warning("CORS_ORIGINS non impostato (ambiente %s): ammessi solo *.emergentagent.com / *.emergent.host / localhost", APP_ENV)
+elif cors_mode() == "production_default":
+    logger.info("CORS produzione: solo %s (imposta CORS_ORIGINS per cambiare)", ", ".join(_origins))
 app.add_middleware(security_events.RateLimiter)
 app.add_middleware(
     CORSMiddleware,

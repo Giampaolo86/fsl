@@ -29,13 +29,13 @@ def _login(email, password):
 
 @pytest.fixture(scope="module")
 def admin_token():
-    tok, _ = _login("castellani.giampaolo@gmail.com", "FSL-Admin-2026!")
+    tok, _ = _login("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"])
     return tok
 
 
 @pytest.fixture(scope="module")
 def societa_token():
-    tok, data = _login("societa@fsl.demo", "Demo1234!")
+    tok, data = _login("societa@fsl.demo", os.environ["QA_PASSWORD"])
     assert data["landing"] == "/societa"
     return tok
 
@@ -56,7 +56,7 @@ def H(tok): return {"Authorization": f"Bearer {tok}"}
 
 # ---- Auth landing tests ----
 def test_login_landings(admin_token, societa_token):
-    _, admin_data = _login("castellani.giampaolo@gmail.com", "FSL-Admin-2026!")
+    _, admin_data = _login("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"])
     assert admin_data["landing"] == "/admin"
 
 

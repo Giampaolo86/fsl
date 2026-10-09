@@ -10,7 +10,7 @@ import pytest
 import requests
 
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or open("/app/frontend/.env").read().split("REACT_APP_BACKEND_URL=")[1].split("\n")[0].strip()).rstrip("/")
-TOTP_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
 
 
 def _login(email, password):
@@ -28,7 +28,7 @@ def _login(email, password):
 
 @pytest.fixture(scope="module")
 def ctx():
-    s = _login("qa.superadmin@fsl.demo", "Demo1234!")
+    s = _login("qa.superadmin@fsl.demo", os.environ["QA_PASSWORD"])
     r = s.post(f"{BASE_URL}/api/tournaments", json={"mode": "scratch", "name": f"QA Motore {int(time.time())}", "start_date": "2026-12-05", "end_date": "2026-12-06", "settings": {"categories": ["2015"], "series": ["x"], "teams_per_series": 4, "fields_count": 3, "match_days": ["sat", "sun"], "day_start": "09:00", "day_end": "19:00", "match_duration_min": 20, "buffer_min": 10, "formula": "groups_knockout", "teams_total": 16, "groups_count": 4, "qualifiers_per_group": 2, "third_place": False, "max_matches_per_team_per_weekend": 8}})
     assert r.status_code in (200, 201), r.text
     t = r.json()

@@ -23,7 +23,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "N/A (skipped, già coperto)", "frontend": "~92% (10/12 flussi al 100%; 2 minori: matchday default e link public-top11-all)"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! (TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C), fan.notifiche@test.it / Password123",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> (TOTP <QA_TOTP_SECRET>), fan.notifiche@test.it / Password123",
   "seed_data_creation": "Nessuna modifica ai dati di seed. Il numero FSL Weekly Giornata 2 è stato portato da bozza → pubblicato durante il test (crea articolo blog kind weekly come atteso). Sponsor 'QA Sponsor Test' aggiunto nelle Impostazioni per verifica persistenza (main agent può rimuoverlo se necessario).",
   "retest_needed": false,
   "should_main_agent_self_test": true,

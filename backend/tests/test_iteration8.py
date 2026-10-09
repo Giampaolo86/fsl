@@ -15,7 +15,7 @@ def _read_env():
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL') or _read_env()
 BASE_URL = BASE_URL.rstrip('/')
 SLUG = "la-serie-a-dei-bambini"
-ADMIN = {"email": "castellani.giampaolo@gmail.com", "password": "FSL-Admin-2026!"}
+ADMIN = {"email": "castellani.giampaolo@gmail.com", "password": os.environ["ADMIN_PASSWORD"]}
 FAN = {"email": "fan.notifiche@test.it", "password": "Password123"}
 
 

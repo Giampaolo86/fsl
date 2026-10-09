@@ -17,7 +17,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iteration30.py"],
   "success_rate": {"backend": "100% (2/2)", "frontend": "100% on all requested scenarios"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>",
   "seed_data_creation": "Created 1 draft blog post via studio-publish flow (kind=news, title 'Matchday · Campionato 2014 Serie A · Giornata 0'). Main agent may want to delete it if pristine seed state matters.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

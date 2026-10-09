@@ -41,3 +41,20 @@ async def put_object(path: str, data: bytes, content_type: str) -> dict:
 
 async def get_object(path: str):
     return await asyncio.to_thread(_get, path)
+
+
+def _open_stream(path: str, range_header: str | None):
+    headers = {"X-Storage-Key": init_storage()}
+    if range_header:
+        headers["Range"] = range_header
+    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers=headers, stream=True, timeout=120)
+    if resp.status_code == 404:
+        headers["X-Storage-Key"] = init_storage(force=True)
+        resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers=headers, stream=True, timeout=120)
+    resp.raise_for_status()
+    return resp
+
+
+async def open_stream(path: str, range_header: str | None = None):
+    """Risposta HTTP in streaming dallo storage (206 se lo storage onora Range, altrimenti 200 completo)."""
+    return await asyncio.to_thread(_open_stream, path, range_header)

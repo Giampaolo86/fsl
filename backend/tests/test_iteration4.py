@@ -16,11 +16,11 @@ M_REF = "6aaa5ce2cfb606f5c0fb7592"     # Atletico Prenestino vs Sporting Eur (sc
 M_OFFICIAL = "6aaa5ce2cfb606f5c0fb7560"  # already official Sporting Eur 3-2 Academy Tuscolana
 
 CRED = {
-    "admin": ("castellani.giampaolo@gmail.com", "FSL-Admin-2026!"),
-    "director": ("direttore@fsl.demo", "Demo1234!"),
-    "referee": ("arbitro@fsl.demo", "Demo1234!"),
-    "club": ("societa@fsl.demo", "Demo1234!"),
-    "secretary": ("segreteria@fsl.demo", "Demo1234!"),
+    "admin": ("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"]),
+    "director": ("direttore@fsl.demo", os.environ["QA_PASSWORD"]),
+    "referee": ("arbitro@fsl.demo", os.environ["QA_PASSWORD"]),
+    "club": ("societa@fsl.demo", os.environ["QA_PASSWORD"]),
+    "secretary": ("segreteria@fsl.demo", os.environ["QA_PASSWORD"]),
 }
 
 

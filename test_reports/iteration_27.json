@@ -16,7 +16,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iteration27.py"],
   "success_rate": {"backend": "100% (5/5)", "frontend": "100% (7/7 aree coperte)"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C; societa@fsl.demo / Demo1234!",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>; societa@fsl.demo / <QA_PASSWORD>",
   "seed_data_creation": "Nessun dato persistente lasciato: il preset QA-Shared-27 è stato creato durante il test frontend e cancellato tramite studio-preset-delete-QA-Shared-27; il test backend cancella anche l'eventuale preset residuo 'QA condiviso'. Profilo di Luca Mariani ripristinato (bio/strengths/tagline vuoti) sia via API sia via UI.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

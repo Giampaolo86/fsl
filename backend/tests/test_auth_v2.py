@@ -12,13 +12,13 @@ import pyotp
 import pytest
 
 BASE = os.environ.get("REACT_APP_BACKEND_URL", "https://torneo-platform.preview.emergentagent.com").rstrip("/")
-TOTP_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
 TOURNAMENT_ID = "6a9b5b045d9e0985643d0a9f"  # la-serie-a-dei-bambini
 
 DIRETTORE = "direttore@fsl.demo"
 QA_ADMIN = "qa.superadmin@fsl.demo"
 SOCIETA = "societa@fsl.demo"
-PWD = "Demo1234!"
+PWD = os.environ["QA_PASSWORD"]
 
 
 def _client():

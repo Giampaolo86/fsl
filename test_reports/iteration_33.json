@@ -20,7 +20,7 @@
     "/app/backend/tests/test_iteration33.py"
   ],
   "success_rate": {"backend": "100% (12/12)", "frontend": "100% across all requested flows"},
-  "test_credentials": "segreteria@fsl.demo / Demo1234!; qa.superadmin@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C; direttore@fsl.demo / Demo1234! (MFA same); societa@fsl.demo / Demo1234!; fan.notifiche@test.it / Password123",
+  "test_credentials": "segreteria@fsl.demo / <QA_PASSWORD>; qa.superadmin@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>; direttore@fsl.demo / <QA_PASSWORD> (MFA same); societa@fsl.demo / <QA_PASSWORD>; fan.notifiche@test.it / Password123",
   "seed_data_creation": "Test paid_media products with title prefix TEST_ were created and cleaned up at end: 3 unsold TEST products deleted, 0 sold archived. Tournament settings.fees restored to defaults 0.99/0.49/2.49/3.99/4.99/3.99. Leftover 'Poster squadra A3' (archived) from prior iterations was archived active=false. 'Iscrizione Camp Estivo 2027' (49€ payment tournament_home+fan_area) preserved as production-seed sample.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

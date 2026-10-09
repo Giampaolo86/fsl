@@ -13,7 +13,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "N/A (skip come richiesto)", "frontend": "100% (5/5 scenari mobile + desktop regressione OK)"},
-  "test_credentials": "arbitro@fsl.demo/Demo1234!, castellani.giampaolo@gmail.com/FSL-Admin-2026! da /app/memory/test_credentials.md",
+  "test_credentials": "arbitro@fsl.demo/<QA_PASSWORD>, castellani.giampaolo@gmail.com/<ADMIN_PASSWORD> da /app/memory/test_credentials.md",
   "seed_data_creation": "",
   "retest_needed": false,
   "should_main_agent_self_test": false,

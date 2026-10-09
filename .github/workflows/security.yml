@@ -1,20 +1,97 @@
 name: Security checks
 on: [push, pull_request]
+
+permissions:
+  contents: read
+
 jobs:
-  secrets-and-deps:
+  secrets:
+    name: Segreti nel codice (gitleaks, albero di lavoro)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - name: Secret scanning (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
-        env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }
+      - name: Install gitleaks
+        run: |
+          curl -sSL -o /tmp/gl.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz
+          tar -xzf /tmp/gl.tgz -C /tmp gitleaks && sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+      - name: Scan working tree
+        run: gitleaks dir . --no-banner --redact --exit-code 1 --config .gitleaks.toml
+
+  python-deps:
+    name: Dipendenze Python (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
-      - name: Python dependencies audit
-        run: pip install pip-audit && pip-audit -r backend/requirements.txt || true
+      - name: pip-audit (pacchetti pubblici pinnati; esclusi gli artefatti interni Emergent non su PyPI)
+        run: |
+          pip install -q pip-audit
+          grep -v '^emergentintegrations\|^litellm @' backend/requirements.txt > /tmp/req-audit.txt
+          pip-audit -r /tmp/req-audit.txt --no-deps --progress-spinner off --strict
+
+  frontend-deps:
+    name: Dipendenze frontend (yarn audit, soglia high/critical)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - name: Frontend dependencies audit
+      - name: Install (lockfile)
         working-directory: frontend
-        run: yarn install --frozen-lockfile --ignore-scripts && yarn audit --level high || true
+        run: yarn install --frozen-lockfile --ignore-scripts
+      - name: Audit con eccezioni documentate (audit-allowlist.json)
+        working-directory: frontend
+        run: node scripts/audit-check.js
+      - name: Build (errori che impediscono il funzionamento)
+        working-directory: frontend
+        env: { CI: "true", REACT_APP_BACKEND_URL: "https://ci.invalid" }
+        run: yarn build
+
+  backend-security-tests:
+    name: Test di sicurezza backend (avvio reale + pytest)
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports: ["27017:27017"]
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      APP_ENV: test
+      MONGO_URL: mongodb://localhost:27017
+      DB_NAME: fsl_ci_test
+      JWT_SECRET: ci-only-jwt-secret-0123456789abcdef0123456789abcdef
+      ADMIN_EMAIL: ci.owner@example.org
+      ADMIN_PASSWORD: Ci-Owner-Password-2026
+      QA_PASSWORD: Ci-Qa-Password-2026
+      QA_TOTP_SECRET: JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP
+      QA_ALLOW_TEST_ACCOUNTS: "true"
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder_secret
+      SEED_DEMO: "false"
+      COOKIE_SECURE: "false"
+      API_URL: http://localhost:8001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: pip }
+      - name: Install backend
+        working-directory: backend
+        run: pip install -q -r requirements.txt --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
+      - name: Start API
+        working-directory: backend
+        run: |
+          nohup python -m uvicorn server:app --host 0.0.0.0 --port 8001 > /tmp/api.log 2>&1 &
+          for i in $(seq 1 40); do curl -sf http://localhost:8001/api/health && break; sleep 2; done
+          curl -sf http://localhost:8001/api/health || (cat /tmp/api.log && exit 1)
+      - name: QA account (solo ambiente di test esplicito)
+        working-directory: backend
+        run: python scripts/qa_admin.py create
+      - name: Security tests
+        working-directory: backend
+        run: python -m pytest tests/test_security_phase2.py -q -n 0 -p no:cacheprovider
+      - name: API log on failure
+        if: failure()
+        run: tail -n 200 /tmp/api.log

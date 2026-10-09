@@ -26,8 +26,8 @@ TID = "6a9b5b045d9e0985643d0a9f"
 PID = "6aaa5ce2cfb606f5c0fb7532"  # Luca Mariani
 SLUG = "la-serie-a-dei-bambini"
 
-ADMIN = ("castellani.giampaolo@gmail.com", "FSL-Admin-2026!")
-CLUB_MGR = ("societa@fsl.demo", "Demo1234!")
+ADMIN = ("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"])
+CLUB_MGR = ("societa@fsl.demo", os.environ["QA_PASSWORD"])
 GUARDIAN = ("fan.notifiche@test.it", "Password123")
 FAN_NOT_LINKED = ("fan.reason@test.it", "Password123")
 

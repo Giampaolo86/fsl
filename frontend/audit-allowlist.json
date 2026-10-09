@@ -1,0 +1,7 @@
+{
+  "_doc": "Eccezioni all'audit high/critical. Ammesse SOLO per pacchetti usati esclusivamente in fase di build (mai spediti al browser né eseguiti sul server) e senza versione corretta compatibile. Rivedere a ogni aggiornamento di react-scripts.",
+  "exceptions": [
+    { "module": "braces", "path_prefix": ["tailwindcss>chokidar", "react-scripts>tailwindcss>chokidar", "react-scripts>"], "reason": "Nessuna versione corretta pubblicata (patched_versions <0.0.0); usato solo dal watcher di build (chokidar), non a runtime." },
+    { "module": "svgo", "path_prefix": ["react-scripts>@svgr/webpack>@svgr/plugin-svgo"], "reason": "svgo 1.x richiesto da @svgr/plugin-svgo di react-scripts 5; usato solo per ottimizzare SVG in build, non a runtime." }
+  ]
+}

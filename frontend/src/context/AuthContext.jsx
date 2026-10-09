@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
   }, [check]);
 
   useEffect(() => {
-    const onLogout = () => clear(false);
+    const onLogout = (e) => { clear(false); if (e?.detail?.reason === "mfa_required") { api.post("/auth/logout").catch(() => {}); window.location.replace("/login?area=staff&mfa=obbligatoria"); } };
     const onRefreshed = (e) => { setUser(e.detail.user); setLanding(e.detail.landing); };
     const onStorage = (e) => { if (impersonationToken()) return; if (e.key === SYNC_KEY && e.newValue) { if (e.newValue.startsWith("out")) clear(false); else check(); } };
     const onImpersonationExpired = () => { setUser(false); window.location.replace("/admin/utenti?entra_come=scaduta"); };

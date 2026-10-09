@@ -25,9 +25,9 @@ def _read_frontend_url():
 BASE_URL = _read_frontend_url()
 assert BASE_URL, "REACT_APP_BACKEND_URL missing in /app/frontend/.env"
 
-TOTP_SECRET = os.environ.get("QA_TOTP_SECRET") or "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
 EMAIL = "direttore@fsl.demo"
-PASSWORD = "Demo1234!"
+PASSWORD = os.environ["QA_PASSWORD"]
 
 
 def _totp():

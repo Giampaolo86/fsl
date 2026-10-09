@@ -20,7 +20,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iteration26.py"],
   "success_rate": {"backend": "100% (6/6 test rilevanti, 1 skip informativo su archived)", "frontend": "100% (tutte le 7 aree del review request coperte)"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>",
   "seed_data_creation": "Nessuna variazione persistente: la rettifica del punteggio della partita 6aaa5ce2cfb606f5c0fb7592 è stata annullata a fine test riportando il punteggio 1-2 originale. La sostituzione admin è stata aperta ma non confermata (nessuna candidata disponibile per lo slot 9); il preset localStorage 'QA-IT26' è solo nel browser di test.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

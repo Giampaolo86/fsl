@@ -3,12 +3,12 @@ import io
 import os
 import secrets
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import stripe
 from fastapi.responses import RedirectResponse
-from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from pydantic import BaseModel
 
 from ..core.deps import CurrentUser, get_current_user, require_tournament
@@ -488,19 +488,17 @@ async def public_shop(slug: str, match_id: str):
 
 def _safe_origin(origin_url: str, request: Request) -> str:
     """URL di ritorno Stripe solo verso il sito stesso (o origini in CORS_ORIGINS): evita redirect verso domini estranei."""
-    import os
     import re
     from urllib.parse import urlparse
 
+    from ..core.origins import allowed_origins, platform_origin_regex
+
     u = urlparse(origin_url or "")
-    allowed = {o.strip().lower() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()}
-    req_origin = (request.headers.get("origin") or "").lower()
     candidate = f"{u.scheme}://{u.netloc}".lower() if u.scheme in ("http", "https") and u.netloc else ""
-    ok = candidate and (candidate in allowed or candidate == req_origin or re.match(r"^https://[a-z0-9.-]+\.(emergentagent\.com|emergent\.host)$|^https?://localhost(:\d+)?$", candidate))
-    if ok:
+    regex = platform_origin_regex()
+    ok = candidate and (candidate in allowed_origins() or (regex and re.match(regex, candidate)))
+    if ok and (u.scheme == "https" or u.hostname in ("localhost", "127.0.0.1")):
         return candidate
-    if req_origin:
-        return req_origin
     raise ApiError(400, "BAD_ORIGIN", "Origine non consentita per il ritorno dal pagamento")
 
 
@@ -550,8 +548,10 @@ async def checkout(body: CheckoutIn, request: Request):
         it = await _find_item(item_id)
         if not it or not it.active:
             raise not_found("Contenuto")
-        if it.stock is not None and it.sold >= it.stock:
-            raise conflict(f"«{it.title}» è esaurito")
+        if it.stock is not None:
+            pending = await Repository("purchases", Purchase).col.count_documents({"item_id": it.id, "payment_status": {"$in": ["pending", "processing", "settling"]}, "created_at": {"$gte": datetime.now(timezone.utc) - timedelta(minutes=30)}})
+            if it.sold + pending >= it.stock:
+                raise conflict(f"«{it.title}» è esaurito o momentaneamente riservato: riprova tra qualche minuto")
         prod = await catalog.product_for_item(it)
         if prod and not prod.active:
             raise conflict(f"«{it.title}» non è più in vendita")
@@ -591,20 +591,52 @@ async def checkout(body: CheckoutIn, request: Request):
     return {"checkout_url": session.url, "session_id": session.id, "count": len(items), "total": sum(c for _, c, _ in items) / 100}
 
 
-async def _mark_paid(p: Purchase, pi=None, email=None):
+async def _mark_paid(p: Purchase, pi=None, email=None) -> bool:
+    """Segna pagato una sola volta (idempotente). Stock: incremento atomico `sold < stock`; se esaurito l'acquisto va in `oversold` (da rimborsare)."""
     repo = Repository("purchases", Purchase)
-    res = await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id), "payment_status": {"$ne": "paid"}}, {"$set": {"status": "completed", "payment_status": "paid", "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": datetime.now(timezone.utc)}})
-    if res.modified_count:
-        await Repository("paid_media", PaidMedia).col.update_one({"_id": __import__("bson").ObjectId(p.item_id)}, {"$inc": {"sold": 1}})
-        it = await _find_item(p.item_id)
-        if it and it.kind == "push_pass" and it.ref_id:
-            from ..services import push
+    items_col = Repository("paid_media", PaidMedia).col
+    item_oid = __import__("bson").ObjectId(p.item_id)
+    now = datetime.now(timezone.utc)
+    claim = await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id), "payment_status": {"$nin": ["paid", "oversold", "refunded"]}}, {"$set": {"payment_status": "settling", "updated_at": now}})
+    if not claim.modified_count:
+        return False
+    inc = await items_col.update_one({"_id": item_oid, "$or": [{"stock": None}, {"$expr": {"$lt": [{"$ifNull": ["$sold", 0]}, "$stock"]}}]}, {"$inc": {"sold": 1}})
+    if not inc.modified_count:
+        from .security_events import record_event
 
-            await push.grant_pass(it.ref_id, it.tournament_id, p.id)
-        if it and it.kind == "custom" and it.delivery == "voucher":
-            from .shop import new_voucher
+        await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id)}, {"$set": {"status": "oversold", "payment_status": "oversold", "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": now}})
+        await record_event("payment_oversold", None, severity="high", detail={"purchase": p.id, "item": p.item_id, "payment_intent": pi})
+        return False
+    await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id)}, {"$set": {"status": "completed", "payment_status": "paid", "paid_at": now, "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": now}})
+    it = await _find_item(p.item_id)
+    if it and it.kind == "push_pass" and it.ref_id:
+        from ..services import push
 
-            await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id)}, {"$set": {"voucher_code": new_voucher()}})
+        await push.grant_pass(it.ref_id, it.tournament_id, p.id)
+    if it and it.kind == "custom" and it.delivery == "voucher":
+        from .shop import new_voucher
+
+        await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id)}, {"$set": {"voucher_code": new_voucher()}})
+    return True
+
+
+def _session_outcome(s) -> str:
+    """Stato reale della sessione Checkout: paid | processing | unpaid | expired."""
+    ps = getattr(s, "payment_status", None) or (s.get("payment_status") if isinstance(s, dict) else None)
+    st = getattr(s, "status", None) or (s.get("status") if isinstance(s, dict) else None)
+    if ps == "paid":
+        return "paid"
+    if st == "expired":
+        return "expired"
+    if st == "complete":
+        return "processing"  # sessione completata ma incasso non ancora confermato (es. bonifico/SEPA)
+    return "unpaid"
+
+
+async def _set_status(repo, ps: list, status: str, payment_status: str):
+    ids = [__import__("bson").ObjectId(p.id) for p in ps if p.payment_status not in ("paid", "oversold", "refunded")]
+    if ids:
+        await repo.col.update_many({"_id": {"$in": ids}}, {"$set": {"status": status, "payment_status": payment_status, "updated_at": datetime.now(timezone.utc)}})
 
 
 @pay_router.get("/payments/status/{session_id}")
@@ -616,17 +648,23 @@ async def payment_status(session_id: str):
     if any(p.payment_status != "paid" for p in ps):
         try:
             s = stripe.checkout.Session.retrieve(session_id)
-            if s.payment_status == "paid" or s.status == "complete":
+            outcome = _session_outcome(s)
+            if outcome == "paid":
                 email = (s.customer_details or {}).get("email") if s.customer_details else None
                 for p in ps:
                     if p.payment_status != "paid":
                         await _mark_paid(p, s.payment_intent, email)
-                ps = await repo.list({"session_id": session_id}, limit=50)
+            elif outcome == "processing":
+                await _set_status(repo, ps, "processing", "processing")
+            elif outcome == "expired":
+                await _set_status(repo, ps, "expired", "expired")
+            ps = await repo.list({"session_id": session_id}, limit=50)
         except stripe.error.StripeError:
             pass
     p = ps[0]
-    out = {"session_id": p.session_id, "status": p.status, "payment_status": "paid" if all(x.payment_status == "paid" for x in ps) else p.payment_status, "count": len(ps), "total": round(sum(x.amount for x in ps), 2)}
-    if out["payment_status"] == "paid":
+    agg = "paid" if all(x.payment_status == "paid" for x in ps) else next((x.payment_status for x in ps if x.payment_status != "paid"), p.payment_status)
+    out = {"session_id": p.session_id, "status": p.status, "payment_status": agg, "count": len(ps), "total": round(sum(x.amount for x in ps), 2)}
+    if agg == "paid":
         t = await tournaments.get(p.tournament_id)
         links = []
         for x in ps:
@@ -638,7 +676,7 @@ async def payment_status(session_id: str):
 
 
 @pay_router.get("/payments/download/{token}")
-async def download(token: str):
+async def download(token: str, request: Request):
     p = await Repository("purchases", Purchase).find_one({"download_token": token, "payment_status": "paid"})
     if not p:
         raise ApiError(404, "NOT_FOUND", "Acquisto non trovato")
@@ -649,27 +687,60 @@ async def download(token: str):
     media = await media_repo.get(it.media_id) if it and it.media_id else None
     if not media:
         raise not_found("File")
-    data, ct = await storage.get_object(media.storage_path)
-    return Response(content=data, media_type=media.content_type or ct, headers={"Content-Disposition": f'attachment; filename="{media.original_filename}"'})
+    from .posts import stream_media
+
+    return await stream_media(media, request, "private, no-store", disposition="attachment")
 
 
 @pay_router.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
+    from .security_events import record_event
+
+    secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+    if not secret:
+        await record_event("webhook_unconfigured", request, severity="high", detail={"provider": "stripe"})
+        raise ApiError(503, "WEBHOOK_UNCONFIGURED", "Webhook non configurato")
     payload = await request.body()
     try:
-        event = stripe.Webhook.construct_event(payload, request.headers.get("stripe-signature", ""), os.environ.get("STRIPE_WEBHOOK_SECRET", ""))
-    except stripe.error.SignatureVerificationError:
+        event = stripe.Webhook.construct_event(payload, request.headers.get("stripe-signature", ""), secret)
+    except (stripe.error.SignatureVerificationError, ValueError):
+        await record_event("webhook_bad_signature", request, severity="high", detail={"provider": "stripe"})
         raise bad_request("Firma non valida")
+    from ..core.db import db
+
+    try:
+        await db.stripe_events.insert_one({"_id": event["id"], "type": event["type"], "received_at": datetime.now(timezone.utc), "livemode": bool(event.get("livemode"))})
+    except Exception:  # noqa: BLE001 - duplicato: già elaborato
+        return {"status": "duplicate"}
     obj, t = event["data"]["object"], event["type"]
     repo = Repository("purchases", Purchase)
     ps = await repo.list({"session_id": obj.get("id")}, limit=50) if obj.get("id") else []
-    for p in ps:
-        if t in ("checkout.session.completed", "checkout.session.async_payment_succeeded"):
-            await _mark_paid(p, obj.get("payment_intent"), (obj.get("customer_details") or {}).get("email"))
-        elif t in ("checkout.session.async_payment_failed", "checkout.session.expired"):
-            await repo.update(p.id, {"status": "failed" if "failed" in t else "expired", "payment_status": "failed" if "failed" in t else "expired"})
+    if ps and t.startswith("checkout.session."):
+        email = (obj.get("customer_details") or {}).get("email")
+        if t == "checkout.session.completed":
+            if _session_outcome(obj) == "paid":
+                for p in ps:
+                    await _mark_paid(p, obj.get("payment_intent"), email)
+            else:
+                await _set_status(repo, ps, "processing", "processing")
+        elif t == "checkout.session.async_payment_succeeded":
+            if obj.get("payment_status") == "paid":
+                for p in ps:
+                    await _mark_paid(p, obj.get("payment_intent"), email)
+        elif t == "checkout.session.async_payment_failed":
+            await _set_status(repo, ps, "failed", "failed")
+        elif t == "checkout.session.expired":
+            await _set_status(repo, ps, "expired", "expired")
     if t == "payment_intent.payment_failed" and obj.get("id"):
-        await repo.col.update_many({"stripe_payment_intent_id": obj.get("id"), "payment_status": {"$ne": "paid"}}, {"$set": {"status": "failed", "payment_status": "failed", "updated_at": datetime.now(timezone.utc)}})
-    if t == "charge.refunded":
-        await repo.col.update_many({"stripe_payment_intent_id": obj.get("payment_intent")}, {"$set": {"status": "refunded", "payment_status": "refunded", "updated_at": datetime.now(timezone.utc)}})
+        await repo.col.update_many({"stripe_payment_intent_id": obj.get("id"), "payment_status": {"$nin": ["paid", "refunded"]}}, {"$set": {"status": "failed", "payment_status": "failed", "updated_at": datetime.now(timezone.utc)}})
+    if t == "payment_intent.canceled" and obj.get("id"):
+        await repo.col.update_many({"stripe_payment_intent_id": obj.get("id"), "payment_status": {"$nin": ["paid", "refunded"]}}, {"$set": {"status": "canceled", "payment_status": "canceled", "updated_at": datetime.now(timezone.utc)}})
+    if t in ("charge.refunded", "charge.refund.updated") and obj.get("payment_intent"):
+        refunded = obj.get("refunded") or (obj.get("amount_refunded") or 0) >= (obj.get("amount") or 1)
+        if refunded:
+            r = await repo.col.update_many({"stripe_payment_intent_id": obj.get("payment_intent"), "payment_status": "paid"}, {"$set": {"status": "refunded", "payment_status": "refunded", "updated_at": datetime.now(timezone.utc)}})
+            if r.modified_count:
+                async for p in repo.col.find({"stripe_payment_intent_id": obj.get("payment_intent"), "payment_status": "refunded"}, {"item_id": 1}):
+                    await Repository("paid_media", PaidMedia).col.update_one({"_id": __import__("bson").ObjectId(p["item_id"]), "sold": {"$gt": 0}}, {"$inc": {"sold": -1}})
+    await db.stripe_events.update_one({"_id": event["id"]}, {"$set": {"processed_at": datetime.now(timezone.utc)}})
     return {"status": "ok"}

@@ -32,7 +32,7 @@
     "/app/backend/tests/test_iteration43.py (new)"
   ],
   "success_rate": {"backend": "100%", "frontend": "90%"},
-  "test_credentials": "Used societa.prova@futurestarsleague.com / Societa-cf13d0-FSL26 (club), qa.superadmin@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C (SA), ephemeral fan e2e_parent_1791199098@test.it (deleted).",
+  "test_credentials": "Used societa.prova@futurestarsleague.com / <CLUB_TEST_PASSWORD> (club), qa.superadmin@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET> (SA), ephemeral fan e2e_parent_1791199098@test.it (deleted).",
   "seed_data_creation": "Temporary QA SA created and removed via /app/backend/scripts/qa_admin.py. Fan user created via /api/auth/register and manually removed from Mongo. Rules checklist tick on Sporting Eur toggled on/off and left in original (unchecked) state.",
   "retest_needed": true,
   "should_main_agent_self_test": false,

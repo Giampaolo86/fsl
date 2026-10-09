@@ -21,7 +21,7 @@ import requests
 from PIL import Image
 
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or open("/app/frontend/.env").read().split("REACT_APP_BACKEND_URL=")[1].split("\n")[0].strip()).rstrip("/")
-TOTP_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
 TID = "6a9b5b045d9e0985643d0a9f"
 SLUG = "la-serie-a-dei-bambini"
 SPORTING_TEAM = "6a9b5b045d9e0985643d0ab3"
@@ -33,9 +33,9 @@ for line in open("/app/backend/.env").readlines():
         CRON_SECRET = line.split("=", 1)[1].strip().strip('"')
 
 FAN = ("fan.notifiche@test.it", "Password123")
-STAFF = ("segreteria@fsl.demo", "Demo1234!")
-DIRECTOR = ("direttore@fsl.demo", "Demo1234!")
-CLUB_MGR = ("societa@fsl.demo", "Demo1234!")
+STAFF = ("segreteria@fsl.demo", os.environ["QA_PASSWORD"])
+DIRECTOR = ("direttore@fsl.demo", os.environ["QA_PASSWORD"])
+CLUB_MGR = ("societa@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 def _mfa(session, r):

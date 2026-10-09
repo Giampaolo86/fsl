@@ -25,7 +25,7 @@
   ],
   "updated_files": ["/app/frontend/src/pages/public/HallOfFame.jsx"],
   "success_rate": {"backend": "N/A (già coperto 8/8 pytest)", "frontend": "~93% (Legacy pubblico 100%, Admin Legacy 100%, Studio schedule 100%, Studio draft = toast non catturato affidabilmente, Blog admin visibility scheduled/draft = non verificata in-UI)"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>",
   "seed_data_creation": "Creato via Studio → schedule: post 'TEST Grafica programmata QA' con publish_at ~ domani 10:00. Possibile anche post 'TEST Bozza QA' (submit draft eseguito ma toast non validato). Da rimuovere se non necessari.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

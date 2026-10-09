@@ -14,7 +14,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iteration31.py"],
   "success_rate": {"backend": "100% (4/4 new + 19/19 regression)", "frontend": "100% across trusted-devices, child-codes admin+club, public regression"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C; societa@fsl.demo / Demo1234!; fan.notifiche@test.it / Password123",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>; societa@fsl.demo / <QA_PASSWORD>; fan.notifiche@test.it / Password123",
   "seed_data_creation": "None persisted — every trusted device created during backend + frontend testing was forgotten before finishing (verified: Mongo mfa_devices active count for director = 0). Director's MFA remains mandatory for subsequent test runs.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

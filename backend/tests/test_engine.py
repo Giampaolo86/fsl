@@ -14,11 +14,11 @@ BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE}/api"
 
 CREDS = {
-    "super_admin": ("castellani.giampaolo@gmail.com", "FSL-Admin-2026!"),
-    "director": ("direttore@fsl.demo", "Demo1234!"),
-    "secretary": ("segreteria@fsl.demo", "Demo1234!"),
-    "referee": ("arbitro@fsl.demo", "Demo1234!"),
-    "club_manager": ("societa@fsl.demo", "Demo1234!"),
+    "super_admin": ("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"]),
+    "director": ("direttore@fsl.demo", os.environ["QA_PASSWORD"]),
+    "secretary": ("segreteria@fsl.demo", os.environ["QA_PASSWORD"]),
+    "referee": ("arbitro@fsl.demo", os.environ["QA_PASSWORD"]),
+    "club_manager": ("societa@fsl.demo", os.environ["QA_PASSWORD"]),
 }
 
 

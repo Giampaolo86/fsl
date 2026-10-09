@@ -23,8 +23,8 @@ BASE_URL = (os.environ.get('REACT_APP_BACKEND_URL') or _read_env()).rstrip('/')
 SLUG = "la-serie-a-dei-bambini"
 TID = "6a9b5b045d9e0985643d0a9f"
 MATCH_ID = "6aaa5ce2cfb606f5c0fb7560"
-ADMIN = {"email": "castellani.giampaolo@gmail.com", "password": "FSL-Admin-2026!"}
-CLUB = {"email": "societa@fsl.demo", "password": "Demo1234!"}
+ADMIN = {"email": "castellani.giampaolo@gmail.com", "password": os.environ["ADMIN_PASSWORD"]}
+CLUB = {"email": "societa@fsl.demo", "password": os.environ["QA_PASSWORD"]}
 
 
 def _login(payload):

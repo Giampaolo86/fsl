@@ -5,7 +5,7 @@ import requests
 import pyotp
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://torneo-platform.preview.emergentagent.com").rstrip("/")
-TOTP_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
 
 
 def _login(email, password):
@@ -26,12 +26,12 @@ def _login(email, password):
 
 @pytest.fixture(scope="module")
 def sa_token():
-    return _login("qa.superadmin@fsl.demo", "Demo1234!")
+    return _login("qa.superadmin@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 @pytest.fixture(scope="module")
 def club_token():
-    return _login("societa.prova@futurestarsleague.com", "Societa-cf13d0-FSL26")
+    return _login("societa.prova@futurestarsleague.com", os.environ.get("CLUB_TEST_PASSWORD", ""))
 
 
 def _h(t):

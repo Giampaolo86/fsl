@@ -25,7 +25,7 @@
     "/app/backend/tests/test_iteration17.py"
   ],
   "success_rate": {"backend": "100% (9 pass, 1 skip motivato)", "frontend": "100% dopo fix (era 0% prima del fix per crash MatchWorkspace)"},
-  "test_credentials": "castellani.giampaolo@gmail.com/FSL-Admin-2026!, societa@fsl.demo/Demo1234!, arbitro@fsl.demo/Demo1234! da /app/memory/test_credentials.md",
+  "test_credentials": "castellani.giampaolo@gmail.com/<ADMIN_PASSWORD>, societa@fsl.demo/<QA_PASSWORD>, arbitro@fsl.demo/<QA_PASSWORD> da /app/memory/test_credentials.md",
   "seed_data_creation": "Ricevuta RIC-2026-0006 creata su gara 6aaa5ce2cfb606f5c0fb7560 lato away (Academy Tuscolana, 15,00 € contanti). Giocatore 'Test Richiesta' #88 aggiunto al team Roma Nord (6a9b5b045d9e0985643d0aaf) via approve richiesta backend. Ulteriore richiesta 'TestUI Rich…' creata via frontend e lasciata in stato 'submitted' (roster-import).",
   "retest_needed": false,
   "should_main_agent_self_test": true,

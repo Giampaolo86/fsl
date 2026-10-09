@@ -24,7 +24,7 @@ def _login(email: str, password: str, mfa: bool = False) -> str:
     if data.get("mfa_required"):
         assert mfa, "MFA unexpectedly required"
         code = subprocess.check_output(
-            ["python3", "-c", "import pyotp;print(pyotp.TOTP('GCB473SZYPJMXCDKMAB7G72HPJDGHY4C').now())"]
+            ["python3", "-c", "import os,pyotp;print(pyotp.TOTP(os.environ['QA_TOTP_SECRET']).now())"]
         ).decode().strip()
         r = requests.post(f"{API_URL}/api/auth/mfa/verify",
                           headers={"X-Client": "api", "Content-Type": "application/json"},
@@ -36,12 +36,12 @@ def _login(email: str, password: str, mfa: bool = False) -> str:
 
 @pytest.fixture(scope="module")
 def staff_token():
-    return _login("direttore@fsl.demo", "Demo1234!", mfa=True)
+    return _login("direttore@fsl.demo", os.environ["QA_PASSWORD"], mfa=True)
 
 
 @pytest.fixture(scope="module")
 def club_token():
-    return _login("societa@fsl.demo", "Demo1234!", mfa=False)
+    return _login("societa@fsl.demo", os.environ["QA_PASSWORD"], mfa=False)
 
 
 @pytest.fixture

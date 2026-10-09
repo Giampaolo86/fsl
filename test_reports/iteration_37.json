@@ -27,7 +27,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "N/A (frontend-only)", "frontend": "100% of flow checkpoints (STEP1/STEP2/STEP3 + regression) passed"},
-  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! (TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C)",
+  "test_credentials": "qa.superadmin@fsl.demo / <QA_PASSWORD> (TOTP <QA_TOTP_SECRET>)",
   "seed_data_creation": "Created tournament 'QA Motore UI 1790850345' (tid 6abe352caa95059b437486af) and club 'Urbetevere QA' (id 6abe369aaa95059b437486e4). These are QA leftovers; safe to purge. The 3 seeded production tournaments (la-serie-a-dei-bambini, torneo-degli-amici, future-cup-weekend) were NOT touched.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

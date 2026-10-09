@@ -2,14 +2,36 @@ from bson import ObjectId
 
 from ..core.db import db
 
-TEST_USER_PATTERNS = [r"@test\.it$", r"@fsl\.demo$", r"^test-ref-", r"^qa[._-]", r"^test_fan", r"^pw-"]
+TEST_USER_PATTERNS = [r"@test\.it$", r"@fsl\.demo$", r"^test-ref-", r"^qa[._-]", r"^test_fan", r"^pw-", r"\.prova@futurestarsleague\.com$"]
+_TEST_RE = __import__("re").compile("|".join(TEST_USER_PATTERNS), __import__("re").I)
+
+
+def is_test_account(email: str) -> bool:
+    return bool(_TEST_RE.search((email or "").lower()))
+
+
+async def disable_test_accounts_in_production() -> list[str]:
+    """In produzione gli account QA/demo/prova non devono essere utilizzabili: disabilitati e sessioni revocate."""
+    import os
+
+    if os.environ.get("APP_ENV") != "production":
+        return []
+    from ..models.base import utcnow
+
+    out = []
+    async for u in db.users.find({"deleted_at": None}, {"email": 1, "status": 1}):
+        if is_test_account(u["email"]) and u.get("status") == "active":
+            await db.users.update_one({"_id": u["_id"]}, {"$set": {"status": "disabled", "disabled_reason": "test_account_in_production", "updated_at": utcnow()}})
+            await db.sessions.update_many({"user_id": str(u["_id"]), "revoked_at": None}, {"$set": {"revoked_at": utcnow(), "revoke_reason": "test_account_in_production"}})
+            out.append(u["email"])
+    return out
 
 
 async def delete_tournament(tournament_id: str) -> dict:
     """Hard delete: the tournament and every document scoped to it, in every collection."""
     removed = {}
     for name in await db.list_collection_names():
-        if name in ("tournaments", "schema_migrations"):
+        if name in ("tournaments", "schema_migrations", "backups", "security_events", "audit_logs", "stripe_events", "rate_limits"):
             continue
         r = await db[name].delete_many({"tournament_id": tournament_id})
         if r.deleted_count:

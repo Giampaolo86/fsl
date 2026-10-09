@@ -9,7 +9,7 @@ from pydantic import BaseModel, EmailStr
 
 from ..core import sessions
 from ..core.db import db
-from ..core.deps import CurrentUser, get_current_user, load_current_user, mfa_is_required
+from ..core.deps import REAUTH_MINUTES, CurrentUser, get_current_user, load_current_user, mfa_is_required
 from ..core.errors import ApiError
 from ..core.security import COOKIE_SAMESITE, COOKIE_SECURE
 from ..core.security import (
@@ -40,12 +40,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 MAX_ATTEMPTS = 5
 LOCK_MINUTES = 15
 MAX_EMAIL_ATTEMPTS = 20
+MAX_IP_ATTEMPTS = 200  # fallimenti da uno stesso IP su email diverse (credential stuffing automatizzato); alto per non bloccare reti condivise
 MAX_MFA_ATTEMPTS = 6
 
 
 def _ip(request: Request) -> Optional[str]:
-    fwd = request.headers.get("x-forwarded-for")
-    return (fwd.split(",")[0].strip() if fwd else None) or (request.client.host if request.client else None)
+    from .security_events import client_ip
+
+    return client_ip(request)
 
 
 def _landing(user: CurrentUser) -> str:
@@ -61,7 +63,9 @@ def _landing(user: CurrentUser) -> str:
 
 
 def _demo_blocked(email: str) -> bool:
-    return os.environ.get("APP_ENV") == "production" and email.endswith("@fsl.demo")
+    from ..services.cleanup import is_test_account
+
+    return os.environ.get("APP_ENV") == "production" and is_test_account(email)
 
 
 # ---------- brute force ----------
@@ -144,17 +148,19 @@ async def login(body: LoginIn, request: Request, response: Response):
     email = body.email.lower()
     ident_ip = f"{_ip(request) or 'unknown'}:{email}"
     ident_email = f"email:{email}"
+    ident_ip_only = f"ip:{_ip(request) or 'unknown'}"
     if _demo_blocked(email):
         raise ApiError(401, "INVALID_CREDENTIALS", "Email o password non corretti")
     from .security_events import record_event
 
-    if await _locked(ident_ip, MAX_ATTEMPTS) or await _locked(ident_email, MAX_EMAIL_ATTEMPTS):
+    if await _locked(ident_ip, MAX_ATTEMPTS) or await _locked(ident_email, MAX_EMAIL_ATTEMPTS) or await _locked(ident_ip_only, MAX_IP_ATTEMPTS):
         await record_event("lockout", request, email=email, severity="high", detail={"ip": _ip(request)})
         raise ApiError(429, "LOCKED", "Troppi tentativi. Riprova tra 15 minuti")
     user = await users.find_one({"email": email})
     if not user or not verify_password(body.password, user.password_hash):
         await _fail(ident_ip)
         await _fail(ident_email)
+        await _fail(ident_ip_only)
         await record_event("login_fail", request, email=email, severity="low", detail={"known_user": bool(user)})
         raise ApiError(401, "INVALID_CREDENTIALS", "Email o password non corretti")
     if user.status != "active":
@@ -382,6 +388,33 @@ async def mfa_recovery_regenerate(body: CodeIn, user: CurrentUser = Depends(get_
 
 
 # ---------- session lifecycle ----------
+class ReauthIn(BaseModel):
+    password: str
+    code: Optional[str] = None
+
+
+@router.post("/reauth")
+async def reauth(body: ReauthIn, request: Request, user: CurrentUser = Depends(get_current_user)):
+    """Conferma recente dell'identità per operazioni critiche (password + codice MFA se attiva)."""
+    from .security_events import record_event
+
+    ident = f"reauth:{user.id}"
+    if await _locked(ident, MAX_MFA_ATTEMPTS):
+        raise ApiError(429, "LOCKED", "Troppi tentativi. Riprova tra 15 minuti")
+    u = await users.get(user.id)
+    ok = bool(u and verify_password(body.password, u.password_hash))
+    if ok and u.mfa_enabled:
+        ok = bool(body.code) and verify_totp(decrypt_secret(u.mfa_secret), body.code.strip())
+    if not ok:
+        await _fail(ident)
+        await record_event("reauth_failed", request, user_id=user.id, email=user.email, severity="high")
+        raise ApiError(401, "INVALID_CREDENTIALS", "Password o codice non corretti")
+    await _clear(ident)
+    await db.sessions.update_one({"_id": user.sid}, {"$set": {"reauth_at": utcnow()}})
+    await audit.record(user, "auth.reauth", "user", user.id, ip=_ip(request))
+    return {"ok": True, "valid_minutes": REAUTH_MINUTES}
+
+
 @router.post("/refresh")
 async def refresh(request: Request, response: Response):
     token = request.cookies.get("refresh_token")

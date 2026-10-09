@@ -22,10 +22,10 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "N/A (already covered by test_iteration37.py 6/6 per request)", "frontend": "100% su tutti i 7 flussi richiesti"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>",
   "seed_data_creation": "Creato torneo bozza 'QA Halloween Cup 1790843861' (id 6abe1bd94efbc280f83bde52) con 2 società collegate: 'Nuova Polisportiva Test' (via registry) e 'QA Nuova 1790843939' (nuova pura). Nessuna squadra iscritta. Settings di 'La Serie A dei Bambini' salvate senza modifiche (idempotente).",
   "retest_needed": false,
   "should_main_agent_self_test": true,
-  "context_for_next_testing_agent": "Backend iteration37 pytest già passante 6/6. Frontend coperto in questa iterazione 34. Draft di QA accumulati — considerare cleanup bulk. Unico text-bug: 'Torneo non trovata' in TournamentHome quando torneo è draft e visitatore anonimo. Login staff passo iniziale: /login?scegli → login-area-staff → form; MFA code via pyotp.TOTP('GCB473SZYPJMXCDKMAB7G72HPJDGHY4C').now(); input testid non valorizzato nel CodeInput, usare 'input[inputmode=\"numeric\"]'.",
+  "context_for_next_testing_agent": "Backend iteration37 pytest già passante 6/6. Frontend coperto in questa iterazione 34. Draft di QA accumulati — considerare cleanup bulk. Unico text-bug: 'Torneo non trovata' in TournamentHome quando torneo è draft e visitatore anonimo. Login staff passo iniziale: /login?scegli → login-area-staff → form; MFA code via pyotp.TOTP('<QA_TOTP_SECRET>').now(); input testid non valorizzato nel CodeInput, usare 'input[inputmode=\"numeric\"]'.",
   "rca of the issue": "N/A — nessuna regressione funzionale. Unico bug minore 'Torneo non trovata': probabilmente stringa hardcoded femminile in TournamentHome.jsx (o PublicPages). RCA: refuso i18n italiano, dovrebbe allinearsi al genere di 'torneo' (maschile). Fix: grep -r 'non trovata' /app/frontend/src e sostituire con 'non trovato' nelle occorrenze che riferiscono a 'Torneo'."
 }

@@ -79,7 +79,23 @@ class ScopedRepository(Repository):
         self.tournament_id = tournament_id
 
     def _base_filter(self, extra: Optional[dict] = None) -> dict:
-        return super()._base_filter({"tournament_id": self.tournament_id, **(extra or {})})
+        extra = dict(extra or {})
+        foreign = extra.pop("tournament_id", None)
+        if foreign is not None and foreign != self.tournament_id:
+            raise ValueError("tournament_id filter outside repository scope")
+        if "$and" in extra:
+            extra["$and"] = [*extra["$and"], {"tournament_id": self.tournament_id}]
+        return super()._base_filter({**extra, "tournament_id": self.tournament_id})
+
+    @staticmethod
+    def _strip_scope(patch: dict) -> dict:
+        return {k: v for k, v in patch.items() if k != "tournament_id"}
+
+    async def update(self, id: str, patch: dict, actor_id: Optional[str] = None):
+        return await super().update(id, self._strip_scope(patch), actor_id)
+
+    async def update_versioned(self, id: str, expected_version: int, patch: dict, actor_id: Optional[str] = None):
+        return await super().update_versioned(id, expected_version, self._strip_scope(patch), actor_id)
 
     async def insert(self, doc: BaseDocument, actor_id: Optional[str] = None):
         if getattr(doc, "tournament_id", None) != self.tournament_id:

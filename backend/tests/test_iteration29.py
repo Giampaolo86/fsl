@@ -18,8 +18,8 @@ from PIL import Image, ImageDraw
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL") or open("/app/frontend/.env").read().split("REACT_APP_BACKEND_URL=")[1].split("\n")[0].strip()
 BASE_URL = BASE_URL.rstrip("/")
-TOTP_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
-DIRECTOR = ("direttore@fsl.demo", "Demo1234!")
+TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
+DIRECTOR = ("direttore@fsl.demo", os.environ["QA_PASSWORD"])
 SLUG = "la-serie-a-dei-bambini"
 PLAYER_ID = "6aaa5ce2cfb606f5c0fb753b"  # Davide Rinaldi @ Atletico Prenestino (per problem)
 SPORTING_EUR_CLUB = "6a9b5b045d9e0985643d0ab2"

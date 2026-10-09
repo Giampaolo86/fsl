@@ -17,7 +17,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iteration42.py"],
   "success_rate": {"backend": "100% (11/11)", "frontend": "100%"},
-  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C (created and DELETED at end). societa.prova@futurestarsleague.com, arbitro.prova@futurestarsleague.com used as per instructions, unchanged.",
+  "test_credentials": "qa.superadmin@fsl.demo / <QA_PASSWORD> TOTP <QA_TOTP_SECRET> (created and DELETED at end). societa.prova@futurestarsleague.com, arbitro.prova@futurestarsleague.com used as per instructions, unchanged.",
   "seed_data_creation": "None. Any referee-guide video set was removed; club profile edited and restored to prior values.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

@@ -31,6 +31,7 @@ api.interceptors.response.use(
   async (err) => {
     const { config, response } = err;
     const code = response?.data?.detail?.code;
+    if (response?.status === 403 && code === "MFA_REQUIRED" && !impersonationToken()) { authEvents.dispatchEvent(new CustomEvent("logout", { detail: { reason: "mfa_required" } })); throw err; }
     if (response?.status !== 401 || !config || config._retried || NO_RETRY.some((p) => config.url?.includes(p))) throw err;
     if (impersonationToken()) { endImpersonation(); authEvents.dispatchEvent(new Event("impersonation-expired")); throw err; }
     if (code === "UNAUTHENTICATED" && !readCookie("csrf_token")) throw err;

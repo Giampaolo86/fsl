@@ -27,7 +27,7 @@ def _patched_request(self, method, url, **kw):
     if is_login or (method.upper() == "POST" and (url.endswith("/api/auth/register") or url.endswith("/api/auth/register-club"))):
         body = kw.get("json") or {}
         if is_login and REAL_ADMIN and body.get("email", "").lower() == REAL_ADMIN and body.get("password") == REAL_ADMIN_PWD:
-            kw["json"] = {**body, "email": QA_ADMIN, "password": "Demo1234!"}
+            kw["json"] = {**body, "email": QA_ADMIN, "password": os.environ["QA_PASSWORD"]}
         kw["headers"] = {**(kw.get("headers") or {}), "X-Client": "api"}
     csrf = self.cookies.get("csrf_token")
     if csrf and method.upper() in ("POST", "PUT", "PATCH", "DELETE") and "Authorization" not in {**self.headers, **(kw.get("headers") or {})}:

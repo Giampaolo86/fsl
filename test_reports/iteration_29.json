@@ -30,7 +30,7 @@
     "/app/backend/tests/test_iteration29.py"
   ],
   "success_rate": {"backend": "83% (5/6, 1 skipped documenting seed limitation) + regressions 22/22 pass", "frontend": "100% on public showcase; admin upload copy verified via source"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>",
   "seed_data_creation": "No persistent test data. Uploaded synthetic JPEG + gk_green.png then re-uploaded original portrait to restore. Bulk-uploaded 1 JPEG to Sporting Eur shirt #1 (overrides photo_url of Davide Rinaldi — main agent may want to reset to seed portrait if pixel-perfect demo is required, or a subsequent showcase reseed will not touch it because `showcase=true` is already set on the player).",
   "retest_needed": true,
   "should_main_agent_self_test": true,

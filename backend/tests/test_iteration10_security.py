@@ -28,10 +28,10 @@ BASE_URL = _read_frontend_url().rstrip("/")
 assert BASE_URL, "REACT_APP_BACKEND_URL missing"
 API = f"{BASE_URL}/api"
 QA_EMAIL = "qa.superadmin@fsl.demo"
-QA_PASSWORD = "Demo1234!"
+QA_PASSWORD = os.environ["QA_PASSWORD"]
 CLUB_EMAIL = "societa.prova@futurestarsleague.com"
-CLUB_PASSWORD = "Societa-cf13d0-FSL26"
-QA_TOTP_SECRET = os.environ.get("QA_TOTP_SECRET") or "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+CLUB_PASSWORD = os.environ.get("CLUB_TEST_PASSWORD", "")
+QA_TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
 
 # ids discovered from Mongo
 PAID_PRIVATE_MEDIA = "6aaa742a68b26f28ae4f4453"  # original (private)
@@ -210,7 +210,7 @@ class TestSecurityEvents:
         assert "admin_denied" in kinds, f"admin_denied missing from recent: {kinds}"
         # no secrets leaked
         raw = r.text.lower()
-        assert "password" not in raw
+        assert "password_hash" not in raw and '"password":' not in raw  # i percorsi (es. /auth/password/change) sono metadati, non segreti
         assert "access_token" not in raw
         assert "bearer " not in raw
 

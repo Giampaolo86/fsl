@@ -21,10 +21,10 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "N/A (già coperto da curl)", "frontend": "100% su 5/5 flussi richiesti"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C; societa@fsl.demo / Demo1234! (no MFA)",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>; societa@fsl.demo / <QA_PASSWORD> (no MFA)",
   "seed_data_creation": "Su torneo La Serie A dei Bambini (6a9b5b045d9e0985643d0a9f) sono stati abilitati i servizi 'lunch' (10€, Mensa QA, Via Roma 1 Roma, Sab 13:00) e 'transport' (20€). Create 3 prenotazioni ospitalità di test: (a) QA Genitore phone 3330000000 → linee lunch×1 (Confermata) e transport×2 (Annullata) codice OSP-089F-192E; (b) Luca De Santis (societa@fsl.demo) → linea lunch×15 codice OSP-CE43-D115 → Annullata via club UI. Se il main agent vuole pulire, basta cambiare lo stato o eliminare le booking record associate al tid.",
   "retest_needed": false,
   "should_main_agent_self_test": false,
-  "context_for_next_testing_agent": "Per login Direttore: /login?scegli → login-area-staff → form → login-mfa-step → focalizzare input[inputmode=\"numeric\"] e usare page.keyboard.type(code) con pyotp.TOTP('GCB473SZYPJMXCDKMAB7G72HPJDGHY4C').now(), poi cliccare bottone 'Conferma'. Per club: /login?scegli → login-area-societa → form (no MFA). Un singolo booking multi-linea genera N righe nella tabella admin, con stesso codice OSP ma id distinti; Conferma/Annulla agiscono per linea. L'export '/api/tournaments/{tid}/hospitality/export' restituisce un .xlsx reale ('FSL_Ospitalita_<slug>.xlsx').",
+  "context_for_next_testing_agent": "Per login Direttore: /login?scegli → login-area-staff → form → login-mfa-step → focalizzare input[inputmode=\"numeric\"] e usare page.keyboard.type(code) con pyotp.TOTP('<QA_TOTP_SECRET>').now(), poi cliccare bottone 'Conferma'. Per club: /login?scegli → login-area-societa → form (no MFA). Un singolo booking multi-linea genera N righe nella tabella admin, con stesso codice OSP ma id distinti; Conferma/Annulla agiscono per linea. L'export '/api/tournaments/{tid}/hospitality/export' restituisce un .xlsx reale ('FSL_Ospitalita_<slug>.xlsx').",
   "rca of the issue": "N/A — nessun bug funzionale riscontrato."
 }

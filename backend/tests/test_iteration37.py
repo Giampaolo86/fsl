@@ -13,8 +13,8 @@ import pytest
 import requests
 
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or open("/app/frontend/.env").read().split("REACT_APP_BACKEND_URL=")[1].split("\n")[0].strip()).rstrip("/")
-TOTP_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
-DIRECTOR = ("direttore@fsl.demo", "Demo1234!")
+TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
+DIRECTOR = ("direttore@fsl.demo", os.environ["QA_PASSWORD"])
 SRC_TID = "6a9b5b045d9e0985643d0a9f"
 
 

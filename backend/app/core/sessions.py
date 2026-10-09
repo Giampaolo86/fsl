@@ -29,18 +29,28 @@ async def get_session(sid: str) -> Optional[dict]:
 
 
 async def rotate_session(sid: str, expected_jti: str) -> Optional[str]:
-    s = await get_session(sid)
-    if not s:
-        return None
-    if s["refresh_jti"] != expected_jti:
-        await revoke_session(sid, reason="refresh_reuse")
-        from ..routers.security_events import record_event
-
-        await record_event("refresh_reuse", None, user_id=s.get("user_id"), severity="high", detail={"session": str(sid)[:8]})
-        return None
+    """Rotazione atomica: il refresh token vale una volta sola (filtro su jti atteso, sessione valida e non revocata)."""
     jti = new_id()
-    await db.sessions.update_one({"_id": sid}, {"$set": {"refresh_jti": jti, "last_used_at": utcnow(), "expires_at": utcnow() + timedelta(days=REFRESH_DAYS)}})
-    return jti
+    now = utcnow()
+    res = await db.sessions.find_one_and_update(
+        {"_id": sid, "refresh_jti": expected_jti, "revoked_at": None, "expires_at": {"$gt": now}},
+        {"$set": {"refresh_jti": jti, "prev_refresh_jti": expected_jti, "rotated_at": now, "last_used_at": now, "expires_at": now + timedelta(days=REFRESH_DAYS)}},
+    )
+    if res is not None:
+        return jti
+    s = await db.sessions.find_one({"_id": sid})
+    if not s or s.get("revoked_at") or s["expires_at"].replace(tzinfo=now.tzinfo) <= now:
+        return None
+    # Sessione viva ma jti diverso: riutilizzo di un refresh token già consumato → revoca e segnala.
+    # Tolleranza: lo stesso token ruotato negli ultimi 10 s (due tab che si rinnovano insieme) non è un attacco.
+    rotated_at = s.get("rotated_at")
+    if s.get("prev_refresh_jti") == expected_jti and rotated_at and (now - rotated_at.replace(tzinfo=now.tzinfo)).total_seconds() < 10:
+        return s["refresh_jti"]
+    await revoke_session(sid, reason="refresh_reuse")
+    from ..routers.security_events import record_event
+
+    await record_event("refresh_reuse", None, user_id=s.get("user_id"), severity="high", detail={"session": str(sid)[:8]})
+    return None
 
 
 async def touch_session(sid: str):

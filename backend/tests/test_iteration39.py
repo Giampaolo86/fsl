@@ -16,7 +16,7 @@ load_dotenv("/app/backend/.env")
 stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
 WH = os.environ["STRIPE_WEBHOOK_SECRET"]
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or open("/app/frontend/.env").read().split("REACT_APP_BACKEND_URL=")[1].split("\n")[0].strip()).rstrip("/")
-TOTP_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
 
 
 def _login(email, password):
@@ -41,7 +41,7 @@ def _webhook(event_type, obj):
 
 @pytest.fixture(scope="module")
 def ctx():
-    s = _login("qa.superadmin@fsl.demo", "Demo1234!")
+    s = _login("qa.superadmin@fsl.demo", os.environ["QA_PASSWORD"])
     mk = lambda name: s.post(f"{BASE_URL}/api/tournaments", json={"mode": "scratch", "name": name, "start_date": "2026-10-31", "end_date": "2026-11-01", "settings": {"categories": ["2016"], "series": ["Unica"], "teams_per_series": 4, "fields_count": 1, "match_days": ["sat", "sun"], "day_start": "09:00", "day_end": "18:00", "match_duration_min": 20, "buffer_min": 10}}).json()  # noqa: E731
     h, c = mk(f"QA Halloween Cup {int(time.time())}"), mk(f"QA Christmas Cup {int(time.time())}")
     for t in (h, c):

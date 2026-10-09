@@ -118,6 +118,9 @@ export default function Login() {
                 </button>
               </span>
             </label>
+            {!error && qs.get("mfa") === "obbligatoria" && (
+              <div role="status" className="rounded-lg border border-fsl-gold/50 bg-fsl-gold/10 p-3 text-sm text-fsl-gold" data-testid="login-mfa-required-notice">Per il tuo profilo la verifica in due passaggi è obbligatoria: accedi di nuovo e completa l'attivazione guidata (app di autenticazione).</div>
+            )}
             {error && (
               <div role="alert" className="rounded-lg border border-fsl-danger/50 bg-fsl-danger/10 p-3 text-sm text-fsl-danger" data-testid="login-error">
                 <p className="flex items-start gap-2"><span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-fsl-danger" aria-hidden="true" /> {error}</p>

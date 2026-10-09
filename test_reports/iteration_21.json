@@ -11,7 +11,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_top11.py"],
   "success_rate": {"backend": "100% (11/11 in test_top11.py)", "frontend": "100% of required flows (generate, list, board, replace dialog, transitions, download PNG, public page, public nav)"},
-  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C, segreteria@fsl.demo / Demo1234!, societa@fsl.demo / Demo1234!",
+  "test_credentials": "qa.superadmin@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>, segreteria@fsl.demo / <QA_PASSWORD>, societa@fsl.demo / <QA_PASSWORD>",
   "seed_data_creation": "None. Tests operate on the already-seeded tournament la-serie-a-dei-bambini and its competitions. Giornata 1 remained published (as documented). Draft docs from other days are cycled through draft/review states and may end archived at the end of the class-level publish flow.",
   "retest_needed": false,
   "should_main_agent_self_test": true,

@@ -14,7 +14,7 @@ if not BASE:
         if line.startswith("REACT_APP_BACKEND_URL="):
             BASE = line.split("=", 1)[1].strip().rstrip("/")
 TID, SLUG, CID, PID = "6a9b5b045d9e0985643d0a9f", "la-serie-a-dei-bambini", "6a9b5b045d9e0985643d0aa1", "6aaa5ce2cfb606f5c0fb7532"
-QA_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+QA_SECRET = os.environ["QA_TOTP_SECRET"]
 
 
 def _login(email, password):
@@ -28,7 +28,7 @@ def _login(email, password):
 
 @pytest.fixture(scope="module")
 def admin():
-    return _login("qa.superadmin@fsl.demo", "Demo1234!")
+    return _login("qa.superadmin@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 def _img(color):

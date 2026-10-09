@@ -1,13 +1,13 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 
 from ..core.db import db
-from ..core.deps import WRITE_ROLES, CurrentUser, get_current_user, require_tournament
-from ..core.errors import forbidden
+from ..core.deps import WRITE_ROLES, CurrentUser, get_current_user, require_recent_auth, require_tournament
+from ..core.errors import ApiError, forbidden
 from ..repositories.registry import audit_repo, memberships, scoped, settings_repo, tournaments, users
-from ..services import audit, cleanup
+from ..services import audit, backups, cleanup
 from ..services import tournaments as svc
 
 router = APIRouter(prefix="/tournaments", tags=["tournaments"])
@@ -93,6 +93,72 @@ def _visible_filter(user: CurrentUser) -> dict:
 @router.get("/templates")
 async def templates(user: CurrentUser = Depends(get_current_user)):
     return [{"key": k, **{kk: vv for kk, vv in v.items() if kk != "settings"}, "settings": v["settings"]} for k, v in svc.TEMPLATES.items()]
+
+
+def _super_admin_only(user: CurrentUser, msg: str) -> None:
+    if not user.is_super_admin:
+        raise forbidden(msg)
+
+
+@router.get("/backups")
+async def list_backups(user: CurrentUser = Depends(get_current_user)):
+    _super_admin_only(user, "Riservato al Super Admin")
+    return await backups.list_backups()
+
+
+@router.post("/backups/{backup_id}/restore")
+async def restore_backup(backup_id: str, user: CurrentUser = Depends(get_current_user)):
+    _super_admin_only(user, "Riservato al Super Admin")
+    await require_recent_auth(user)
+    try:
+        out = await backups.restore_backup(backup_id)
+    except ValueError as e:
+        raise ApiError(409, "RESTORE_FAILED", str(e))
+    await audit.record(user, "backup.restore", "tournament", out["tournament_id"], None, after=out)
+    return out
+
+
+class PurgeIn(BaseModel):
+    keep_slugs: list[str]
+    keep_emails: list[str] = []
+
+
+async def _purge_guard(user: CurrentUser, body: PurgeIn, request) -> None:
+    from .security_events import record_event
+
+    _super_admin_only(user, "Solo il Super Admin può eseguire la pulizia")
+    if backups.db_is_production_like():
+        await record_event("purge_blocked", request, user_id=user.id, email=user.email, severity="high", detail={"env": __import__("os").environ.get("APP_ENV"), "db": __import__("os").environ.get("DB_NAME")})
+        raise ApiError(403, "PURGE_BLOCKED_IN_PRODUCTION", "La pulizia massiva dei dati di test è disabilitata in produzione: elimina i singoli tornei dalla card (con backup) oppure usa un ambiente di anteprima")
+    if not body.keep_slugs:
+        raise forbidden("Indica almeno un torneo da conservare")
+
+
+@router.post("/purge-test-data/preview")
+async def purge_test_data_preview(body: PurgeIn, request: Request, user: CurrentUser = Depends(get_current_user)):
+    """Anteprima: cosa verrebbe eliminato (nessuna modifica)."""
+    await _purge_guard(user, body, request)
+    ts = [{"id": str(t["_id"]), "slug": t["slug"], "name": t.get("name"), "documents": (await backups.preview_tournament(str(t["_id"])))["documents"]} async for t in db.tournaments.find({"slug": {"$nin": body.keep_slugs}}, {"slug": 1, "name": 1})]
+    keep = set(e.lower() for e in body.keep_emails + [user.email])
+    us = [u["email"] async for u in db.users.find({}, {"email": 1}) if u["email"] not in keep and cleanup.is_test_account(u["email"])]
+    return {"tournaments": ts, "users": us, "environment": __import__("os").environ.get("APP_ENV"), "db_name": __import__("os").environ.get("DB_NAME")}
+
+
+@router.post("/purge-test-data")
+async def purge_test_data(body: PurgeIn, request: Request, user: CurrentUser = Depends(get_current_user)):
+    """Pulizia dati di test (solo Super Admin, mai in produzione, con ri-autenticazione e backup di ogni torneo)."""
+    from .security_events import record_event
+
+    await _purge_guard(user, body, request)
+    await require_recent_auth(user)
+    saved = []
+    async for t in db.tournaments.find({"slug": {"$nin": body.keep_slugs}}, {"slug": 1}):
+        saved.append(await backups.export_tournament(str(t["_id"]), f"pre-purge {t['slug']}", user.email))
+    out = await cleanup.purge_test_data(body.keep_slugs, body.keep_emails + [user.email])
+    out["backups"] = saved
+    await record_event("tournament_purged", request, user_id=user.id, email=user.email, severity="high", detail={"tournaments": len(out["tournaments"]), "users": len(out["users"])})
+    await audit.record(user, "admin.purge_test_data", "organization", "fsl", None, after={k: v for k, v in out.items() if k != "backups"})
+    return out
 
 
 @router.get("/hub")
@@ -183,32 +249,32 @@ async def patch(tournament_id: str, body: PatchIn, user: CurrentUser = Depends(g
     return await _enrich(t)
 
 
-class PurgeIn(BaseModel):
-    keep_slugs: list[str]
-    keep_emails: list[str] = []
+@router.get("/{tournament_id}/delete-preview")
+async def delete_preview(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Anteprima dei dati che verrebbero eliminati con il torneo (solo Super Admin)."""
+    _super_admin_only(user, "Solo il Super Admin può eliminare un torneo")
+    t, _ = await require_tournament(tournament_id, user)
+    return await backups.preview_tournament(t.id)
 
 
 @router.delete("/{tournament_id}")
-async def delete_tournament(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
-    """Eliminazione definitiva (solo Super Admin): torneo e tutti i dati collegati."""
-    if not user.is_super_admin:
-        raise forbidden("Solo il Super Admin può eliminare un torneo")
+async def delete_tournament(tournament_id: str, request: Request, confirm: str = "", user: CurrentUser = Depends(get_current_user)):
+    """Eliminazione definitiva (solo Super Admin): conferma con lo slug, identità confermata di recente, backup ripristinabile prima della cancellazione."""
+    from .security_events import record_event
+
+    _super_admin_only(user, "Solo il Super Admin può eliminare un torneo")
     t, _ = await require_tournament(tournament_id, user)
+    if confirm.strip().lower() not in (t.slug.lower(), t.name.strip().lower()):
+        raise ApiError(400, "CONFIRM_REQUIRED", "Per confermare digita esattamente il nome (o lo slug) del torneo", {"slug": t.slug})
+    await require_recent_auth(user)
+    try:
+        backup = await backups.export_tournament(t.id, f"pre-delete {t.slug}", user.email)
+    except Exception as e:  # noqa: BLE001
+        raise ApiError(503, "BACKUP_FAILED", f"Backup non riuscito, eliminazione annullata: {e}")
     removed = await cleanup.delete_tournament(t.id)
-    await audit.record(user, "tournament.delete", "tournament", t.id, None, before={"name": t.name, "slug": t.slug}, after=removed)
-    return {"deleted": t.slug, "removed": removed}
-
-
-@router.post("/purge-test-data")
-async def purge_test_data(body: PurgeIn, user: CurrentUser = Depends(get_current_user)):
-    """Pulizia dati di test (solo Super Admin): elimina i tornei non in keep_slugs e gli utenti di test."""
-    if not user.is_super_admin:
-        raise forbidden("Solo il Super Admin può eseguire la pulizia")
-    if not body.keep_slugs:
-        raise forbidden("Indica almeno un torneo da conservare")
-    out = await cleanup.purge_test_data(body.keep_slugs, body.keep_emails + [user.email])
-    await audit.record(user, "admin.purge_test_data", "organization", "fsl", None, after=out)
-    return out
+    await record_event("tournament_purged", request, user_id=user.id, email=user.email, severity="high", detail={"slug": t.slug, "backup": backup["id"]})
+    await audit.record(user, "tournament.delete", "tournament", t.id, None, before={"name": t.name, "slug": t.slug}, after={"removed": removed, "backup_id": backup["id"]})
+    return {"deleted": t.slug, "removed": removed, "backup": backup}
 
 
 @router.post("/{tournament_id}/status")

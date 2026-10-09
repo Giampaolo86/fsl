@@ -129,8 +129,16 @@ async def seed_all():
     actor = await load_current_user(admin.id)
 
     if os.environ.get("APP_ENV") == "production" or os.environ.get("SEED_DEMO", "false").lower() != "true":
+        from .services.cleanup import disable_test_accounts_in_production
+
+        disabled = await disable_test_accounts_in_production()
+        if disabled:
+            logging.getLogger("fsl").warning("Account di test disabilitati in produzione: %s", ", ".join(disabled))
         return
-    qa_admin = await upsert_user("qa.superadmin@fsl.demo", "Demo1234!", "QA Super Admin", "super_admin", is_super_admin=True)
+    if not os.environ.get("QA_PASSWORD"):
+        logging.getLogger("fsl").warning("SEED_DEMO attivo ma QA_PASSWORD mancante: account demo non creati")
+        return
+    qa_admin = await upsert_user("qa.superadmin@fsl.demo", os.environ["QA_PASSWORD"], "QA Super Admin", "super_admin", is_super_admin=True)
     demo_director = await users.find_one({"email": "direttore@fsl.demo"})
     await enroll_demo_mfa(*[u for u in (qa_admin, demo_director) if u])
     if await tournaments.find_one({"slug": "la-serie-a-dei-bambini"}):
@@ -143,10 +151,10 @@ async def seed_all():
     if not org:
         org = await organizations.insert(Organization(name="Future Stars League", slug="future-stars-league", owner_user_id=admin.id))
 
-    director = await upsert_user("direttore@fsl.demo", "Demo1234!", "Giovanni Lombardi", "director")
-    secretary = await upsert_user("segreteria@fsl.demo", "Demo1234!", "Chiara Valenti", "secretary")
-    referee = await upsert_user("arbitro@fsl.demo", "Demo1234!", "Matteo Bianchi", "referee")
-    club_mgr = await upsert_user("societa@fsl.demo", "Demo1234!", "Luca De Santis", "club_manager")
+    director = await upsert_user("direttore@fsl.demo", os.environ["QA_PASSWORD"], "Giovanni Lombardi", "director")
+    secretary = await upsert_user("segreteria@fsl.demo", os.environ["QA_PASSWORD"], "Chiara Valenti", "secretary")
+    referee = await upsert_user("arbitro@fsl.demo", os.environ["QA_PASSWORD"], "Matteo Bianchi", "referee")
+    club_mgr = await upsert_user("societa@fsl.demo", os.environ["QA_PASSWORD"], "Luca De Santis", "club_manager")
 
     serie_a = await create_tournament(
         {

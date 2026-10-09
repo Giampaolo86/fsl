@@ -35,7 +35,7 @@ def login(email, pwd):
 
 @pytest.fixture(scope="module")
 def admin():
-    return login("castellani.giampaolo@gmail.com", "FSL-Admin-2026!")
+    return login("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"])
 
 
 @pytest.fixture(scope="module")
@@ -50,7 +50,7 @@ def unlinked_fan():
 
 @pytest.fixture(scope="module")
 def club():
-    return login("societa@fsl.demo", "Demo1234!")
+    return login("societa@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 # ---------- ADMIN CARD ----------

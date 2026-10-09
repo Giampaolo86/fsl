@@ -16,7 +16,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iteration10_security.py"],
   "success_rate": {"backend": "100% (18/18)", "frontend": "100% – admin Sicurezza page fully rendered with all expected testids; club shell properly blocks /admin/sicurezza"},
-  "test_credentials": "QA SA qa.superadmin@fsl.demo / Demo1234! (TOTP from QA_TOTP_SECRET in backend/.env) – created at start, deleted at end. Club manager societa.prova@futurestarsleague.com / Societa-cf13d0-FSL26 unchanged.",
+  "test_credentials": "QA SA qa.superadmin@fsl.demo / <QA_PASSWORD> (TOTP from QA_TOTP_SECRET in backend/.env) – created at start, deleted at end. Club manager societa.prova@futurestarsleague.com / <CLUB_TEST_PASSWORD> unchanged.",
   "seed_data_creation": "Transient only: a throwaway referee user (TEST_del_*@fsl.demo on tournament la-serie-a-dei-bambini) created & deleted inside the user-delete test; QA SA created and deleted via scripts/qa_admin.py.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

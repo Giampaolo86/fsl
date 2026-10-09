@@ -28,6 +28,8 @@ class CurrentUser:
     mfa_required: bool = False
     must_change_password: bool = False
     impersonated_by: Optional[dict] = None
+    mfa_verified: bool = False
+    session_auth_at: Optional[object] = None
 
     def role_in(self, tournament_id: str) -> Optional[str]:
         if self.is_super_admin:
@@ -88,6 +90,7 @@ async def load_current_user(user_id: str) -> Optional[CurrentUser]:
 
 
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
+MFA_EXEMPT_PATHS = ("/api/auth/me", "/api/auth/logout", "/api/auth/logout-all", "/api/auth/mfa/enable", "/api/auth/mfa/setup", "/api/auth/sessions", "/api/auth/refresh")
 IMPERSONATION_BLOCKED = ("/auth/password/change", "/auth/mfa/", "/auth/logout-all", "/auth/sessions", "/auth/impersonate/", "/push/", "/auth/google")
 
 
@@ -118,6 +121,13 @@ async def get_current_user(request: Request) -> CurrentUser:
         await revoke_session(session["_id"], reason="user_disabled")
         raise ApiError(401, "USER_NOT_FOUND", "Utente non trovato o disabilitato")
     user.sid = session["_id"]
+    user.mfa_verified = bool(session.get("mfa_verified"))
+    user.session_auth_at = max(session.get("created_at"), session.get("reauth_at") or session.get("created_at"))
+    if user.mfa_required and not user.mfa_verified and not any(request.url.path.startswith(p) for p in MFA_EXEMPT_PATHS):
+        from ..routers.security_events import record_event
+
+        await record_event("mfa_required", request, user_id=user.id, email=user.email, severity="medium", detail={"path": request.url.path})
+        raise ApiError(403, "MFA_REQUIRED", "Per questo profilo è obbligatoria la verifica in due passaggi: accedi di nuovo e completa l'attivazione")
     if session.get("impersonated_by"):
         user.impersonated_by = {**session["impersonated_by"], "expires_at": session["expires_at"].isoformat()}
         user.must_change_password = False
@@ -135,6 +145,20 @@ def require_roles(*roles: str):
         raise forbidden()
 
     return dep
+
+
+REAUTH_MINUTES = 10
+
+
+async def require_recent_auth(user: CurrentUser, minutes: int = REAUTH_MINUTES) -> None:
+    """Operazioni critiche: identità confermata (login o /auth/reauth) negli ultimi N minuti."""
+    from datetime import datetime, timedelta, timezone
+
+    at = user.session_auth_at
+    if at is not None and at.tzinfo is None:
+        at = at.replace(tzinfo=timezone.utc)
+    if at is None or at < datetime.now(timezone.utc) - timedelta(minutes=minutes):
+        raise ApiError(403, "REAUTH_REQUIRED", f"Conferma la tua identità (password{' e codice MFA' if user.mfa_enabled else ''}) per continuare", {"minutes": minutes})
 
 
 async def require_tournament(tournament_id: str, user: CurrentUser, roles: Optional[set] = None, writable: bool = False):

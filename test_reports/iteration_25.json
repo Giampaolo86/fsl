@@ -13,7 +13,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "N/A (già coperto da pytest test_fsl2_phase5 6/6)", "frontend": "100% (7/7 test cases richiesti superati)"},
-  "test_credentials": "fan.notifiche@test.it / Password123 (fan); direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C (admin MFA)",
+  "test_credentials": "fan.notifiche@test.it / Password123 (fan); direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET> (admin MFA)",
   "seed_data_creation": "Nessuna modifica dati persistente rilevante. Bulk photos ha aggiornato la foto del giocatore Davide Rinaldi (Academy Tuscolana 2014, jersey 1) con un JPEG 1x1 di test (non impatta l'UX, i placeholder colorati restano invariati per gli altri giocatori).",
   "retest_needed": false,
   "should_main_agent_self_test": true,

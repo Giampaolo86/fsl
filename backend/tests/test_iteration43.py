@@ -18,7 +18,7 @@ def _env_backend():
 
 BASE_URL = _env_backend()
 API = f"{BASE_URL}/api"
-TOTP = pyotp.TOTP("GCB473SZYPJMXCDKMAB7G72HPJDGHY4C")
+TOTP = pyotp.TOTP(os.environ["QA_TOTP_SECRET"])
 
 
 def _login(email, password, mfa=False):
@@ -41,12 +41,12 @@ def _login(email, password, mfa=False):
 
 @pytest.fixture(scope="module")
 def staff():
-    return _login("qa.superadmin@fsl.demo", "Demo1234!", mfa=True)
+    return _login("qa.superadmin@fsl.demo", os.environ["QA_PASSWORD"], mfa=True)
 
 
 @pytest.fixture(scope="module")
 def club_mgr():
-    return _login("societa.prova@futurestarsleague.com", "Societa-cf13d0-FSL26")
+    return _login("societa.prova@futurestarsleague.com", os.environ.get("CLUB_TEST_PASSWORD", ""))
 
 
 @pytest.fixture(scope="module")

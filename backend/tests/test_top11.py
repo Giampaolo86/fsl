@@ -16,7 +16,7 @@ if not BASE:
 
 TID = "6a9b5b045d9e0985643d0a9f"
 SLUG = "la-serie-a-dei-bambini"
-QA_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+QA_SECRET = os.environ["QA_TOTP_SECRET"]
 
 
 def _login(email, password, expect_mfa=False):
@@ -37,17 +37,17 @@ def _login(email, password, expect_mfa=False):
 
 @pytest.fixture(scope="module")
 def admin():
-    return _login("qa.superadmin@fsl.demo", "Demo1234!")
+    return _login("qa.superadmin@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 @pytest.fixture(scope="module")
 def secretary():
-    return _login("segreteria@fsl.demo", "Demo1234!")
+    return _login("segreteria@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 @pytest.fixture(scope="module")
 def club():
-    return _login("societa@fsl.demo", "Demo1234!")
+    return _login("societa@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 @pytest.fixture(scope="module")

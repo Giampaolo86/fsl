@@ -3,11 +3,12 @@ import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { api, apiError } from "@/lib/api";
+import { withReauth } from "@/lib/reauth";
 
 const TEST_RE = /^(test|qa|demo|prova)[-_]|^winter-stars-2025$/i;
 export const looksLikeTest = (t) => TEST_RE.test(t.slug || "") || TEST_RE.test(t.name || "");
 
-export function PurgeTestDataDialog({ tournaments, onDone }) {
+export function PurgeTestDataDialog({ tournaments, onDone, user }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
@@ -20,14 +21,16 @@ export function PurgeTestDataDialog({ tournaments, onDone }) {
     const keep = tournaments.filter((t) => !selected.has(t.id)).map((t) => t.slug);
     if (keep.length === 0) { toast.error("Devi conservare almeno un torneo"); return; }
     const names = tournaments.filter((t) => selected.has(t.id)).map((t) => t.name);
-    if (!window.confirm(`Eliminazione DEFINITIVA di ${names.length} tornei e di tutti gli utenti di test.\n\n${names.join("\n")}\n\nConfermi?`)) return;
     setBusy(true);
     try {
-      const { data } = await api.post("/tournaments/purge-test-data", { keep_slugs: keep });
-      toast.success(`Pulizia completata: ${data.tournaments.length} tornei, ${data.users.length} utenti, ${data.access_requests || 0} richieste di accesso e ${(data.clubs || []).length} società di test eliminati`);
+      const { data: preview } = await api.post("/tournaments/purge-test-data/preview", { keep_slugs: keep });
+      const docs = preview.tournaments.reduce((a, t) => a + (t.documents || 0), 0);
+      if (!window.confirm(`Ambiente ${preview.environment} · database ${preview.db_name}\n\nEliminazione DEFINITIVA di ${names.length} tornei (${docs} documenti) e di ${preview.users.length} account di test:\n${names.join("\n")}\n${preview.users.slice(0, 8).join(", ")}${preview.users.length > 8 ? "…" : ""}\n\nDi ogni torneo viene salvato un backup ripristinabile (30 giorni). Confermi?`)) return;
+      const { data } = await withReauth(() => api.post("/tournaments/purge-test-data", { keep_slugs: keep }), user);
+      toast.success(`Pulizia completata: ${data.tournaments.length} tornei, ${data.users.length} utenti, ${data.access_requests || 0} richieste di accesso e ${(data.clubs || []).length} società di test eliminati · ${(data.backups || []).length} backup salvati`);
       setOpen(false);
       onDone?.();
-    } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
+    } catch (e) { if (!e.cancelled) toast.error(apiError(e)); } finally { setBusy(false); }
   };
 
   return (

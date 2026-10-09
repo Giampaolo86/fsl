@@ -21,7 +21,7 @@
   ],
   "updated_files": [],
   "success_rate": {"backend": "N/A (skipped come da richiesta)", "frontend": "100% (13/13 pagine pubbliche mobile + 3/3 Area Società + 4/4 Control Room, desktop regressione classifiche OK, Match Center ratings/standings mobile OK)"},
-  "test_credentials": "societa@fsl.demo/Demo1234!, castellani.giampaolo@gmail.com/FSL-Admin-2026! (da /app/memory/test_credentials.md)",
+  "test_credentials": "societa@fsl.demo/<QA_PASSWORD>, castellani.giampaolo@gmail.com/<ADMIN_PASSWORD> (da /app/memory/test_credentials.md)",
   "seed_data_creation": "",
   "retest_needed": false,
   "should_main_agent_self_test": true,

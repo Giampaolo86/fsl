@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 load_dotenv("/app/backend/.env")
 BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL") or open("/app/frontend/.env").read().split("REACT_APP_BACKEND_URL=")[1].split("\n")[0].strip()).rstrip("/")
-TOTP_SECRET = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+TOTP_SECRET = os.environ["QA_TOTP_SECRET"]
 
 
 def _login(email, password, with_mfa=True):
@@ -38,14 +38,14 @@ def _login(email, password, with_mfa=True):
 
 @pytest.fixture(scope="module")
 def admin():
-    s, token = _login("qa.superadmin@fsl.demo", "Demo1234!")
+    s, token = _login("qa.superadmin@fsl.demo", os.environ["QA_PASSWORD"])
     assert token, "login admin failed"
     return s
 
 
 @pytest.fixture(scope="module")
 def referee():
-    s, token = _login("arbitro@fsl.demo", "Demo1234!", with_mfa=False)
+    s, token = _login("arbitro@fsl.demo", os.environ["QA_PASSWORD"], with_mfa=False)
     return s
 
 

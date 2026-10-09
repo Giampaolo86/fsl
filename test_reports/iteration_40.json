@@ -10,7 +10,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iteration40.py"],
   "success_rate": {"backend": "100% (9/9)", "frontend": "100% (tutti i flussi testati OK)"},
-  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! (TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C); arbitro@fsl.demo / Demo1234!",
+  "test_credentials": "qa.superadmin@fsl.demo / <QA_PASSWORD> (TOTP <QA_TOTP_SECRET>); arbitro@fsl.demo / <QA_PASSWORD>",
   "seed_data_creation": "Creati e poi eliminati tornei TEST_QA_SIMPLE_* e TEST_QA_UI_* al termine dei test. Nessun torneo di test residuo.",
   "retest_needed": false,
   "should_main_agent_self_test": false,

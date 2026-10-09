@@ -1,0 +1,21 @@
+# Configurazione gitleaks: regole predefinite + eccezioni per segnaposto non utilizzabili.
+title = "FSL security scan"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Segnaposto nei report/test e valori fittizi della pipeline CI (non sono credenziali reali)"
+regexes = [
+  '''<(QA_PASSWORD|QA_TOTP_SECRET|ADMIN_PASSWORD|CLUB_TEST_PASSWORD|REFEREE_TEST_PASSWORD)>''',
+  '''_ci_placeholder''',
+  '''ci-only-jwt-secret''',
+  '''Ci-(Owner|Qa)-Password-2026''',
+  '''JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP''',
+  '''gitleaks:allow''',
+]
+paths = [
+  '''frontend/yarn\.lock''',
+  '''frontend/public/.*\.(png|jpg|jpeg|svg|webp|woff2?)''',
+  '''backend/app/demo_assets/.*''',
+]

@@ -24,10 +24,10 @@ SLUG = "la-serie-a-dei-bambini"
 TID = "6a9b5b045d9e0985643d0a9f"
 TEAM_ID = "6a9b5b045d9e0985643d0ab3"  # Sporting Eur 2014
 PID_CONSENT = "6aaa5ce2cfb606f5c0fb7532"  # Luca Mariani (consent)
-TOKEN_TEAM = "1kQ-JDLATF9kgms90qMLlbKSP_vanP8Q"
-TOKEN_ALBUM = "RuNhWAvP6MekDgwBVajdrcIQXPlqTnCy"
+TOKEN_TEAM = "1kQ-JDLATF9kgms90qMLlbKSP_vanP8Q"  # gitleaks:allow (token demo DB di sviluppo)
+TOKEN_ALBUM = "RuNhWAvP6MekDgwBVajdrcIQXPlqTnCy"  # gitleaks:allow (token demo DB di sviluppo)
 
-ADMIN = ("castellani.giampaolo@gmail.com", "FSL-Admin-2026!")
+ADMIN = ("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"])
 GUARDIAN = ("fan.notifiche@test.it", "Password123")
 
 

@@ -30,9 +30,9 @@ def _team_club_id(admin_h, team_id):
     raise AssertionError(f"team {team_id} not found")
 
 CRED = {
-    "admin": ("castellani.giampaolo@gmail.com", "FSL-Admin-2026!"),
-    "club": ("societa@fsl.demo", "Demo1234!"),
-    "director": ("direttore@fsl.demo", "Demo1234!"),
+    "admin": ("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"]),
+    "club": ("societa@fsl.demo", os.environ["QA_PASSWORD"]),
+    "director": ("direttore@fsl.demo", os.environ["QA_PASSWORD"]),
 }
 
 

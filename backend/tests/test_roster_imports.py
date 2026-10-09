@@ -28,12 +28,12 @@ def _login(email, password):
 
 @pytest.fixture(scope="module")
 def admin():
-    return _login("castellani.giampaolo@gmail.com", "FSL-Admin-2026!")
+    return _login("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"])
 
 
 @pytest.fixture(scope="module")
 def club():
-    return _login("societa@fsl.demo", "Demo1234!")
+    return _login("societa@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 def _template_bytes(club_sess):

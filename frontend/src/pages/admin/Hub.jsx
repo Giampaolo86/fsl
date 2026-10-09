@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/fsl/StatusBadge";
 import { fmtNum, fmtPeriod } from "@/lib/format";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
+import { withReauth } from "@/lib/reauth";
 
 const HERO = "https://images.unsplash.com/photo-1551958219-acbc608c6377?crop=entropy&cs=srgb&fm=jpg&q=80&w=1800";
 
@@ -25,7 +26,14 @@ export default function Hub() {
     const typed = window.prompt(`Eliminazione DEFINITIVA di «${t.name}»: società, squadre, rose, gare, risultati, foto e vendite del torneo verranno cancellati per sempre.\n\nPer confermare scrivi il nome del torneo:`);
     if (typed === null) return;
     if (typed.trim().toLowerCase() !== t.name.trim().toLowerCase()) { toast.error("Nome non corrispondente: eliminazione annullata"); return; }
-    try { await api.delete(`/tournaments/${t.id}`); toast.success(`Torneo «${t.name}» eliminato`); refresh(); } catch (e) { toast.error(apiError(e)); }
+    try {
+      const { data: preview } = await api.get(`/tournaments/${t.id}/delete-preview`);
+      const rows = Object.entries(preview.collections || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+      if (!window.confirm(`Verranno eliminati ${preview.documents} documenti (${rows || "nessun dato collegato"}).\nPrima della cancellazione viene salvato un backup ripristinabile per 30 giorni.\n\nProcedere?`)) return;
+      const { data } = await withReauth(() => api.delete(`/tournaments/${t.id}`, { params: { confirm: typed.trim() } }), user);
+      toast.success(`Torneo «${t.name}» eliminato · backup ${data.backup?.id?.slice(-6) || "salvato"}`);
+      refresh();
+    } catch (e) { if (!e.cancelled) toast.error(apiError(e)); }
   };
 
   const visible = useMemo(() => {
@@ -52,7 +60,7 @@ export default function Hub() {
           </div>
           {canWrite && (
             <div className="flex flex-wrap gap-2">
-              {user.is_super_admin && <PurgeTestDataDialog tournaments={tournaments} onDone={refresh} />}
+              {user.is_super_admin && <PurgeTestDataDialog tournaments={tournaments} onDone={refresh} user={user} />}
               <Link to="/admin/tornei/nuovo" className="btn-gold" data-testid="hub-create-tournament-button">
                 <Plus className="h-4 w-4" aria-hidden="true" /> Crea nuovo torneo
               </Link>

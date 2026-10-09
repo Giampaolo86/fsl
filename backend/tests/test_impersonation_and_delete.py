@@ -22,12 +22,12 @@ def _read_env():
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or _read_env()
 
 QA_EMAIL = "qa.superadmin@fsl.demo"
-QA_PASS = "Demo1234!"
-QA_TOTP = "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"
+QA_PASS = os.environ["QA_PASSWORD"]
+QA_TOTP = os.environ["QA_TOTP_SECRET"]
 CLUB_EMAIL = "societa.prova@futurestarsleague.com"
 REF_EMAIL = "arbitro.prova@futurestarsleague.com"
-CLUB_PASS = "Societa-cf13d0-FSL26"
-REF_PASS = "Arbitro-e3f3e4-FSL31"
+CLUB_PASS = os.environ.get("CLUB_TEST_PASSWORD", "")
+REF_PASS = os.environ.get("REFEREE_TEST_PASSWORD", "")
 OWNER_EMAIL = "castellani.giampaolo@gmail.com"
 
 

@@ -10,8 +10,8 @@ TID = "6a9b5b045d9e0985643d0a9f"
 TEAM_ID = "6a9b5b045d9e0985643d0ab3"
 PID = "6aaa5ce2cfb606f5c0fb7532"
 
-ADMIN = ("castellani.giampaolo@gmail.com", "FSL-Admin-2026!")
-CLUB = ("societa@fsl.demo", "Demo1234!")
+ADMIN = ("castellani.giampaolo@gmail.com", os.environ["ADMIN_PASSWORD"])
+CLUB = ("societa@fsl.demo", os.environ["QA_PASSWORD"])
 FAN = ("fan.notifiche@test.it", "Password123")
 
 

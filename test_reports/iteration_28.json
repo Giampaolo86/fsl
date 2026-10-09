@@ -12,7 +12,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_iteration28.py"],
   "success_rate": {"backend": "100% (5/5) + regressioni 17/17", "frontend": "100% (redirect+hero+seed content+admin verificati)"},
-  "test_credentials": "direttore@fsl.demo / Demo1234! + TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C",
+  "test_credentials": "direttore@fsl.demo / <QA_PASSWORD> + TOTP <QA_TOTP_SECRET>",
   "seed_data_creation": "Nessun dato di test aggiunto. La demo showcase è idempotente: prima/dopo restart backend counts identici (vetrina posts=15, players media_consent=57/57).",
   "retest_needed": false,
   "should_main_agent_self_test": true,

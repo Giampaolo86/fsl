@@ -13,7 +13,7 @@
   ],
   "updated_files": ["/app/backend/tests/test_impersonation_and_delete.py"],
   "success_rate": {"backend": "100%", "frontend": "100%"},
-  "test_credentials": "qa.superadmin@fsl.demo / Demo1234! (MFA TOTP GCB473SZYPJMXCDKMAB7G72HPJDGHY4C); societa.prova@futurestarsleague.com / Societa-cf13d0-FSL26; arbitro.prova@futurestarsleague.com / Arbitro-e3f3e4-FSL31",
+  "test_credentials": "qa.superadmin@fsl.demo / <QA_PASSWORD> (MFA TOTP <QA_TOTP_SECRET>); societa.prova@futurestarsleague.com / <CLUB_TEST_PASSWORD>; arbitro.prova@futurestarsleague.com / <REFEREE_TEST_PASSWORD>",
   "seed_data_creation": "Each test run creates and deletes a throwaway fan e2e_del_<ts>@test.it and an access-request e2e_ar_<ts>@test.it. Cleaned up by the test itself (no residue).",
   "retest_needed": false,
   "main_agent_can_self_test": true,

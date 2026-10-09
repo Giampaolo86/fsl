@@ -12,7 +12,7 @@ PID = "6aaa5ce2cfb606f5c0fb7532"
 
 
 def _totp():
-    return subprocess.check_output(["python3", "-c", "import pyotp;print(pyotp.TOTP('GCB473SZYPJMXCDKMAB7G72HPJDGHY4C').now())"]).decode().strip()
+    return subprocess.check_output(["python3", "-c", "import os,pyotp;print(pyotp.TOTP(os.environ['QA_TOTP_SECRET']).now())"]).decode().strip()
 
 
 def _login(email, password):
@@ -33,12 +33,12 @@ def _login(email, password):
 
 @pytest.fixture(scope="module")
 def director():
-    return _login("direttore@fsl.demo", "Demo1234!")
+    return _login("direttore@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 @pytest.fixture(scope="module")
 def club_mgr():
-    return _login("societa@fsl.demo", "Demo1234!")
+    return _login("societa@fsl.demo", os.environ["QA_PASSWORD"])
 
 
 @pytest.fixture(scope="module")
