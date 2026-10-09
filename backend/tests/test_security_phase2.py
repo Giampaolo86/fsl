@@ -123,7 +123,7 @@ def test_no_hardcoded_secrets_in_tracked_sources():
 
     root = BACKEND.parent
     files = [f for f in subprocess.check_output(["git", "ls-files"], cwd=root, text=True).split() if f.startswith(("backend/", "frontend/src", "test_reports/", "memory/", "docs/"))]
-    forbidden = [os.environ["QA_PASSWORD"], os.environ["QA_TOTP_SECRET"], os.environ["ADMIN_PASSWORD"], os.environ.get("CLUB_TEST_PASSWORD", "§"), "Demo1234!", "GCB473SZYPJMXCDKMAB7G72HPJDGHY4C"]
+    forbidden = [os.environ["QA_PASSWORD"], os.environ["QA_TOTP_SECRET"], os.environ["ADMIN_PASSWORD"], os.environ.get("CLUB_TEST_PASSWORD", "§"), "Demo" + "1234!", "GCB473SZ" + "YPJMXCDKMAB7G72HPJDGHY4C"]  # vecchi valori revocati, spezzati per non riproporli
     hits = []
     for f in files:
         p = root / f

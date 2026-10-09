@@ -37,9 +37,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - name: Install (lockfile)
+      - name: Install (lockfile se presente nel repository)
         working-directory: frontend
-        run: yarn install --frozen-lockfile --ignore-scripts
+        run: |
+          if [ -f yarn.lock ]; then yarn install --frozen-lockfile --ignore-scripts;
+          else echo "::warning::frontend/yarn.lock non è nel repository: installazione non riproducibile (committare yarn.lock)"; yarn install --ignore-scripts; fi
       - name: Audit con eccezioni documentate (audit-allowlist.json)
         working-directory: frontend
         run: node scripts/audit-check.js
