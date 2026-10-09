@@ -406,7 +406,8 @@ def test_purge_blocked_when_db_is_production_like(monkeypatch):
 def test_purge_preview_and_execution_guarded(world, sa):
     s_sec, _ = login(world["a"]["email"], world["a"]["pwd"])
     assert s_sec.post(f"{API}/tournaments/purge-test-data", json={"keep_slugs": ["x"]}).status_code == 403
-    assert sa.post(f"{API}/tournaments/purge-test-data", json={"keep_slugs": []}).status_code == 403
+    assert sa.post(f"{API}/tournaments/purge-test-data", json={"keep_slugs": []}).status_code == 422  # validazione: almeno un torneo da conservare
+    assert sa.post(f"{API}/tournaments/purge-test-data/preview", json={"keep_slugs": []}).status_code == 422
     keep = [t["slug"] for t in sa.get(f"{API}/tournaments").json()]
     pv = sa.post(f"{API}/tournaments/purge-test-data/preview", json={"keep_slugs": keep}).json()
     assert pv["tournaments"] == [] and pv["environment"] in ("development", "test")
@@ -420,3 +421,84 @@ def test_security_summary_reports_real_states(sa):
     assert states["stripe_webhook"] in ("verified", "configured")
     assert states["backups"] == "verified"
     assert all(p["state"] in ("configured", "active", "verified", "error", "unverifiable") for p in d["protections"])
+
+
+# ---------- 8b. macchina a stati pagamenti: lock settling, retry, eventi interrotti, rimborsi ripetuti ----------
+def test_settling_lock_prevents_double_processing(world):
+    from app.routers.club_extras import _mark_paid
+    from app.models.domain import Purchase
+
+    db, item_id, sess = _seed_purchase(world, stock=5)
+    doc = _run(db.purchases.find_one({"session_id": sess}))
+    p = Purchase.from_mongo(doc)
+    # un worker ha acquisito l'ordine (settling, lock fresco): un secondo worker non può riacquisirlo
+    _run(db.purchases.update_one({"_id": doc["_id"]}, {"$set": {"payment_status": "settling", "settling_at": datetime.now(timezone.utc), "settling_op": "op_altro_worker"}}))
+    assert _run(_mark_paid(p, "pi_x", "a@b.it", op_id="op_secondo")) is False
+    assert _run(db.paid_media.find_one({"_id": __import__("bson").ObjectId(item_id)}))["sold"] == 0
+    # lock scaduto (operazione interrotta > 5 min): il recupero completa l'ordine una sola volta
+    _run(db.purchases.update_one({"_id": doc["_id"]}, {"$set": {"settling_at": datetime.now(timezone.utc) - timedelta(minutes=10)}}))
+    assert _run(_mark_paid(p, "pi_x", "a@b.it", op_id="op_recupero")) is True
+    assert _run(_mark_paid(p, "pi_x", "a@b.it", op_id="op_ancora")) is False
+    after = _run(db.purchases.find_one({"_id": doc["_id"]}))
+    assert after["payment_status"] == "paid" and after["stock_reserved"] is True and after.get("settling_op") is None
+    assert _run(db.paid_media.find_one({"_id": __import__("bson").ObjectId(item_id)}))["sold"] == 1
+
+
+def test_interrupted_after_stock_reservation_does_not_double_increment(world):
+    from app.routers.club_extras import _mark_paid
+    from app.models.domain import Purchase
+
+    db, item_id, sess = _seed_purchase(world, stock=5)
+    doc = _run(db.purchases.find_one({"session_id": sess}))
+    # simulazione: stock già prenotato da un tentativo interrotto, lock scaduto
+    _run(db.paid_media.update_one({"_id": __import__("bson").ObjectId(item_id)}, {"$inc": {"sold": 1}}))
+    _run(db.purchases.update_one({"_id": doc["_id"]}, {"$set": {"payment_status": "settling", "stock_reserved": True, "settling_at": datetime.now(timezone.utc) - timedelta(minutes=10), "settling_op": "op_morto"}}))
+    p = Purchase.from_mongo(_run(db.purchases.find_one({"_id": doc["_id"]})))
+    assert _run(_mark_paid(p, "pi_y", None, op_id="op_retry")) is True
+    assert _run(db.paid_media.find_one({"_id": __import__("bson").ObjectId(item_id)}))["sold"] == 1
+
+
+def test_webhook_failed_event_is_retryable_and_processed_once(world):
+    db, item_id, sess = _seed_purchase(world)
+    evt = _evt("checkout.session.completed", sess, "paid")
+    # evento registrato ma fallito in elaborazione: il reinvio di Stripe NON è un duplicato e completa l'ordine
+    _run(db.stripe_events.insert_one({"_id": evt["id"], "type": evt["type"], "status": "failed", "worker": "w_old", "attempts": 1, "received_at": datetime.now(timezone.utc), "started_at": datetime.now(timezone.utc)}))
+    r = requests.post(f"{API}/stripe/webhook", **_signed(evt))
+    assert r.status_code == 200 and r.json()["status"] == "ok", r.text
+    e = _run(db.stripe_events.find_one({"_id": evt["id"]}))
+    assert e["status"] == "processed" and e["attempts"] == 2
+    assert _run(db.purchases.find_one({"session_id": sess}))["payment_status"] == "paid"
+    # reinvio dopo successo: duplicato, nessun nuovo accredito
+    assert requests.post(f"{API}/stripe/webhook", **_signed(evt)).json()["status"] == "duplicate"
+    # evento bloccato in processing da un worker morto: ripreso dopo la soglia
+    evt2 = _evt("checkout.session.async_payment_succeeded", sess, "paid")
+    _run(db.stripe_events.insert_one({"_id": evt2["id"], "type": evt2["type"], "status": "processing", "worker": "w_dead", "attempts": 1, "received_at": datetime.now(timezone.utc), "started_at": datetime.now(timezone.utc) - timedelta(minutes=5)}))
+    assert requests.post(f"{API}/stripe/webhook", **_signed(evt2)).json()["status"] == "ok"
+    assert _run(db.stripe_events.find_one({"_id": evt2["id"]}))["status"] == "processed"
+    assert _run(db.paid_media.find_one({"_id": __import__("bson").ObjectId(item_id)}))["sold"] == 1
+    # due eventi diversi sullo stesso ordine + consegna una sola volta (voucher invariato)
+    v = _run(db.purchases.find_one({"session_id": sess}))["voucher_code"]
+    assert v and requests.post(f"{API}/stripe/webhook", **_signed(_evt("checkout.session.completed", sess, "paid"))).json()["status"] == "ok"
+    assert _run(db.purchases.find_one({"session_id": sess}))["voucher_code"] == v
+
+
+def test_concurrent_identical_and_different_webhooks_same_order(world):
+    db, item_id, sess = _seed_purchase(world, stock=3)
+    evt = _evt("checkout.session.completed", sess, "paid")
+    evts = [evt, evt, _evt("checkout.session.async_payment_succeeded", sess, "paid"), _evt("checkout.session.completed", sess, "paid")]
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        results = list(ex.map(lambda e: requests.post(f"{API}/stripe/webhook", **_signed(e)), evts))
+    assert all(r.status_code == 200 for r in results)
+    assert _run(db.purchases.find_one({"session_id": sess}))["payment_status"] == "paid"
+    assert _run(db.paid_media.find_one({"_id": __import__("bson").ObjectId(item_id)}))["sold"] == 1
+
+
+def test_refund_processed_multiple_times_decrements_stock_once(world):
+    db, item_id, sess = _seed_purchase(world, stock=3)
+    assert requests.post(f"{API}/stripe/webhook", **_signed(_evt("checkout.session.completed", sess, "paid"))).json()["status"] == "ok"
+    pi = _run(db.purchases.find_one({"session_id": sess}))["stripe_payment_intent_id"]
+    refund = lambda: {"id": f"evt_{uuid.uuid4().hex}", "object": "event", "type": "charge.refunded", "livemode": False, "data": {"object": {"id": f"ch_{uuid.uuid4().hex[:8]}", "object": "charge", "payment_intent": pi, "refunded": True, "amount": 100, "amount_refunded": 100}}}  # noqa: E731
+    for _ in range(3):
+        assert requests.post(f"{API}/stripe/webhook", **_signed(refund())).status_code == 200
+    assert _run(db.purchases.find_one({"session_id": sess}))["payment_status"] == "refunded"
+    assert _run(db.paid_media.find_one({"_id": __import__("bson").ObjectId(item_id)}))["sold"] == 0

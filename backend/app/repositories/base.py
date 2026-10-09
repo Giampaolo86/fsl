@@ -53,12 +53,18 @@ class Repository:
     async def count(self, filter: Optional[dict] = None) -> int:
         return await self.col.count_documents(self._base_filter(filter))
 
+    PROTECTED_FIELDS = {"users": ("is_owner",)}
+
+    def _guard(self, patch: dict) -> dict:
+        return {k: v for k, v in patch.items() if k not in self.PROTECTED_FIELDS.get(self.col.name, ())}
+
     async def update(self, id: str, patch: dict, actor_id: Optional[str] = None):
-        patch = {**patch, "updated_at": utcnow(), "updated_by": actor_id}
+        patch = {**self._guard(patch), "updated_at": utcnow(), "updated_by": actor_id}
         await self.col.update_one(self._base_filter({"_id": oid(id)}), {"$set": patch})
         return await self.get(id)
 
     async def update_versioned(self, id: str, expected_version: int, patch: dict, actor_id: Optional[str] = None):
+        patch = self._guard(patch)
         patch = {**patch, "updated_at": utcnow(), "updated_by": actor_id}
         res = await self.col.find_one_and_update(
             self._base_filter({"_id": oid(id), "version": expected_version}),

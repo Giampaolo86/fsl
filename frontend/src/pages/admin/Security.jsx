@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, KeyRound, Lock, RefreshCw, ShieldAlert, ShieldCheck, UserX, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Crown, KeyRound, Lock, RefreshCw, ShieldAlert, ShieldCheck, UserX, XCircle } from "lucide-react";
 import { KpiTile, PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { ErrorState, LoadingState } from "@/components/fsl/States";
 import { api, apiError } from "@/lib/api";
@@ -72,7 +72,7 @@ export default function Security() {
         <div className="space-y-4">
           <div className="fsl-card p-5" data-testid="security-admins">
             <SectionTitle>Account privilegiati</SectionTitle>
-            <div className="space-y-1.5 text-sm">{d.admins.map((a) => <div key={a.id} className="flex items-center gap-2" data-testid={`security-admin-${a.id}`}><KeyRound className="h-3.5 w-3.5 text-fsl-gold" /><span className="truncate flex-1">{a.email}</span><span className="text-xs text-fsl-slate">{a.is_super_admin ? "Super Admin" : "Direttore"}</span><span className={`h-5 px-2 rounded text-[10px] font-bold uppercase ${a.mfa_enabled ? "bg-fsl-success text-ink-950" : "bg-fsl-danger text-fsl-white"}`}>{a.mfa_enabled ? "MFA" : "no MFA"}</span>{a.status !== "active" && <span className="text-[10px] uppercase text-fsl-slate">{a.status}</span>}</div>)}</div>
+            <div className="space-y-1.5 text-sm">{d.admins.map((a) => <div key={a.id} className="flex items-center gap-2" data-testid={`security-admin-${a.id}`}><KeyRound className="h-3.5 w-3.5 text-fsl-gold" /><span className="truncate flex-1">{a.email}</span><span className={`text-xs ${a.is_owner ? "text-fsl-gold font-bold uppercase inline-flex items-center gap-1" : "text-fsl-slate"}`}>{a.is_owner ? <><Crown className="h-3 w-3" /> Owner</> : a.is_super_admin ? "Super Admin" : "Direttore"}</span><span className={`h-5 px-2 rounded text-[10px] font-bold uppercase ${a.mfa_enabled ? "bg-fsl-success text-ink-950" : "bg-fsl-danger text-fsl-white"}`}>{a.mfa_enabled ? "MFA" : "no MFA"}</span>{a.status !== "active" && <span className="text-[10px] uppercase text-fsl-slate">{a.status}</span>}</div>)}</div>
           </div>
         </div>
       </div>

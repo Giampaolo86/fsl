@@ -591,32 +591,51 @@ async def checkout(body: CheckoutIn, request: Request):
     return {"checkout_url": session.url, "session_id": session.id, "count": len(items), "total": sum(c for _, c, _ in items) / 100}
 
 
-async def _mark_paid(p: Purchase, pi=None, email=None) -> bool:
-    """Segna pagato una sola volta (idempotente). Stock: incremento atomico `sold < stock`; se esaurito l'acquisto va in `oversold` (da rimborsare)."""
+SETTLING_STALE_SECONDS = 300
+
+
+async def _mark_paid(p: Purchase, pi=None, email=None, op_id: Optional[str] = None) -> bool:
+    """Macchina a stati del pagamento: pending/processing → settling (lock atomico con op_id) → paid | oversold.
+    Un ordine in `settling` non è acquisibile da un secondo worker finché il lock non è scaduto (recupero operazioni interrotte).
+    Idempotente: paid/oversold/refunded non vengono mai rielaborati; lo stock cresce al massimo una volta per ordine."""
+    from bson import ObjectId
+
     repo = Repository("purchases", Purchase)
     items_col = Repository("paid_media", PaidMedia).col
-    item_oid = __import__("bson").ObjectId(p.item_id)
+    pid, item_oid = ObjectId(p.id), ObjectId(p.item_id)
     now = datetime.now(timezone.utc)
-    claim = await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id), "payment_status": {"$nin": ["paid", "oversold", "refunded"]}}, {"$set": {"payment_status": "settling", "updated_at": now}})
+    op_id = op_id or f"op_{uuid.uuid4().hex}"
+    stale = now - timedelta(seconds=SETTLING_STALE_SECONDS)
+    claim = await repo.col.update_one(
+        {"_id": pid, "$or": [{"payment_status": {"$in": ["pending", "processing", "failed", "expired", "canceled"]}}, {"payment_status": "settling", "settling_at": {"$lt": stale}}]},
+        {"$set": {"payment_status": "settling", "settling_at": now, "settling_op": op_id, "updated_at": now}},
+    )
     if not claim.modified_count:
         return False
-    inc = await items_col.update_one({"_id": item_oid, "$or": [{"stock": None}, {"$expr": {"$lt": [{"$ifNull": ["$sold", 0]}, "$stock"]}}]}, {"$inc": {"sold": 1}})
-    if not inc.modified_count:
-        from .security_events import record_event
+    owned = {"_id": pid, "payment_status": "settling", "settling_op": op_id}
+    if not p.stock_reserved:
+        inc = await items_col.update_one({"_id": item_oid, "$or": [{"stock": None}, {"$expr": {"$lt": [{"$ifNull": ["$sold", 0]}, "$stock"]}}]}, {"$inc": {"sold": 1}})
+        if not inc.modified_count:
+            from .security_events import record_event
 
-        await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id)}, {"$set": {"status": "oversold", "payment_status": "oversold", "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": now}})
-        await record_event("payment_oversold", None, severity="high", detail={"purchase": p.id, "item": p.item_id, "payment_intent": pi})
-        return False
-    await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id)}, {"$set": {"status": "completed", "payment_status": "paid", "paid_at": now, "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": now}})
+            await repo.col.update_one(owned, {"$set": {"status": "oversold", "payment_status": "oversold", "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": now}, "$unset": {"settling_op": ""}})
+            await record_event("payment_oversold", None, severity="high", detail={"purchase": p.id, "item": p.item_id, "payment_intent": pi})
+            return False
+        # lo stock è stato prenotato da questa operazione: anche se il passo successivo fallisse, il recupero non lo incrementerà di nuovo
+        await repo.col.update_one(owned, {"$set": {"stock_reserved": True}})
     it = await _find_item(p.item_id)
+    patch = {"status": "completed", "payment_status": "paid", "paid_at": now, "stripe_payment_intent_id": pi, "buyer_email": email or p.buyer_email, "updated_at": now}
+    if it and it.kind == "custom" and it.delivery == "voucher" and not p.voucher_code:
+        from .shop import new_voucher
+
+        patch["voucher_code"] = new_voucher()
+    done = await repo.col.update_one(owned, {"$set": patch, "$unset": {"settling_op": ""}})
+    if not done.modified_count:
+        return False
     if it and it.kind == "push_pass" and it.ref_id:
         from ..services import push
 
         await push.grant_pass(it.ref_id, it.tournament_id, p.id)
-    if it and it.kind == "custom" and it.delivery == "voucher":
-        from .shop import new_voucher
-
-        await repo.col.update_one({"_id": __import__("bson").ObjectId(p.id)}, {"$set": {"voucher_code": new_voucher()}})
     return True
 
 
@@ -634,9 +653,9 @@ def _session_outcome(s) -> str:
 
 
 async def _set_status(repo, ps: list, status: str, payment_status: str):
-    ids = [__import__("bson").ObjectId(p.id) for p in ps if p.payment_status not in ("paid", "oversold", "refunded")]
+    ids = [__import__("bson").ObjectId(p.id) for p in ps if p.payment_status not in ("paid", "oversold", "refunded", "settling")]
     if ids:
-        await repo.col.update_many({"_id": {"$in": ids}}, {"$set": {"status": status, "payment_status": payment_status, "updated_at": datetime.now(timezone.utc)}})
+        await repo.col.update_many({"_id": {"$in": ids}, "payment_status": {"$nin": ["paid", "oversold", "refunded", "settling"]}}, {"$set": {"status": status, "payment_status": payment_status, "updated_at": datetime.now(timezone.utc)}})
 
 
 @pay_router.get("/payments/status/{session_id}")
@@ -692,6 +711,79 @@ async def download(token: str, request: Request):
     return await stream_media(media, request, "private, no-store", disposition="attachment")
 
 
+EVENT_RETRY_AFTER_SECONDS = 120
+
+
+async def _claim_event(event: dict, request: Request) -> Optional[str]:
+    """Registra l'evento (received → processing). Ritorna None se già elaborato con successo o in elaborazione da un altro worker."""
+    from pymongo.errors import DuplicateKeyError
+
+    from ..core.db import db
+
+    now = datetime.now(timezone.utc)
+    worker = f"w_{uuid.uuid4().hex[:12]}"
+    try:
+        await db.stripe_events.insert_one({"_id": event["id"], "type": event["type"], "status": "processing", "worker": worker, "attempts": 1, "received_at": now, "started_at": now, "livemode": bool(event.get("livemode"))})
+        return worker
+    except DuplicateKeyError:
+        pass
+    # già visto: riprendibile solo se fallito o bloccato in processing da troppo tempo
+    res = await db.stripe_events.find_one_and_update(
+        {"_id": event["id"], "$or": [{"status": "failed"}, {"status": "processing", "started_at": {"$lt": now - timedelta(seconds=EVENT_RETRY_AFTER_SECONDS)}}]},
+        {"$set": {"status": "processing", "worker": worker, "started_at": now}, "$inc": {"attempts": 1}},
+    )
+    return worker if res else None
+
+
+async def _finish_event(event_id: str, worker: str, status: str, error: Optional[str] = None) -> None:
+    from ..core.db import db
+
+    await db.stripe_events.update_one({"_id": event_id, "worker": worker}, {"$set": {"status": status, "finished_at": datetime.now(timezone.utc), "error": (error or "")[:300] or None}})
+
+
+async def _apply_refund(repo, payment_intent: str) -> int:
+    """Rimborso idempotente: decremento stock solo per gli ordini che passano ora da paid a refunded."""
+    from bson import ObjectId
+
+    n = 0
+    async for p in repo.col.find({"stripe_payment_intent_id": payment_intent, "payment_status": "paid"}, {"item_id": 1, "stock_reserved": 1}):
+        r = await repo.col.update_one({"_id": p["_id"], "payment_status": "paid"}, {"$set": {"status": "refunded", "payment_status": "refunded", "refunded_at": datetime.now(timezone.utc), "updated_at": datetime.now(timezone.utc)}})
+        if r.modified_count:
+            n += 1
+            await Repository("paid_media", PaidMedia).col.update_one({"_id": ObjectId(p["item_id"]), "sold": {"$gt": 0}}, {"$inc": {"sold": -1}})
+    return n
+
+
+async def _process_event(event: dict) -> None:
+    obj, t = event["data"]["object"], event["type"]
+    repo = Repository("purchases", Purchase)
+    ps = await repo.list({"session_id": obj.get("id")}, limit=50) if obj.get("id") else []
+    if ps and t.startswith("checkout.session."):
+        email = (obj.get("customer_details") or {}).get("email")
+        if t == "checkout.session.completed":
+            if _session_outcome(obj) == "paid":
+                for p in ps:
+                    await _mark_paid(p, obj.get("payment_intent"), email, op_id=f"{event['id']}:{p.id}")
+            else:
+                await _set_status(repo, ps, "processing", "processing")
+        elif t == "checkout.session.async_payment_succeeded":
+            if obj.get("payment_status") == "paid":
+                for p in ps:
+                    await _mark_paid(p, obj.get("payment_intent"), email, op_id=f"{event['id']}:{p.id}")
+        elif t == "checkout.session.async_payment_failed":
+            await _set_status(repo, ps, "failed", "failed")
+        elif t == "checkout.session.expired":
+            await _set_status(repo, ps, "expired", "expired")
+    if t == "payment_intent.payment_failed" and obj.get("id"):
+        await repo.col.update_many({"stripe_payment_intent_id": obj.get("id"), "payment_status": {"$nin": ["paid", "refunded", "settling", "oversold"]}}, {"$set": {"status": "failed", "payment_status": "failed", "updated_at": datetime.now(timezone.utc)}})
+    if t == "payment_intent.canceled" and obj.get("id"):
+        await repo.col.update_many({"stripe_payment_intent_id": obj.get("id"), "payment_status": {"$nin": ["paid", "refunded", "settling", "oversold"]}}, {"$set": {"status": "canceled", "payment_status": "canceled", "updated_at": datetime.now(timezone.utc)}})
+    if t in ("charge.refunded", "charge.refund.updated") and obj.get("payment_intent"):
+        refunded = obj.get("refunded") or (obj.get("amount_refunded") or 0) >= (obj.get("amount") or 1)
+        if refunded:
+            await _apply_refund(repo, obj.get("payment_intent"))
+
+
 @pay_router.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
     from .security_events import record_event
@@ -706,41 +798,13 @@ async def stripe_webhook(request: Request):
     except (stripe.error.SignatureVerificationError, ValueError):
         await record_event("webhook_bad_signature", request, severity="high", detail={"provider": "stripe"})
         raise bad_request("Firma non valida")
-    from ..core.db import db
-
-    try:
-        await db.stripe_events.insert_one({"_id": event["id"], "type": event["type"], "received_at": datetime.now(timezone.utc), "livemode": bool(event.get("livemode"))})
-    except Exception:  # noqa: BLE001 - duplicato: già elaborato
+    worker = await _claim_event(event, request)
+    if worker is None:
         return {"status": "duplicate"}
-    obj, t = event["data"]["object"], event["type"]
-    repo = Repository("purchases", Purchase)
-    ps = await repo.list({"session_id": obj.get("id")}, limit=50) if obj.get("id") else []
-    if ps and t.startswith("checkout.session."):
-        email = (obj.get("customer_details") or {}).get("email")
-        if t == "checkout.session.completed":
-            if _session_outcome(obj) == "paid":
-                for p in ps:
-                    await _mark_paid(p, obj.get("payment_intent"), email)
-            else:
-                await _set_status(repo, ps, "processing", "processing")
-        elif t == "checkout.session.async_payment_succeeded":
-            if obj.get("payment_status") == "paid":
-                for p in ps:
-                    await _mark_paid(p, obj.get("payment_intent"), email)
-        elif t == "checkout.session.async_payment_failed":
-            await _set_status(repo, ps, "failed", "failed")
-        elif t == "checkout.session.expired":
-            await _set_status(repo, ps, "expired", "expired")
-    if t == "payment_intent.payment_failed" and obj.get("id"):
-        await repo.col.update_many({"stripe_payment_intent_id": obj.get("id"), "payment_status": {"$nin": ["paid", "refunded"]}}, {"$set": {"status": "failed", "payment_status": "failed", "updated_at": datetime.now(timezone.utc)}})
-    if t == "payment_intent.canceled" and obj.get("id"):
-        await repo.col.update_many({"stripe_payment_intent_id": obj.get("id"), "payment_status": {"$nin": ["paid", "refunded"]}}, {"$set": {"status": "canceled", "payment_status": "canceled", "updated_at": datetime.now(timezone.utc)}})
-    if t in ("charge.refunded", "charge.refund.updated") and obj.get("payment_intent"):
-        refunded = obj.get("refunded") or (obj.get("amount_refunded") or 0) >= (obj.get("amount") or 1)
-        if refunded:
-            r = await repo.col.update_many({"stripe_payment_intent_id": obj.get("payment_intent"), "payment_status": "paid"}, {"$set": {"status": "refunded", "payment_status": "refunded", "updated_at": datetime.now(timezone.utc)}})
-            if r.modified_count:
-                async for p in repo.col.find({"stripe_payment_intent_id": obj.get("payment_intent"), "payment_status": "refunded"}, {"item_id": 1}):
-                    await Repository("paid_media", PaidMedia).col.update_one({"_id": __import__("bson").ObjectId(p["item_id"]), "sold": {"$gt": 0}}, {"$inc": {"sold": -1}})
-    await db.stripe_events.update_one({"_id": event["id"]}, {"$set": {"processed_at": datetime.now(timezone.utc)}})
+    try:
+        await _process_event(event)
+    except Exception as e:  # noqa: BLE001 - errore temporaneo: evento marcato failed, Stripe lo reinvia e verrà ritentato
+        await _finish_event(event["id"], worker, "failed", str(e))
+        raise ApiError(500, "WEBHOOK_RETRY", "Elaborazione fallita, riprovare")
+    await _finish_event(event["id"], worker, "processed")
     return {"status": "ok"}

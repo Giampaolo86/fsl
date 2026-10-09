@@ -180,6 +180,9 @@ async def protections() -> list[dict]:
     without = [a["email"] for a in admins if not a.get("mfa_enabled")]
     unverified = await db.sessions.count_documents({"revoked_at": None, "mfa_verified": {"$ne": True}, "user_id": {"$in": [str(a["_id"]) for a in admins]}})
     add("mfa_admins", "MFA obbligatoria per Super Admin e Direttori", "verified" if not without and not unverified else "error", ("Tutti gli account privilegiati attivi hanno la MFA" if not without else f"Senza MFA (obbligo al prossimo accesso, operazioni admin bloccate): {', '.join(without)}") + (f" · {unverified} sessioni privilegiate senza MFA (bloccate)" if unverified else ""))
+    owners = await db.users.count_documents({"is_owner": True})
+    idx_ok = "uniq_owner" in await db.users.index_information()
+    add("owner", "Owner unico e protetto", "verified" if owners == 1 and idx_ok else "error", (f"1 fondatore, vincolo di unicità DB {'attivo' if idx_ok else 'MANCANTE'}; eliminazione/disabilitazione/reset/impersonazione bloccate lato server" if owners == 1 else f"{owners} account owner trovati (atteso 1)"))
     add("media_private", "File riservati protetti lato server", "active", "Documenti, file non pubblici e originali in vendita richiedono autorizzazione; streaming con Range")
     add("env_guard", "Account di test in produzione", "verified" if env == "production" else "active", "Login bloccato e account @fsl.demo / *.prova disabilitati all'avvio" if env == "production" else f"Ambiente {env}: account QA consentiti solo con QA_ALLOW_TEST_ACCOUNTS")
     add("purge_guard", "Pulizia dati e cancellazioni", "active", "Purge bloccata in produzione; eliminazione torneo con conferma, ri-autenticazione recente e backup su storage")
@@ -205,7 +208,7 @@ async def security_summary(user: CurrentUser = Depends(get_current_user)):
     high = await db.security_events.find({"severity": "high"}, {"_id": 0}).sort("ts", -1).limit(30).to_list(30)
     locked = await db.login_attempts.find({}, {"_id": 0}).sort("updated_at", -1).limit(20).to_list(20) if "login_attempts" in await db.list_collection_names() else []
     disabled = await db.users.count_documents({"status": {"$ne": "active"}, "deleted_at": None})
-    admins = await db.users.find({"$or": [{"is_super_admin": True}, {"role": {"$in": ["super_admin", "director"]}}], "deleted_at": None}, {"email": 1, "role": 1, "is_super_admin": 1, "mfa_enabled": 1, "status": 1, "last_login_at": 1}).to_list(50)
+    admins = await db.users.find({"$or": [{"is_super_admin": True}, {"role": {"$in": ["super_admin", "director"]}}], "deleted_at": None}, {"email": 1, "role": 1, "is_super_admin": 1, "is_owner": 1, "mfa_enabled": 1, "status": 1, "last_login_at": 1}).to_list(50)
     prots = await protections()
     config = {
         "cors_explicit": bool(os.environ.get("CORS_ORIGINS")),

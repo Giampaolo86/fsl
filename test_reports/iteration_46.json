@@ -1,0 +1,358 @@
+{
+  "iteration": 46,
+  "generated_at": "2026-10-09T14:48:41.743875+00:00",
+  "source": "test_reports/pytest/iteration46.xml (generato dallo stesso run pytest: JSON e XML sono per costruzione coerenti)",
+  "scope": "Owner hierarchy, Security hardening fase 2 (sessioni, rate limiting, isolamento, media, Stripe state machine, cancellazioni/backup), regressione iteration_45 e iteration10_security",
+  "summary": {
+    "passed": 69,
+    "failed": 0,
+    "skipped": 0
+  },
+  "tests": [
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_qa_script_refuses_without_explicit_test_env",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_test_accounts_recognised_and_blocked_in_production",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_no_hardcoded_secrets_in_tracked_sources",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_refresh_token_single_use",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_concurrent_refresh_no_false_alarm",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_revocation_invalidates_immediately",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_privileged_session_without_mfa_is_blocked",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_rate_limit_ignores_spoofed_xff_and_is_shared",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_rate_limit_under_concurrency_never_exceeds_limit",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_client_ip_trusts_only_proxy_chain",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_cross_tournament_access_denied",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_scoped_repository_filter_is_immutable",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_club_cannot_edit_other_clubs_player",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_private_media_requires_authorization",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_webhook_completed_but_unpaid_is_not_paid",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_webhook_async_failed_and_bad_signature",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_stock_never_oversold_on_concurrent_paid_events",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_checkout_return_origin_not_trusted_from_header",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_delete_requires_super_admin_confirm_recent_auth_and_backs_up",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_purge_blocked_when_db_is_production_like",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_purge_preview_and_execution_guarded",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_security_summary_reports_real_states",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_settling_lock_prevents_double_processing",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_interrupted_after_stock_reservation_does_not_double_increment",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_webhook_failed_event_is_retryable_and_processed_once",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_concurrent_identical_and_different_webhooks_same_order",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_security_phase2",
+      "name": "test_refund_processed_multiple_times_decrements_stock_once",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_owner_hierarchy",
+      "name": "test_exactly_one_owner_with_unique_index",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_owner_hierarchy",
+      "name": "test_second_owner_impossible_at_db_level",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_owner_hierarchy",
+      "name": "test_owner_field_cannot_be_set_via_repository_or_api",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_owner_hierarchy",
+      "name": "test_super_admin_cannot_delete_disable_reset_or_impersonate_owner",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_owner_hierarchy",
+      "name": "test_owner_delete_blocked_even_from_owner_session_and_from_cleanup",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_owner_hierarchy",
+      "name": "test_seed_cannot_replace_owner_or_reset_its_password",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_owner_hierarchy",
+      "name": "test_backup_restore_cannot_alter_ownership",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_owner_hierarchy",
+      "name": "test_super_admins_keep_full_powers",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_owner_hierarchy",
+      "name": "test_owner_manages_other_super_admins",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_owner_hierarchy",
+      "name": "test_user_delete_requires_recent_auth",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_payment_status_unknown_session_404",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_stripe_webhook_without_signature_400",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_private_file_media_requires_auth",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_public_image_media_200",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_club_manager_users_403",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_club_manager_security_summary_403",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_club_manager_delete_tournament_403",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_public_tournament_loads",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_public_tournaments_list",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_sa_can_list_users",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_sa_security_summary",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_delete_tournament_requires_confirm_and_backup",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_purge_preview_requires_sa_and_returns_preview",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration45",
+      "name": "test_purge_preview_club_manager_403",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestMediaPrivacy",
+      "name": "test_anon_private_paid_media_forbidden",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestMediaPrivacy",
+      "name": "test_anon_public_preview_ok",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestMediaPrivacy",
+      "name": "test_anon_file_media_forbidden",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestMediaPrivacy",
+      "name": "test_admin_private_media_ok",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestCORS",
+      "name": "test_cors_evil_origin_not_echoed",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestCORS",
+      "name": "test_cors_allowed_origin_echoed",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestRateLimit",
+      "name": "test_access_requests_rate_limited",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestRateLimit",
+      "name": "test_track_rate_limited",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestUserDelete",
+      "name": "test_delete_requires_confirm",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestSecurityEvents",
+      "name": "test_generate_events_and_summary",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestAuthorization",
+      "name": "test_club_cannot_security_summary",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestAuthorization",
+      "name": "test_club_cannot_analytics",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestAuthorization",
+      "name": "test_club_cannot_org_groups",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestAuthorization",
+      "name": "test_anon_security_summary_401",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestPublicRegression",
+      "name": "test_tournament_page",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestPublicRegression",
+      "name": "test_club_in_tournament",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestPublicRegression",
+      "name": "test_public_club",
+      "status": "passed"
+    },
+    {
+      "file": "tests.test_iteration10_security.TestPublicRegression",
+      "name": "test_club_overview",
+      "status": "passed"
+    }
+  ]
+}

@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, EmailStr
 
 from ..core import sessions
-from ..core.deps import CurrentUser, get_current_user, require_roles, require_tournament
+from ..core.deps import CurrentUser, get_current_user, require_recent_auth, require_roles, require_tournament
 from ..core.errors import ApiError, bad_request, conflict, forbidden, not_found
 from ..core.security import hash_password, password_problem, temporary_password
 from ..models.base import utcnow
 from ..models.domain import ROLE_LABELS, TournamentMembership, User
 from ..repositories.registry import memberships, scoped, tournaments, users
 from ..services import audit
+from ..services.owner import assert_owner_protected
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -44,7 +45,7 @@ async def list_users(user: CurrentUser = Depends(require_roles("director", "secr
     out = []
     for u in us:
         d = u.safe()
-        d["role_label"] = ROLE_LABELS.get(u.role, "Genitore / Tifoso" if u.role == "fan" else u.role)
+        d["role_label"] = "Owner — Fondatore FSL" if u.is_owner else ROLE_LABELS.get(u.role, "Genitore / Tifoso" if u.role == "fan" else u.role)
         d["memberships"] = [{**m.public(), "tournament_name": t_names.get(m.tournament_id)} for m in all_ms if m.user_id == u.id]
         out.append(d)
     return out
@@ -77,10 +78,11 @@ async def create_user(body: UserIn, user: CurrentUser = Depends(require_roles("d
     return u.safe()
 
 
-async def _manageable(actor: CurrentUser, target_id: str) -> User:
+async def _manageable(actor: CurrentUser, target_id: str, operation: str = "manage") -> User:
     target = await users.get(target_id)
     if not target:
         raise not_found("Utente")
+    assert_owner_protected(target, operation, actor)  # l'Owner non è gestibile da nessuno (neppure da sé via API amministrative)
     if target.id == actor.id:
         raise bad_request("Usa il tuo profilo per modificare il tuo account")
     if target.is_super_admin and not actor.is_super_admin:
@@ -100,7 +102,7 @@ class StatusIn(BaseModel):
 async def set_status(user_id: str, body: StatusIn, user: CurrentUser = Depends(require_roles("director"))):
     if body.status not in ("active", "disabled"):
         raise bad_request("Stato non valido")
-    target = await _manageable(user, user_id)
+    target = await _manageable(user, user_id, "disable" if body.status == "disabled" else "status")
     await users.update(target.id, {"status": body.status}, user.id)
     revoked = 0
     if body.status == "disabled":
@@ -114,7 +116,8 @@ async def delete_user_account(user_id: str, confirm_email: str = "", user: Curre
     """Eliminazione definitiva: solo Super Admin, con conferma contestuale (email dell'utente) e mai l'ultimo Super Admin."""
     if not user.is_super_admin:
         raise forbidden("Solo un Super Admin può eliminare un utente")
-    target = await _manageable(user, user_id)
+    target = await _manageable(user, user_id, "delete")
+    await require_recent_auth(user)
     if confirm_email.strip().lower() != target.email.lower():
         raise ApiError(400, "CONFIRM_REQUIRED", "Per confermare l'eliminazione digita l'email esatta dell'utente")
     if target.is_super_admin or target.role == "super_admin":
@@ -132,7 +135,7 @@ async def delete_user_account(user_id: str, confirm_email: str = "", user: Curre
 
 @router.post("/{user_id}/temporary-password")
 async def temp_password(user_id: str, user: CurrentUser = Depends(require_roles("director"))):
-    target = await _manageable(user, user_id)
+    target = await _manageable(user, user_id, "password_reset")
     pwd = temporary_password()
     await users.update(target.id, {"password_hash": hash_password(pwd), "must_change_password": True, "password_changed_at": utcnow()}, user.id)
     revoked = await sessions.revoke_user_sessions(target.id, reason="password_reset")
@@ -142,7 +145,7 @@ async def temp_password(user_id: str, user: CurrentUser = Depends(require_roles(
 
 @router.post("/{user_id}/mfa/reset")
 async def reset_mfa(user_id: str, user: CurrentUser = Depends(require_roles("director"))):
-    target = await _manageable(user, user_id)
+    target = await _manageable(user, user_id, "mfa_reset")
     if not user.is_super_admin and target.role in ("director", "super_admin"):
         raise forbidden("Solo un Super Admin può azzerare la MFA di un Direttore")
     await users.update(target.id, {"mfa_enabled": False, "mfa_secret": None, "mfa_pending_secret": None, "mfa_recovery_codes": []}, user.id)
@@ -162,6 +165,7 @@ async def revoke_membership(membership_id: str, user: CurrentUser = Depends(requ
     await require_tournament(m.tournament_id, user, roles={"super_admin", "director"}, writable=True)
     if m.user_id == user.id:
         raise bad_request("Non puoi revocare la tua stessa membership")
+    assert_owner_protected(await users.get(m.user_id), "membership", user)
     await memberships.update(m.id, {"status": "revoked"}, user.id)
     await audit.record(user, "membership.revoke", "membership", m.id, m.tournament_id, before={"status": "active"}, after={"status": "revoked"})
     return {"ok": True}
@@ -175,6 +179,7 @@ async def add_membership(body: MembershipIn, user: CurrentUser = Depends(require
         raise bad_request("Utente non trovato")
     if body.role not in ROLE_LABELS or body.role == "super_admin":
         raise forbidden("Ruolo non assegnabile")
+    assert_owner_protected(target, "membership", user)
     if await memberships.find_one({"user_id": target.id, "tournament_id": body.tournament_id, "role": body.role, "club_id": body.club_id}):
         raise conflict("Membership già presente")
     m = await memberships.insert(TournamentMembership(**body.model_dump()), user.id)

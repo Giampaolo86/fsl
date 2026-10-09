@@ -23,6 +23,7 @@ class User(BaseDocument):
     full_name: str
     role: Role
     is_super_admin: bool = False
+    is_owner: bool = False  # unico proprietario (vincolo di unicità DB; mai modificabile via API ordinarie)
     status: Literal["active", "disabled"] = "active"
     mfa_required: bool = False
     mfa_enabled: bool = False
@@ -424,6 +425,10 @@ class Purchase(BaseDocument):
     buyer_email: Optional[str] = None
     buyer_user_id: Optional[str] = None
     voucher_code: Optional[str] = None
+    stock_reserved: bool = False
+    settling_at: Optional[datetime] = None
+    settling_op: Optional[str] = None
+    paid_at: Optional[datetime] = None
     redeemed_at: Optional[datetime] = None
 
 

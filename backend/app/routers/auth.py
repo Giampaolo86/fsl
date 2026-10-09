@@ -515,6 +515,9 @@ async def impersonate(user_id: str, request: Request, user: CurrentUser = Depend
     target = await users.get(user_id)
     if not target or target.status != "active":
         raise ApiError(404, "NOT_FOUND", "Utente non trovato o disabilitato")
+    from ..services.owner import assert_owner_protected
+
+    assert_owner_protected(target, "impersonate", user)
     if target.is_super_admin or target.role not in IMPERSONABLE_ROLES:
         raise ApiError(403, "FORBIDDEN", "Questo ruolo non può essere impersonato")
     extra = {"impersonated_by": {"user_id": user.id, "full_name": user.full_name, "sid": user.sid}}

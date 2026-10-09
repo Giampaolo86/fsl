@@ -106,9 +106,13 @@ async def restore_backup(backup_id: str) -> dict:
         restored["tournaments"] = 1
     from pymongo.errors import BulkWriteError
 
+    from .owner import strip_owner_fields
+
     for name, docs in payload["collections"].items():
         if not docs:
             continue
+        if name == "users":  # la proprietà non si ripristina mai da un backup ordinario
+            docs = [strip_owner_fields(d) for d in docs]
         try:
             r = await db[name].insert_many(docs, ordered=False)
             restored[name] = len(r.inserted_ids)

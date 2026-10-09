@@ -30,6 +30,7 @@ class CurrentUser:
     impersonated_by: Optional[dict] = None
     mfa_verified: bool = False
     session_auth_at: Optional[object] = None
+    is_owner: bool = False
 
     def role_in(self, tournament_id: str) -> Optional[str]:
         if self.is_super_admin:
@@ -55,6 +56,7 @@ class CurrentUser:
             "full_name": self.full_name,
             "role": self.role,
             "is_super_admin": self.is_super_admin,
+            "is_owner": self.is_owner,
             "memberships": self.memberships,
             "picture": self.picture,
             "favorites": self.favorites,
@@ -81,7 +83,8 @@ async def load_current_user(user_id: str) -> Optional[CurrentUser]:
         picture=user.picture,
         favorites=user.favorites or {"tournaments": [], "teams": [], "players": []},
         role=user.role,
-        is_super_admin=user.is_super_admin,
+        is_super_admin=user.is_super_admin or user.is_owner,
+        is_owner=user.is_owner,
         memberships=[{"tournament_id": m.tournament_id, "role": m.role, "club_id": m.club_id} for m in ms],
         mfa_enabled=user.mfa_enabled,
         mfa_required=mfa_is_required(user),

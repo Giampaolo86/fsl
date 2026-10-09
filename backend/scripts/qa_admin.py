@@ -7,11 +7,13 @@ import asyncio
 import os
 import re
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "/app/backend")
-from dotenv import load_dotenv
+BACKEND_DIR = Path(__file__).resolve().parents[1]  # funziona sia nel container Emergent sia in GitHub Actions
+sys.path.insert(0, str(BACKEND_DIR))
+from dotenv import load_dotenv  # noqa: E402
 
-load_dotenv("/app/backend/.env")
+load_dotenv(BACKEND_DIR / ".env")
 
 EMAIL = "qa.superadmin@fsl.demo"
 

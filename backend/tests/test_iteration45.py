@@ -247,6 +247,6 @@ def test_purge_preview_requires_sa_and_returns_preview(sa_token):
 
 def test_purge_preview_club_manager_403(club_token):
     r = requests.post(f"{API}/tournaments/purge-test-data/preview",
-                      json={"keep_slugs": [], "keep_emails": []},
+                      json={"keep_slugs": ["la-serie-a-dei-bambini"], "keep_emails": []},
                       headers={"Authorization": f"Bearer {club_token}"}, timeout=10)
     assert r.status_code == 403

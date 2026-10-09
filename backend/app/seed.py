@@ -51,9 +51,15 @@ async def upsert_user(email: str, password: str, full_name: str, role: str, is_s
     email = email.lower()
     existing = await users.find_one({"email": email})
     if existing:
-        if is_super_admin and os.environ.get("ADMIN_FORCE_PASSWORD_RESET", "false").lower() == "true" and not verify_password(password, existing.password_hash):
-            await users.update(existing.id, {"password_hash": hash_password(password), "password_changed_at": utcnow()})
-            logging.getLogger("fsl").warning("Password Super Admin reimpostata da .env (ADMIN_FORCE_PASSWORD_RESET): rimuovi il flag")
+        if os.environ.get("ADMIN_FORCE_PASSWORD_RESET", "false").lower() == "true":
+            # Mai sovrascrivere la password dell'Owner (o di un account con MFA attiva) dall'ambiente: solo il percorso sicuro volontario.
+            if existing.is_owner or existing.mfa_enabled or not is_super_admin:
+                logging.getLogger("fsl").error("ADMIN_FORCE_PASSWORD_RESET ignorato: l'account %s è protetto (owner/MFA). Rimuovi il flag.", email)
+            elif os.environ.get("APP_ENV") == "production":
+                logging.getLogger("fsl").error("ADMIN_FORCE_PASSWORD_RESET ignorato in produzione")
+            elif not verify_password(password, existing.password_hash):
+                await users.update(existing.id, {"password_hash": hash_password(password), "password_changed_at": utcnow()})
+                logging.getLogger("fsl").warning("Password Super Admin (senza MFA, ambiente %s) reimpostata da .env: rimuovi il flag", os.environ.get("APP_ENV"))
         return existing
     return await users.insert(
         User(email=email, password_hash=hash_password(password), full_name=full_name, role=role, is_super_admin=is_super_admin, mfa_required=role in ("super_admin", "director"), password_changed_at=utcnow())
@@ -123,6 +129,10 @@ async def seed_all():
     admin_email = os.environ["ADMIN_EMAIL"]
     admin_password = os.environ["ADMIN_PASSWORD"]
     admin = await upsert_user(admin_email, admin_password, "Giampaolo Castellani", "super_admin", is_super_admin=True)
+    from .services.owner import bootstrap_owner, ensure_owner_index
+
+    await ensure_owner_index()
+    await bootstrap_owner()
 
     from .core.deps import load_current_user
 

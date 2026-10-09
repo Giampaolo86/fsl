@@ -287,3 +287,13 @@ Provider email/SMS; policy retention; Pantone su mazzetta fisica. Stripe: sandbo
 - [x] Pannello Sicurezza con 12 protezioni e stati reali (configured/active/verified/error/unverifiable)
 - [x] Test: `tests/test_security_phase2.py` 22/22, E2E `iteration_45.json`
 - [ ] Azioni esterne: cambio password owner in produzione; attivazione MFA di liviadm15/alessioodt al prossimo login; rimuovere `QA_TOTP_SECRET`/`SEED_DEMO` dall'env di produzione; commit di `frontend/yarn.lock`; verificare la run GitHub Actions dopo «Save to GitHub»
+
+## Iterazione 47 (2026-10) · GERARCHIA OWNER + STRIPE STATE MACHINE + CI (rapporto: `/app/memory/OWNER_STRIPE_CI_REPORT.md`)
+- [x] Owner unico (`users.is_owner`, indice unico parziale `uniq_owner`, bootstrap una tantum da `ADMIN_EMAIL` per ID in `services/owner.py`); `CurrentUser.is_owner`; `/auth/me` espone `is_owner`
+- [x] Protezioni server: `_manageable()` + `assert_owner_protected` su status/delete/temp-password/mfa-reset/membership/impersonate; `cleanup.delete_user` rifiuta l'Owner; purge/disable escludono l'Owner; `Repository.update*` scarta `is_owner`; restore backup rimuove campi owner; seed non reimposta mai la password Owner/MFA/produzione
+- [x] `DELETE /users/{id}` richiede `require_recent_auth`; `PurgeIn.keep_slugs` min 1 (422)
+- [x] Stripe: lock `settling` con `settling_op`/`settling_at` (stale 300 s), `stock_reserved`, voucher una sola volta, `stripe_events` con stati processing/processed/failed + retry (120 s), `DuplicateKeyError` specifica, rimborsi idempotenti
+- [x] `scripts/qa_admin.py` percorsi da `__file__`; workflow esegue `test_security_phase2.py` + `test_owner_hierarchy.py`; job backend simulato in locale (35 passed, 2 skipped)
+- [x] UI: badge «OWNER — FONDATORE FSL» (corona) e «Account fondatore protetto» in Utenti; Owner e protezione «Owner unico» in Sicurezza
+- [x] Test: `tests/test_owner_hierarchy.py` 10/10; `test_security_phase2.py` 27/27; report coerente `test_reports/iteration_46.json` ← `pytest/iteration46.xml` (69 passed)
+- [ ] Manuali: Save to GitHub + verifica run; ruleset `main` (block force push + restrict deletions); password Owner prod; MFA liviadm15/alessioodt; env prod pulito; commit yarn.lock

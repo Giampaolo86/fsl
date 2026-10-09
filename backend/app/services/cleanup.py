@@ -19,8 +19,8 @@ async def disable_test_accounts_in_production() -> list[str]:
     from ..models.base import utcnow
 
     out = []
-    async for u in db.users.find({"deleted_at": None}, {"email": 1, "status": 1}):
-        if is_test_account(u["email"]) and u.get("status") == "active":
+    async for u in db.users.find({"deleted_at": None}, {"email": 1, "status": 1, "is_owner": 1}):
+        if is_test_account(u["email"]) and u.get("status") == "active" and not u.get("is_owner"):
             await db.users.update_one({"_id": u["_id"]}, {"$set": {"status": "disabled", "disabled_reason": "test_account_in_production", "updated_at": utcnow()}})
             await db.sessions.update_many({"user_id": str(u["_id"]), "revoked_at": None}, {"$set": {"revoked_at": utcnow(), "revoke_reason": "test_account_in_production"}})
             out.append(u["email"])
@@ -42,6 +42,9 @@ async def delete_tournament(tournament_id: str) -> dict:
 
 
 async def delete_user(user_id: str) -> dict:
+    from .owner import assert_not_owner_id
+
+    await assert_not_owner_id(user_id, "delete")
     removed = {}
     for name in ("sessions", "tournament_memberships", "mfa_devices", "push_subscriptions", "notifications", "password_reset_tokens", "password_resets", "login_attempts"):
         r = await db[name].delete_many({"$or": [{"user_id": user_id}, {"user_id": ObjectId(user_id)}]})
@@ -73,8 +76,8 @@ async def purge_test_data(keep_slugs: list[str], keep_emails: list[str]) -> dict
         await delete_tournament(str(t["_id"]))
         out["tournaments"].append(t["slug"])
     pat = re.compile("|".join(TEST_USER_PATTERNS), re.I)
-    async for u in db.users.find({}, {"email": 1}):
-        if u["email"] not in keep_emails and pat.search(u["email"]):
+    async for u in db.users.find({}, {"email": 1, "is_owner": 1}):
+        if u["email"] not in keep_emails and pat.search(u["email"]) and not u.get("is_owner"):
             await delete_user(str(u["_id"]))
             out["users"].append(u["email"])
     async for a in db.access_requests.find({}, {"email": 1, "club_id": 1, "club_name": 1}):

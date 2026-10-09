@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..core.db import db
 from ..core.deps import WRITE_ROLES, CurrentUser, get_current_user, require_recent_auth, require_tournament
@@ -119,7 +119,7 @@ async def restore_backup(backup_id: str, user: CurrentUser = Depends(get_current
 
 
 class PurgeIn(BaseModel):
-    keep_slugs: list[str]
+    keep_slugs: list[str] = Field(min_length=1)
     keep_emails: list[str] = []
 
 
@@ -130,8 +130,6 @@ async def _purge_guard(user: CurrentUser, body: PurgeIn, request) -> None:
     if backups.db_is_production_like():
         await record_event("purge_blocked", request, user_id=user.id, email=user.email, severity="high", detail={"env": __import__("os").environ.get("APP_ENV"), "db": __import__("os").environ.get("DB_NAME")})
         raise ApiError(403, "PURGE_BLOCKED_IN_PRODUCTION", "La pulizia massiva dei dati di test è disabilitata in produzione: elimina i singoli tornei dalla card (con backup) oppure usa un ambiente di anteprima")
-    if not body.keep_slugs:
-        raise forbidden("Indica almeno un torneo da conservare")
 
 
 @router.post("/purge-test-data/preview")

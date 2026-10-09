@@ -93,7 +93,7 @@ jobs:
         run: python scripts/qa_admin.py create
       - name: Security tests
         working-directory: backend
-        run: python -m pytest tests/test_security_phase2.py -q -n 0 -p no:cacheprovider
+        run: python -m pytest tests/test_security_phase2.py tests/test_owner_hierarchy.py -q -n 0 -p no:cacheprovider
       - name: API log on failure
         if: failure()
         run: tail -n 200 /tmp/api.log
