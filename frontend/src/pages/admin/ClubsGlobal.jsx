@@ -4,6 +4,7 @@ import { CheckCircle2, ExternalLink, ListChecks, Pencil, Shield, Trash2, Wand2 }
 import { toast } from "sonner";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { OrgGroupsInbox } from "@/components/fsl/OrgGroupsInbox";
+import { OrgRegistry } from "@/components/fsl/OrgRegistry";
 import { KpiTile, PageHeader } from "@/components/fsl/Primitives";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { api, apiError } from "@/lib/api";
@@ -54,8 +55,10 @@ export default function ClubsGlobal() {
   const first = rows.find((c) => c.missing.length) || todo[0];
   return (
     <div className="space-y-6" data-testid="clubs-global">
-      <PageHeader kicker="Tutti i tornei · Società" title="Società" subtitle="Tutte le società di tutti i tornei: stato della homepage pubblica e checklist pre-torneo (rosa, foto, documenti, convocazioni, saldo, spunte del Responsabile). Sistema in sequenza quelle incomplete: ogni modifica dell'admin è pubblicata subito." actions={first && <button className="btn-gold" onClick={() => navigate(`/admin/t/${first.tournament_id}/societa/${first.id}?seq=1`)} data-testid="clubs-global-fix-sequence"><Wand2 className="h-4 w-4" /> Sistema in sequenza ({todo.length})</button>} />
+      <PageHeader kicker="Tutti i tornei · Società" title="Società" subtitle="Anagrafe unica delle società FSL (una società, un responsabile, un profilo per tutti i tornei) e, sotto, lo stato per torneo: homepage pubblica e checklist pre-torneo (rosa, foto, documenti, convocazioni, saldo, spunte del Responsabile). Sistema in sequenza quelle incomplete: ogni modifica dell'admin è pubblicata subito." actions={first && <button className="btn-gold" onClick={() => navigate(`/admin/t/${first.tournament_id}/societa/${first.id}?seq=1`)} data-testid="clubs-global-fix-sequence"><Wand2 className="h-4 w-4" /> Sistema in sequenza ({todo.length})</button>} />
+      <OrgRegistry onChanged={load} />
       <OrgGroupsInbox onChanged={load} />
+      <h2 className="fsl-section-title pt-2">Checklist per torneo</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiTile icon={Shield} value={items.length} label="Società" testId="clubs-global-kpi-total" />
         <KpiTile icon={CheckCircle2} value={items.length - todo.length} label="Homepage complete" gold testId="clubs-global-kpi-complete" />

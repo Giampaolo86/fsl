@@ -140,6 +140,7 @@ function AppRoutes() {
                 <Route path="/admin/tornei/nuovo" element={<NewTournament />} />
                 <Route path="/admin/utenti" element={<UsersPage />} />
                 <Route path="/admin/societa" element={<ClubsGlobal />} />
+                <Route path="/admin/societa/:orgKey" element={<ClubHomeEditor adminMode orgMode />} />
                 <Route path="/admin/traffico" element={<Traffic />} />
                 <Route path="/admin/sicurezza" element={<Security />} />
               </Route>

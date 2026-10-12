@@ -10,6 +10,7 @@ from ..core.errors import bad_request, conflict, forbidden, not_found
 from ..models.domain import ErrorReport
 from ..repositories.registry import Repository, scoped, tournaments, users
 from ..services import audit
+from ..services import org_clubs as org_clubs_svc
 from ..services.readiness import MANUAL, club_readiness, toggle_manual
 
 router = APIRouter(tags=["fans"])
@@ -222,7 +223,6 @@ async def _fan_notify(t_id: str, uid: str, kind: str, title: str, body: str, lin
 
 async def notify_result(t_id: str, m):
     """Risultato ufficiale (o rettificato): genitori dei convocati/rosa delle due squadre e fan che seguono squadre o giocatori."""
-    from bson import ObjectId
 
     t = await tournaments.get(t_id)
     tids = [m.home_team_id, m.away_team_id]
@@ -536,7 +536,10 @@ async def put_profile(tournament_id: str, club_id: str, body: dict, user: Curren
     if role == "club_manager":
         if user.club_in(tournament_id) != c.id:
             raise forbidden("Puoi modificare solo la homepage della tua società")
-        c2 = await repo.update(c.id, {"profile_draft": {**(c.profile_draft or {}), **data}, "approval_status": "pending_review", "review_note": ""}, user.id)
+        draft = {**(c.profile_draft or {}), **data}
+        c2 = await repo.update(c.id, {"profile_draft": draft, "approval_status": "pending_review", "review_note": ""}, user.id)
+        await org_clubs_svc.ensure_for_club(c, user.id)
+        await org_clubs_svc.set_draft(org_clubs_svc.key_of(c), draft, "pending_review", "")  # profilo unico: la bozza vale per tutti i tornei
         await audit.record(user, "club.profile_draft", "club", c.id, tournament_id, after={"fields": list(data)})
         return {"approval_status": c2.approval_status, "draft": c2.profile_draft}
     patch = _apply(c, data)
@@ -544,6 +547,7 @@ async def put_profile(tournament_id: str, club_id: str, body: dict, user: Curren
         if isinstance(body.get(k), str) and body[k].strip():
             patch[k] = body[k].strip()
     c2 = await repo.update(c.id, patch, user.id)
+    await org_clubs_svc.sync_from_club(c2, user.id)
     await audit.record(user, "club.profile_update", "club", c.id, tournament_id, after={"fields": list(data)})
     return {"approval_status": c2.approval_status, "profile": c2.profile}
 
@@ -558,13 +562,16 @@ async def review_profile(tournament_id: str, club_id: str, body: dict, user: Cur
     if not c or not c.profile_draft:
         raise not_found("Nessuna modifica da approvare")
     if body.get("action") == "approve":
-        await repo.update(c.id, {**_apply(c, c.profile_draft), "profile_draft": None, "approval_status": "approved", "review_note": ""}, user.id)
+        c2 = await repo.update(c.id, {**_apply(c, c.profile_draft), "profile_draft": None, "approval_status": "approved", "review_note": ""}, user.id)
+        await org_clubs_svc.sync_from_club(c2, user.id)
+        await org_clubs_svc.set_draft(org_clubs_svc.key_of(c2), None, "approved", "")
         await notify(tournament_id, c.id, "profile", "Homepage società approvata", "Le modifiche sono ora visibili nel portale pubblico.", "/societa/profilo", None)
     else:
         note = (body.get("note") or "").strip()
         if not note:
             raise bad_request("Indica il motivo")
         await repo.update(c.id, {"approval_status": "rejected", "review_note": note}, user.id)
+        await org_clubs_svc.set_draft(org_clubs_svc.key_of(c), c.profile_draft, "rejected", note)
         await notify(tournament_id, c.id, "profile", "Modifiche homepage respinte", note, "/societa/profilo", None)
     await audit.record(user, f"club.profile_{body.get('action')}", "club", c.id, tournament_id, reason=body.get("note"))
     return {"ok": True}

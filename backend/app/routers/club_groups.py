@@ -319,3 +319,48 @@ async def pending_count(tournament_id: str, user: CurrentUser = Depends(get_curr
     groups = await scoped("teams", tournament_id).count({"status": "pending"})
     rosters = await scoped("roster_imports", tournament_id).count({"status": "submitted"})
     return {"groups": groups, "rosters": rosters, "count": groups + rosters}
+
+
+# ---------- profilo unico della società (Area Società) ----------
+@router.get("/me/club/profile")
+async def my_club_profile(user: CurrentUser = Depends(get_current_user)):
+    from ..services import org_clubs as svc
+    from .org_clubs import _profile_view
+
+    if user.role != "club_manager":
+        raise forbidden("Area riservata al Responsabile Società")
+    org = await _org_for(user)
+    if not org:
+        raise not_found("Società")
+    oc = await svc.get(org["org_key"])
+    if not oc:
+        for m in user.memberships:
+            if m["role"] == "club_manager" and m.get("club_id"):
+                c = await scoped("clubs", m["tournament_id"]).get(m["club_id"])
+                if c:
+                    oc = await svc.ensure_for_club(c, user.id)
+                    break
+    if not oc:
+        raise not_found("Società")
+    if not oc.manager_user_id:
+        await org_clubs.update(oc.id, {"manager_user_id": user.id}, user.id)
+    return await _profile_view(oc, await svc.tournament_clubs(oc.org_key))
+
+
+@router.put("/me/club/profile")
+async def put_my_club_profile(body: dict, user: CurrentUser = Depends(get_current_user)):
+    from ..services import org_clubs as svc
+    from .fans import PROFILE_KEYS
+
+    if user.role != "club_manager":
+        raise forbidden("Area riservata al Responsabile Società")
+    org = await _org_for(user)
+    oc = await svc.get(org["org_key"]) if org else None
+    if not oc:
+        raise not_found("Società")
+    data = {k: v for k, v in body.items() if k in PROFILE_KEYS}
+    draft = {**(oc.profile_draft or {}), **data}
+    await svc.set_draft(oc.org_key, draft, "pending_review", "")
+    await staff_notify.notify_global("profile", f"Homepage da approvare: {oc.name}", "Il responsabile ha aggiornato il profilo unico della società.", "/admin/societa", f"orgprofile:{oc.org_key}")
+    await audit.record(user, "org_club.profile_draft", "org_club", oc.id, None, after={"fields": list(data)})
+    return {"approval_status": "pending_review", "draft": draft}

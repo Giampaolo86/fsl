@@ -37,7 +37,7 @@ export default function PublicTeam() {
       <div className="mx-auto max-w-[1488px] px-6 mt-10 grid lg:grid-cols-[1fr_1.2fr] gap-10">
         <section data-testid="public-team-roster">
           <SectionHead icon={Users} title="La rosa" count={roster.length} />
-          {roster.length === 0 ? <p className="text-sm text-fsl-slate">La rosa sarà pubblicata appena confermata dall'organizzazione.</p> : (
+          {roster.length === 0 ? <p className="text-sm text-fsl-slate" data-testid="public-team-roster-empty">{d.roster_pending_review ? "Rosa inviata dalla società: in verifica da parte dell'organizzazione." : "La società non ha ancora caricato la rosa di questo gruppo."}</p> : (
             <div className="grid sm:grid-cols-2 gap-2">
               {roster.map((p) => (
                 <Link key={p.id} to={`/tornei/${slug}/giocatori/${p.id}`} className="fsl-card p-3 flex items-center gap-3 hover:border-fsl-gold/60 transition-colors" data-testid={`public-team-player-${p.id}`}>

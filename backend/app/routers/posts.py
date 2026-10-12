@@ -246,9 +246,22 @@ async def _ensure_upload_indexes():
     await db.upload_chunks.create_index([("upload_id", 1), ("index", 1)], unique=True, name="uniq_upload_chunk")
 
 
+ORG_SCOPE = "org"  # caricamenti del profilo unico società (nessun torneo): responsabili società e organizzazione
+
+
+async def _upload_scope(tournament_id: str, user: CurrentUser):
+    if tournament_id == ORG_SCOPE:
+        if not (user.is_super_admin or user.role in ("club_manager", "director")):
+            raise forbidden()
+        return None, ORG_SCOPE
+    return await require_tournament(tournament_id, user, roles=EDITORS, writable=True)
+
+
 @router.post("/media/uploads", status_code=201)
 async def upload_init(tournament_id: str, body: UploadInit, user: CurrentUser = Depends(get_current_user)):
-    await require_tournament(tournament_id, user, roles=EDITORS, writable=True)
+    await _upload_scope(tournament_id, user)
+    if tournament_id == ORG_SCOPE and not body.content_type.startswith("image/"):
+        raise bad_request("Per il profilo società sono ammesse solo immagini")
     if not (body.content_type.startswith("image/") or body.content_type.startswith("video/") or body.content_type == "application/pdf"):
         raise bad_request("Sono ammessi solo immagini, video e PDF")
     if body.size > MAX_BYTES:
@@ -275,7 +288,7 @@ async def _discard_upload(upload_id: str) -> None:
 
 @router.put("/media/uploads/{upload_id}/{index}")
 async def upload_chunk(tournament_id: str, upload_id: str, index: int, request: Request, user: CurrentUser = Depends(get_current_user)):
-    await require_tournament(tournament_id, user, roles=EDITORS, writable=True)
+    await _upload_scope(tournament_id, user)
     meta = await _meta(upload_id, tournament_id)
     if index != meta["next"]:
         raise conflict(f"Atteso il blocco {meta['next']}")
@@ -291,7 +304,7 @@ async def upload_chunk(tournament_id: str, upload_id: str, index: int, request: 
 
 @router.post("/media/uploads/{upload_id}/complete", status_code=201)
 async def upload_complete(tournament_id: str, upload_id: str, user: CurrentUser = Depends(get_current_user)):
-    t, role = await require_tournament(tournament_id, user, roles=EDITORS, writable=True)
+    t, role = await _upload_scope(tournament_id, user)
     meta = await _meta(upload_id, tournament_id)
     if meta["next"] < meta["total_chunks"]:
         raise conflict(f"Upload incompleto: {meta['next']}/{meta['total_chunks']} blocchi")

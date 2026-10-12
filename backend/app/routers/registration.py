@@ -14,6 +14,7 @@ from ..models.domain import AccessRequest, Club, ClubInvite, TournamentMembershi
 from ..repositories.base import Repository
 from ..repositories.registry import memberships, scoped, tournaments, users
 from ..services import audit
+from ..services import org_clubs as org_clubs_svc
 from ..services.tournaments import slugify
 from .auth import _start_session
 
@@ -45,7 +46,11 @@ async def create_invite(tournament_id: str, club_id: str, user: CurrentUser = De
         raise not_found("Società")
     for old in await invites.list({"club_id": club_id, "used_by": None}):
         await invites.update(old.id, {"expires_at": utcnow()}, user.id)
-    inv = await invites.insert(ClubInvite(tournament_id=tournament_id, club_id=club_id, code=_code(), expires_at=utcnow() + timedelta(days=30)), user.id)
+    club = await scoped("clubs", tournament_id).get(club_id)
+    if not club:
+        raise not_found("Società")
+    oc = await org_clubs_svc.ensure_for_club(club, user.id)
+    inv = await invites.insert(ClubInvite(tournament_id=tournament_id, club_id=club_id, org_key=oc.org_key, code=_code(), expires_at=utcnow() + timedelta(days=30)), user.id)
     await audit.record(user, "club.invite", "club", club_id, tournament_id, after={"code": inv.code})
     return inv.public()
 
@@ -64,9 +69,12 @@ async def check_invite(code: str):
     inv = await _valid_invite(code)
     if not inv:
         raise bad_request("Codice invito non valido o scaduto")
+    if not inv.tournament_id:  # invito FSL: la società si registra una volta sola, i tornei arrivano dopo
+        oc = await org_clubs_svc.get(inv.org_key)
+        return {"club": {"id": oc.org_key, "name": oc.name, "city": oc.city} if oc else None, "tournament": None, "fsl": True, "expires_at": inv.expires_at}
     club = await scoped("clubs", inv.tournament_id).get(inv.club_id)
     t = await tournaments.get(inv.tournament_id)
-    return {"club": {"id": club.id, "name": club.name, "city": club.city} if club else None, "tournament": {"id": t.id, "name": t.name, "slug": t.slug} if t else None, "expires_at": inv.expires_at}
+    return {"club": {"id": club.id, "name": club.name, "city": club.city} if club else None, "tournament": {"id": t.id, "name": t.name, "slug": t.slug} if t else None, "fsl": False, "expires_at": inv.expires_at}
 
 
 class RegisterClubIn(BaseModel):
@@ -93,10 +101,20 @@ async def register_club(body: RegisterClubIn, request: Request, response: Respon
     if await users.find_one({"email": email}):
         raise conflict("Esiste già un account con questa email: accedi e chiedi all'organizzazione di abbinarti alla società")
     u = await users.insert(User(email=email, password_hash=hash_password(body.password), full_name=body.full_name.strip(), role="club_manager"))
-    await memberships.insert(TournamentMembership(user_id=u.id, tournament_id=inv.tournament_id, role="club_manager", club_id=inv.club_id), u.id)
+    if inv.tournament_id:
+        await memberships.insert(TournamentMembership(user_id=u.id, tournament_id=inv.tournament_id, role="club_manager", club_id=inv.club_id), u.id)
+    key = inv.org_key
+    if not key and inv.club_id:
+        club = await scoped("clubs", inv.tournament_id).get(inv.club_id)
+        key = (await org_clubs_svc.ensure_for_club(club, u.id)).org_key if club else None
+    if key:  # il responsabile è della società FSL: entra in tutti i tornei dove la società è già iscritta
+        oc = await org_clubs_svc.get(key)
+        if oc and not oc.manager_user_id:
+            await org_clubs_svc.org_clubs.update(oc.id, {"manager_user_id": u.id, "email": email, "contact_name": body.full_name.strip()}, u.id)
+        await org_clubs_svc.manager_memberships(key, u.id, u.id)
     await invites.update(inv.id, {"used_by": u.id, "used_at": utcnow()}, u.id)
     current = await load_current_user(u.id)
-    await audit.record(current, "auth.register_club", "user", u.id, inv.tournament_id, ip=request.client.host if request.client else None, after={"club_id": inv.club_id})
+    await audit.record(current, "auth.register_club", "user", u.id, inv.tournament_id, ip=request.client.host if request.client else None, after={"club_id": inv.club_id, "org_key": key})
     return await _start_session(request, response, u, mfa_verified=False, via="register_club")
 
 

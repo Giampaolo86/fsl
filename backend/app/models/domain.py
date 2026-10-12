@@ -522,8 +522,9 @@ class AuditLog(BaseDocument):
 
 
 class ClubInvite(BaseDocument):
-    tournament_id: str
-    club_id: str
+    tournament_id: Optional[str] = None  # None = invito FSL (livello società, non legato a un torneo)
+    club_id: Optional[str] = None
+    org_key: Optional[str] = None
     code: str
     expires_at: datetime
     used_by: Optional[str] = None
@@ -554,6 +555,20 @@ class OrgClub(BaseDocument):
     email: str = ""
     phone: str = ""
     manager_user_id: Optional[str] = None
+    # profilo unico (sincronizzato su tutte le copie per torneo)
+    short_name: str = ""
+    motto: str = ""
+    description: str = ""
+    colors: Optional[dict] = None
+    crest_url: Optional[str] = None
+    crest_is_placeholder: bool = True
+    cover_url: Optional[str] = None
+    contacts: list[ClubContact] = []
+    founded_year: Optional[int] = None
+    profile: dict = {}
+    profile_draft: Optional[dict] = None
+    approval_status: Literal["approved", "pending_review", "rejected"] = "approved"
+    review_note: str = ""
 
 
 class OrgGroup(BaseDocument):

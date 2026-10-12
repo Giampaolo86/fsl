@@ -333,7 +333,8 @@ async def public_team(slug: str, team_id: str, request: Request):
     roster = [{"id": p.id, "name": p.public_name or f"{p.first_name} {p.last_name[:1]}.", "shirt_number": p.shirt_number, "role": p.role, "photo_url": p.photo_url if p.media_consent else None} for p in players]
     ms = await scoped("matches", t.id).list({"$or": [{"home_team_id": tm.id}, {"away_team_id": tm.id}]}, sort=[("kickoff_at", 1)], limit=200)
     matches = await _public_matches(t.id, ms)
-    return {"tournament": t.public(), "team": tm.public(), "club": {"id": club.id, "name": club.name, "slug": club.slug, "crest_url": club.crest_url, "colors": club.colors} if club else None, "competition": comp.public() if comp else None, "standing": standing, "roster": roster, "matches": matches}
+    imp = await scoped("roster_imports", t.id).find_one({"team_id": tm.id, "status": "submitted"})
+    return {"tournament": t.public(), "team": tm.public(), "club": {"id": club.id, "name": club.name, "slug": club.slug, "crest_url": club.crest_url, "colors": club.colors} if club else None, "competition": comp.public() if comp else None, "standing": standing, "roster": roster, "roster_pending_review": bool(imp), "matches": matches}
 
 
 @router.get("/tournaments/{slug}/players/{player_id}")

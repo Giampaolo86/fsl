@@ -30,32 +30,35 @@ function useNextIncomplete(enabled, cid) {
   return state;
 }
 
-export default function ClubHomeEditor({ adminMode = false }) {
+export default function ClubHomeEditor({ adminMode = false, orgMode = false }) {
   const { user } = useAuth();
   const params = useParams();
   const [search] = useSearchParams();
   const navigate = useNavigate();
-  const seq = adminMode && search.get("seq") === "1";
-  const membership = user.memberships?.find((m) => m.role === "club_manager");
-  const tid = adminMode ? params.tournamentId : membership?.tournament_id;
-  const cid = adminMode ? params.clubId : membership?.club_id;
+  const seq = adminMode && !orgMode && search.get("seq") === "1";
+  // Profilo unico: il responsabile e l'admin "FSL" lavorano sull'anagrafe (valida per tutti i tornei); l'admin nel torneo sulla copia del torneo (sincronizzata)
+  const unified = orgMode || !adminMode;
+  const profileUrl = orgMode ? `/org-clubs/${params.orgKey}/profile` : adminMode ? `/tournaments/${params.tournamentId}/clubs/${params.clubId}/profile` : "/me/club/profile";
+  const cid = adminMode && !orgMode ? params.clubId : (orgMode ? params.orgKey : "me");
   const { next, left, current } = useNextIncomplete(seq, cid);
   const [data, setData] = useState(null);
   const [f, setF] = useState(null);
   const [busy, setBusy] = useState(false);
   const [slug, setSlug] = useState(null);
-  const load = () => api.get(`/tournaments/${tid}/clubs/${cid}/profile`).then((r) => { setData(r.data); const c = r.data.club; setSlug(c.slug); setF({ name: c.name, short_name: c.short_name || "", city: c.city || "", motto: c.motto || "", description: c.description || "", colors: c.colors, crest_url: c.crest_url, cover_url: c.cover_url, founded_year: c.founded_year || "", phone: "", whatsapp: "", email: "", website: "", instagram: "", address: "", hours_office: "", hours_field: "", directions: "", services: [], manager: { name: "", role: "", phone: "", email: "", photo_url: null }, ...r.data.profile, ...(r.data.draft || {}) }); });
-  useEffect(() => { setF(null); if (tid && cid) load(); }, [tid, cid]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!tid || !cid) return <EmptyState title="Nessuna società assegnata" />;
+  const tid = unified ? data?.upload_tournament_id || "org" : params.tournamentId;
+  const load = () => api.get(profileUrl).then((r) => { setData(r.data); const c = r.data.club; setSlug(c.slug); setF({ name: c.name, short_name: c.short_name || "", city: c.city || "", motto: c.motto || "", description: c.description || "", colors: c.colors, crest_url: c.crest_url, cover_url: c.cover_url, founded_year: c.founded_year || "", phone: "", whatsapp: "", email: "", website: "", instagram: "", address: "", hours_office: "", hours_field: "", directions: "", services: [], manager: { name: "", role: "", phone: "", email: "", photo_url: null }, ...r.data.profile, ...(r.data.draft || {}) }); });
+  const [loadError, setLoadError] = useState(null);
+  useEffect(() => { setF(null); setLoadError(null); load().catch((e) => setLoadError(apiError(e))); }, [profileUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (loadError) return <EmptyState title="Nessuna società assegnata" description={loadError} />;
   if (!f) return <LoadingState />;
   const set = (k, v) => setF({ ...f, [k]: v });
   const up = async (file, k, sub) => { try { const m = await uploadMedia(tid, file); if (sub) set(k, { ...f[k], [sub]: m.url }); else set(k, m.url); toast.success("Immagine caricata"); } catch (e) { toast.error(apiError(e)); } };
-  const save = async (goNext = false) => { setBusy(true); try { const body = { ...f, founded_year: f.founded_year ? Number(f.founded_year) : null }; const r = await api.put(`/tournaments/${tid}/clubs/${cid}/profile`, body); toast.success(r.data.approval_status === "pending_review" ? "Modifiche inviate: saranno pubblicate dopo l'approvazione dell'admin" : "Homepage aggiornata"); if (goNext && next) navigate(editorPath(next)); else load(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); } };
+  const save = async (goNext = false) => { setBusy(true); try { const body = { ...f, founded_year: f.founded_year ? Number(f.founded_year) : null }; const r = await api.put(profileUrl, body); toast.success(r.data.approval_status === "pending_review" ? "Modifiche inviate: saranno pubblicate dopo l'approvazione dell'admin" : "Homepage aggiornata"); if (goNext && next) navigate(editorPath(next)); else load(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); } };
   const [sl, tone] = STATUS[data.approval_status] || STATUS.approved;
   const slugT = data.club.tournament_slug;
   return (
     <div className="space-y-6" data-testid="club-home-editor">
-      <PageHeader kicker={adminMode ? "Control Room · Società" : "Area Società"} title={adminMode ? data.club.name : "La mia homepage"} subtitle={adminMode ? "Modifica direttamente identità, immagini, contatti e sede della società: le modifiche dell'admin sono pubblicate subito, senza approvazione." : "Racconta la tua società a genitori e tifosi: stemma, colori, sede, contatti, responsabile. Le modifiche vanno in approvazione all'admin prima di essere pubbliche."} actions={<>{adminMode && <Link to={seq ? "/admin/societa" : `/admin/t/${tid}/societa`} className="btn-ghost" data-testid="club-home-back"><ArrowLeft className="h-4 w-4" /> {seq ? "Tutte le società" : "Società"}</Link>}{slug && slugT && <Link to={`/tornei/${slugT}/squadre/${slug}`} className="btn-ghost" target="_blank" data-testid="club-home-preview"><Eye className="h-4 w-4" /> Vedi pagina pubblica</Link>}<button className="btn-gold" disabled={busy} onClick={() => save(false)} data-testid="club-home-save"><Save className="h-4 w-4" /> {adminMode ? "Salva e pubblica" : "Salva e invia"}</button>{seq && next && <button className="btn-primary" disabled={busy} onClick={() => save(true)} data-testid="club-home-save-next"><ArrowRight className="h-4 w-4" /> Salva e prossima</button>}</>} />
+      <PageHeader kicker={adminMode ? "Control Room · Società" : "Area Società"} title={adminMode ? data.club.name : "La mia homepage"} subtitle={adminMode ? (orgMode ? "Profilo unico della società FSL: ogni modifica è pubblicata subito in tutti i tornei a cui partecipa." : "Modifica direttamente identità, immagini, contatti e sede della società: le modifiche dell'admin sono pubblicate subito, senza approvazione, e valgono in tutti i tornei della società.") : "Racconta la tua società a genitori e tifosi: stemma, colori, sede, contatti, responsabile. Il profilo è unico per tutti i tornei; le modifiche vanno in approvazione all'organizzazione prima di essere pubbliche."} actions={<>{adminMode && <Link to={seq || orgMode ? "/admin/societa" : `/admin/t/${tid}/societa`} className="btn-ghost" data-testid="club-home-back"><ArrowLeft className="h-4 w-4" /> {seq || orgMode ? "Tutte le società" : "Società"}</Link>}{slug && slugT && <Link to={`/tornei/${slugT}/squadre/${slug}`} className="btn-ghost" target="_blank" data-testid="club-home-preview"><Eye className="h-4 w-4" /> Vedi pagina pubblica</Link>}<button className="btn-gold" disabled={busy} onClick={() => save(false)} data-testid="club-home-save"><Save className="h-4 w-4" /> {adminMode ? "Salva e pubblica" : "Salva e invia"}</button>{seq && next && <button className="btn-primary" disabled={busy} onClick={() => save(true)} data-testid="club-home-save-next"><ArrowRight className="h-4 w-4" /> Salva e prossima</button>}</>} />
       {seq && current && (
         <div className="fsl-card p-3 flex flex-wrap items-center gap-2 text-xs" data-testid="club-home-sequence">
           <span className="font-display uppercase text-fsl-gold">Da sistemare in questa società:</span>
@@ -95,7 +98,7 @@ export default function ClubHomeEditor({ adminMode = false }) {
           <div><div className="fsl-label mb-1">Servizi della sede</div><div className="flex flex-wrap gap-1.5">{SERVICES.map((s) => { const on = (f.services || []).includes(s); return <button key={s} type="button" onClick={() => set("services", on ? f.services.filter((x) => x !== s) : [...(f.services || []), s])} className={`h-8 px-3 rounded-full text-xs border ${on ? "bg-fsl-gold text-ink-950 border-fsl-gold" : "border-white/20 text-fsl-slate"}`} aria-pressed={on}>{s}</button>; })}</div></div>
         </section>
       </div>
-      {!adminMode && <ClubRosterModule tid={tid} />}
+      {!adminMode && tid !== "org" && <ClubRosterModule tid={tid} />}
     </div>
   );
 }
