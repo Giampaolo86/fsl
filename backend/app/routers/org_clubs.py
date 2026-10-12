@@ -87,7 +87,7 @@ async def create_org_club(body: OrgClubIn, user: CurrentUser = Depends(get_curre
 @router.get("/{key}/invite")
 async def get_invite(key: str, user: CurrentUser = Depends(get_current_user)):
     _staff(user)
-    inv = await invites.find_one({"org_key": key, "tournament_id": None}, sort=[("created_at", -1)])
+    inv = next(iter(await invites.list({"org_key": key, "tournament_id": None}, sort=[("created_at", -1)], limit=1)), None)
     valid = bool(inv and not inv.used_by and inv.expires_at.replace(tzinfo=None) > utcnow().replace(tzinfo=None))
     return {"invite": inv.public() if inv else None, "valid": valid}
 

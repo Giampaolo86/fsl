@@ -1,0 +1,34 @@
+{
+  "summary": "Verifica end-to-end feature Società FSL (anagrafe org_clubs + profilo unico): backend 23/23 test passati (nuovo file test_iteration48_org_clubs.py) e flussi UI critici (super admin: anagrafe → nuova società → invito FSL → iscrizione torneo → editor profilo admin; responsabile: /societa/profilo con subtitle, bozza pending → approvazione super admin; pagina pubblica: team empty roster). Trovato e corretto bug backend 500 su GET /api/org-clubs/{key}/invite (TypeError sort kwarg).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration48_org_clubs.py",
+    "/app/test_reports/pytest/iteration48.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Repository.find_one in /app/backend/app/repositories/base.py NON accetta kwarg 'sort': altri call-site che lo usano potrebbero avere lo stesso bug latente — verificare con grep 'find_one.*sort=' e rimpiazzare con list(..., limit=1).",
+    "/api/org-clubs/{key}/invite (GET) usava find_one con sort e tornava 500 in produzione a ogni apertura del dialog 'Invito FSL' nell'Anagrafe Società: regressione da hot-fix.",
+    "/app/backend/app/routers/org_clubs.py: nella risposta registry non c'è paginazione (limit=200 hard-coded su tournaments) — accettabile ora, ma se la lista cresce >200 andrà introdotto paging/search server-side.",
+    "InviteDialog (OrgRegistry.jsx) non mostra toast di errore in caso di 500 su load (solo toast.error con apiError), ma blocca definitivamente il flusso. Suggerita retry-UX e messaggio nel LoadingState se load fallisce."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration48_org_clubs.py",
+    "/app/backend/app/routers/org_clubs.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "QA super admin (TOTP) e societa.prova letti da /app/backend/.env come da memory/test_credentials.md.",
+  "seed_data_creation": "Creata e poi eliminata società 'QA Test FSL <RUN>' + utente responsabile 'qa.mgr.<run>@fsl.demo' + relativi clubs/teams/org_groups/club_invites/tournament_memberships. Motto originale 'Sempre avanti.' di Sporting Eur ripristinato.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Hot-fix applicato in /app/backend/app/routers/org_clubs.py line 90: 'invites.find_one(..., sort=...)' sostituito con next(iter(await invites.list(..., limit=1)), None). Verificare se altri endpoint usano Repository.find_one con kwarg 'sort' (non supportato dalla classe).",
+  "rca of the issue": "Bug: GET /api/org-clubs/{key}/invite ritornava 500 TypeError. RCA: Repository.find_one(filter) non accetta kwarg 'sort' (vedi /app/backend/app/repositories/base.py line 43); solo Repository.list supporta sort. L'InviteDialog chiama GET in useEffect per sapere se esiste già un invito valido: finché il fetch non ritorna, il bottone 'Genera codice FSL' non viene renderizzato, bloccando totalmente il flusso di invito FSL dalla UI (il backend POST invece funzionava e il flusso end-to-end backend non lo copriva perché il test del main agent chiamava direttamente POST). Fix: sostituito con list(..., limit=1). Verificato: curl ora torna 401 (auth) invece di 500 e UI del dialog funziona correttamente generando il codice FSL-XXXX-XXXX."
+}

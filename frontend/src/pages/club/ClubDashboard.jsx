@@ -34,7 +34,7 @@ function OrgOnlyDashboard() {
           <div className="min-w-0 flex-1">
             <div className="fsl-kicker">Area Società</div>
             <h1 className="text-4xl sm:text-5xl font-extrabold leading-[0.92]" data-testid="club-dashboard-name">{org?.name || user.full_name}</h1>
-            <p className="text-sm text-fsl-slate mt-2 max-w-2xl">Benvenuto! La tua società non è ancora iscritta a un torneo: aggiungi i gruppi (categoria e anno) che vuoi portare in campo e l'organizzazione li inviterà al torneo giusto. Nel frattempo puoi seguire i tornei dal <Link to="/" className="text-fsl-gold hover:underline">portale pubblico</Link>.</p>
+            <p className="text-sm text-fsl-slate mt-2 max-w-2xl">Benvenuto! La tua società non è ancora iscritta a un torneo: aggiungi i gruppi (categoria e anno) che vuoi portare in campo e l'organizzazione li inviterà al torneo giusto. Nel frattempo puoi <Link to="/societa/profilo" className="text-fsl-gold hover:underline" data-testid="club-org-profile-link">completare il profilo della società</Link> (stemma, colori, contatti: vale per tutti i tornei) e seguire i tornei dal <Link to="/" className="text-fsl-gold hover:underline">portale pubblico</Link>.</p>
           </div>
         </div>
       </section>
