@@ -9,7 +9,8 @@ import { fmtDate } from "@/lib/format";
 function InviteDialog({ groups, tournaments, onClose, onDone }) {
   const g = groups[0];
   const many = groups.length > 1;
-  const [tid, setTid] = useState(tournaments[0]?.id || "");
+  const requested = !many && g.requested_tournament_id && tournaments.some((t) => t.id === g.requested_tournament_id) ? g.requested_tournament_id : "";
+  const [tid, setTid] = useState(requested || tournaments[0]?.id || "");
   const [comps, setComps] = useState([]);
   const [compId, setCompId] = useState("");
   const [note, setNote] = useState("");
@@ -28,7 +29,7 @@ function InviteDialog({ groups, tournaments, onClose, onDone }) {
       <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl max-w-lg" aria-describedby={undefined} data-testid="invite-group-dialog">
         <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Invita al torneo</DialogTitle></DialogHeader>
         {many ? <div className="text-sm text-fsl-slate" data-testid="invite-group-list"><strong className="text-fsl-white">{groups.length} gruppi</strong>: {groups.map((x) => `${x.club_name} ${x.category}`).join(", ")}. Per ognuno creo la società nel torneo (se manca), l'accesso del responsabile e la squadra.</div>
-          : <p className="text-sm text-fsl-slate"><strong className="text-fsl-white">{g.club_name}</strong> · {g.name || g.category}{g.birth_year ? ` · anno ${g.birth_year}` : ""}{g.level ? ` · ${g.level}` : ""}. Creo la società nel torneo (se manca), l'accesso del responsabile e la squadra; la società potrà subito caricare la rosa.</p>}
+          : <p className="text-sm text-fsl-slate"><strong className="text-fsl-white">{g.club_name}</strong> · {g.name || g.category}{g.birth_year ? ` · anno ${g.birth_year}` : ""}{g.level ? ` · ${g.level}` : ""}. Creo la società nel torneo (se manca), l'accesso del responsabile e la squadra; la società potrà subito caricare la rosa.{g.requested_tournament_name && <span className="block mt-1 text-fsl-gold" data-testid="invite-group-requested">La società ha chiesto l'invito a <strong>{g.requested_tournament_name}</strong>{g.request_note ? ` · «${g.request_note}»` : ""}.</span>}{g.roster && <span className="block mt-1 text-fsl-success" data-testid="invite-group-roster">Rosa già caricata ({g.roster.rows} giocatori): all'invito arriva in Rose da confermare.</span>}</p>}
         <label className="block"><span className="fsl-label">Torneo *</span><select className="fsl-input mt-1" value={tid} onChange={(e) => setTid(e.target.value)} data-testid="invite-group-tournament">{tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
         <label className="block"><span className="fsl-label">Girone (facoltativo)</span><select className="fsl-input mt-1" value={compId} onChange={(e) => setCompId(e.target.value)} data-testid="invite-group-competition"><option value="">Assegno dopo da Gironi e Calendario</option>{comps.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
         <label className="block"><span className="fsl-label">Messaggio alla società</span><input className="fsl-input mt-1" placeholder="es. Benvenuti! Caricate la rosa entro il 20 ottobre" value={note} onChange={(e) => setNote(e.target.value)} data-testid="invite-group-note" /></label>
@@ -63,6 +64,8 @@ export function OrgGroupsInbox({ onChanged }) {
               <input type="checkbox" aria-label="Seleziona" checked={sel.includes(g.id)} onChange={(e) => setSel(e.target.checked ? [...sel, g.id] : sel.filter((x) => x !== g.id))} data-testid={`org-group-select-${g.id}`} />
               <span className="font-display font-extrabold text-xl num text-fsl-gold">{g.category}</span>
               <span className="flex-1 min-w-0 truncate"><span className="font-semibold">{g.club_name}</span> · {g.name}{g.birth_year ? ` · anno ${g.birth_year}` : ""}{g.level ? ` · ${g.level}` : ""}{g.description ? <span className="text-fsl-slate"> · {g.description}</span> : null}</span>
+              {g.requested_tournament_name && <span className="h-6 px-2 rounded-full bg-fsl-gold/15 text-fsl-gold border border-fsl-gold/40 text-[10px] font-bold uppercase inline-flex items-center" data-testid={`org-group-requested-${g.id}`}>Chiede: {g.requested_tournament_name}</span>}
+              {g.roster && <span className="h-6 px-2 rounded bg-fsl-success/15 text-fsl-success text-[10px] font-bold uppercase inline-flex items-center" data-testid={`org-group-roster-${g.id}`}>Rosa · {g.roster.rows}</span>}
               <span className="text-xs text-fsl-slate num inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {fmtDate(g.created_at)}</span>
               <button className="btn-ghost h-9 text-fsl-danger" onClick={() => reject(g)} data-testid={`org-group-reject-${g.id}`}><XCircle className="h-4 w-4" /></button>
               <button className="btn-gold h-9" onClick={() => setInviting([g])} disabled={active.length === 0} data-testid={`org-group-invite-${g.id}`}><Send className="h-4 w-4" /> Invita al torneo</button>

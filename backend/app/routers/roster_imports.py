@@ -40,6 +40,35 @@ def _birth(v):
     return s, None
 
 
+def _validate_row(n: int, first, last, role, num, born, numbers: dict) -> dict:
+    """Stessa validazione per modulo Excel e lettura da foto/PDF."""
+    year_now = date.today().year
+    errors = []
+    first, last = _txt(first).title(), _txt(last).title()
+    if not first or not last:
+        errors.append("Nome o cognome mancante")
+    role_n = ROLES.get(_txt(role).lower(), "")
+    if not role_n:
+        errors.append("Ruolo non riconosciuto")
+    shirt = None
+    try:
+        shirt = int(float(num)) if _txt(num) else None
+        if shirt is not None and not 1 <= shirt <= 99:
+            errors.append("Numero maglia fuori range (1-99)")
+    except ValueError:
+        errors.append("Numero maglia non numerico")
+    if shirt is not None:
+        if shirt in numbers:
+            errors.append(f"Numero {shirt} duplicato con riga {numbers[shirt]}")
+        numbers[shirt] = n
+    birth_date, birth_year = _birth(born)
+    if born not in (None, "") and birth_year is None:
+        errors.append("Data di nascita non valida (gg/mm/aaaa)")
+    if birth_year and not (year_now - 20 <= birth_year <= year_now - 4):
+        errors.append("Anno di nascita non plausibile")
+    return {"n": n, "first_name": first, "last_name": last, "role": role_n or _txt(role), "shirt_number": shirt, "birth_date": birth_date, "birth_year": birth_year, "errors": errors}
+
+
 def parse_workbook(data: bytes) -> dict:
     import openpyxl
 
@@ -49,35 +78,12 @@ def parse_workbook(data: bytes) -> dict:
         raise bad_request("File non valido: usa il modulo Excel (.xlsx) scaricato dalla piattaforma")
     ws = wb.active
     head = {"team_name": _txt(ws["B5"].value), "coach": _txt(ws["B6"].value), "contact": _txt(ws["B7"].value), "phone": _txt(ws["E7"].value)}
-    rows, numbers, year_now = [], {}, date.today().year
+    rows, numbers = [], {}
     for r in range(FIRST_ROW, ws.max_row + 1):
         first, last, role, num, born = (ws.cell(r, c).value for c in range(2, 7))
         if not any(_txt(x) for x in (first, last, role, num, born)):
             continue
-        errors = []
-        first, last = _txt(first).title(), _txt(last).title()
-        if not first or not last:
-            errors.append("Nome o cognome mancante")
-        role_n = ROLES.get(_txt(role).lower(), "")
-        if not role_n:
-            errors.append("Ruolo non riconosciuto")
-        shirt = None
-        try:
-            shirt = int(float(num)) if _txt(num) else None
-            if shirt is not None and not 1 <= shirt <= 99:
-                errors.append("Numero maglia fuori range (1-99)")
-        except ValueError:
-            errors.append("Numero maglia non numerico")
-        if shirt is not None:
-            if shirt in numbers:
-                errors.append(f"Numero {shirt} duplicato con riga {numbers[shirt]}")
-            numbers[shirt] = r - FIRST_ROW + 1
-        birth_date, birth_year = _birth(born)
-        if born not in (None, "") and birth_year is None:
-            errors.append("Data di nascita non valida (gg/mm/aaaa)")
-        if birth_year and not (year_now - 20 <= birth_year <= year_now - 4):
-            errors.append("Anno di nascita non plausibile")
-        rows.append({"n": r - FIRST_ROW + 1, "first_name": first, "last_name": last, "role": role_n or _txt(role), "shirt_number": shirt, "birth_date": birth_date, "birth_year": birth_year, "errors": errors})
+        rows.append(_validate_row(r - FIRST_ROW + 1, first, last, role, num, born, numbers))
     return {**head, "rows": rows}
 
 
@@ -144,6 +150,88 @@ async def submit(tournament_id: str, team_id: str = Form(...), file: UploadFile 
         club = await scoped("clubs", tournament_id).get(tm.club_id)
         pend = " · gruppo da confermare" if tm.status == "pending" else ""
         await staff_notify.notify_staff(tournament_id, "roster", f"Rosa caricata: {club.name if club else ''} · {tm.category}", f"{tm.name} · {len(parsed['rows'])} giocatori{pend} · {t.name}. Rivedi e conferma da Rose.", f"/admin/t/{tournament_id}/rose", f"roster:{imp.id}")
+    return (await _out(tournament_id, [imp]))[0]
+
+VISION_PROMPT = """Sei l'assistente della segreteria di un torneo di calcio giovanile. Nell'immagine c'è una lista di giocatori (modulo cartaceo, screenshot di chat, foglio scritto a mano o stampato).
+Estrai TUTTI i giocatori e rispondi SOLO con JSON valido, senza testo attorno, nel formato:
+{"team_name": "", "coach": "", "contact": "", "phone": "", "players": [{"first_name": "", "last_name": "", "role": "", "shirt_number": null, "birth_date": ""}]}
+Regole: role tra Portiere/Difensore/Centrocampista/Esterno/Attaccante (deduci da abbreviazioni P, D, C, A, POR, DIF…; se assente lascia ""); shirt_number intero o null; birth_date in gg/mm/aaaa oppure solo anno "aaaa" oppure ""; se un nome è un'unica parola mettila in last_name. Non inventare dati assenti."""
+
+
+def _pdf_pages_to_png(data: bytes, max_pages: int = 3) -> list[bytes]:
+    import fitz
+
+    out = []
+    with fitz.open(stream=data, filetype="pdf") as doc:
+        for page in list(doc)[:max_pages]:
+            out.append(page.get_pixmap(dpi=130).tobytes("png"))
+    return out
+
+
+async def _extract_rows_from_images(images: list[bytes], session: str) -> dict:
+    import base64
+    import json
+    import re
+
+    from emergentintegrations.llm.chat import ImageContent, UserMessage
+
+    from .ai import _llm
+
+    chat = _llm("Rispondi esclusivamente con JSON valido.", session)
+    files = [ImageContent(image_base64=base64.b64encode(b).decode()) for b in images]
+    try:
+        raw = await chat.send_message(UserMessage(text=VISION_PROMPT, file_contents=files))
+    except Exception as e:  # noqa: BLE001
+        raise bad_request(f"Lettura automatica non disponibile: {e}")
+    m = re.search(r"\{.*\}", raw or "", re.S)
+    try:
+        data = json.loads(m.group(0)) if m else {}
+    except ValueError:
+        data = {}
+    players = data.get("players") if isinstance(data, dict) else None
+    if not players:
+        raise bad_request("Nessun giocatore riconosciuto nell'immagine: prova con una foto più nitida o inserisci i giocatori a mano")
+    numbers, rows = {}, []
+    for i, p in enumerate(players[:60], start=1):
+        if not isinstance(p, dict):
+            continue
+        rows.append(_validate_row(i, p.get("first_name"), p.get("last_name"), p.get("role"), p.get("shirt_number"), p.get("birth_date"), numbers))
+    return {"team_name": _txt(data.get("team_name")), "coach": _txt(data.get("coach")), "contact": _txt(data.get("contact")), "phone": _txt(data.get("phone")), "rows": rows}
+
+
+@router.post("/from-image", status_code=201)
+async def submit_from_image(tournament_id: str, team_id: str = Form(...), file: UploadFile = File(...), user: CurrentUser = Depends(get_current_user)):
+    """Staff: rosa ricevuta come foto, screenshot (es. WhatsApp) o PDF → lettura automatica → stessa revisione del modulo Excel."""
+    t, role = await require_tournament(tournament_id, user, roles=STAFF | {"club_manager"}, writable=True)
+    tm = await scoped("teams", tournament_id).get(team_id)
+    if not tm:
+        raise not_found("Squadra")
+    if role == "club_manager" and tm.club_id != user.club_in(tournament_id):
+        raise forbidden("Puoi caricare solo la rosa della tua società")
+    ct = (file.content_type or "").lower()
+    data = await file.read()
+    if len(data) > 12 * 1024 * 1024:
+        raise bad_request("File troppo grande (max 12 MB)")
+    if ct == "application/pdf" or (file.filename or "").lower().endswith(".pdf"):
+        images, ct = _pdf_pages_to_png(data), "application/pdf"
+    elif ct.startswith("image/"):
+        images = [data]
+    else:
+        raise bad_request("Carica una foto, uno screenshot o un PDF della rosa")
+    if not images:
+        raise bad_request("PDF vuoto")
+    repo = scoped("roster_imports", tournament_id)
+    if await repo.find_one({"team_id": team_id, "status": "submitted"}):
+        raise conflict("C'è già un modulo in attesa di conferma per questa squadra: confermalo o respingilo prima")
+    parsed = await _extract_rows_from_images(images, f"roster-vision:{tournament_id}:{team_id}")
+    m = await _store(tournament_id, data, ct, file.filename or "rosa", user.id, tm.club_id)
+    imp = await repo.insert(RosterImport(tournament_id=tournament_id, club_id=tm.club_id, team_id=team_id, media_id=m.id, file_url=f"/api/media/{m.id}", filename=file.filename or "rosa", submitted_by=user.id, **parsed), user.id)
+    await audit.record(user, "roster_import.submit_image", "roster_import", imp.id, tournament_id, after={"team_id": team_id, "rows": len(parsed["rows"]), "errors": sum(1 for r in parsed["rows"] if r["errors"])})
+    if role == "club_manager":
+        from ..services import staff_notify
+
+        club = await scoped("clubs", tournament_id).get(tm.club_id)
+        await staff_notify.notify_staff(tournament_id, "roster", f"Rosa da foto: {club.name if club else ''} · {tm.category}", f"{tm.name} · {len(parsed['rows'])} giocatori letti dall'immagine · {t.name}. Rivedi e conferma da Rose.", f"/admin/t/{tournament_id}/rose", f"roster:{imp.id}")
     return (await _out(tournament_id, [imp]))[0]
 
 

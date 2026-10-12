@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Upload, XCircle } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, Download, FileSpreadsheet, Upload, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ReasonDialog } from "@/components/fsl/ReasonDialog";
@@ -92,20 +92,21 @@ export function RosterImportAdmin({ tid, onImported }) {
   const reloadTeams = () => api.get(`/tournaments/${tid}/teams`).then((r) => setTeams(r.data)).catch(() => {});
   const confirmGroup = (t) => api.post(`/tournaments/${tid}/club-groups/${t.id}/confirm`, {}).then(() => { toast.success(`Gruppo «${t.name}» confermato: ora puoi assegnarlo a un girone`); reloadTeams(); load(); }).catch((e) => toast.error(apiError(e)));
   const rejectGroup = (t) => { const note = window.prompt(`Motivo del rifiuto per «${t.name}» (la società riceverà una notifica):`); if (note === null) return; api.post(`/tournaments/${tid}/club-groups/${t.id}/reject`, { note }).then(() => { toast.success("Gruppo rifiutato"); reloadTeams(); load(); }).catch((e) => toast.error(apiError(e))); };
-  const upload = async (file) => {
+  const upload = async (file, fromImage = false) => {
     if (!file || !teamId) return;
-    setBusy(true);
+    setBusy(fromImage ? "image" : "xlsx");
     const fd = new FormData(); fd.append("team_id", teamId); fd.append("file", file);
-    try { const r = await api.post(`/tournaments/${tid}/roster-imports`, fd, { headers: { "Content-Type": "multipart/form-data" } }); toast.success(`${r.data.rows.length} giocatori letti dal modulo: rivedi e carica la rosa`); load(); setReview(r.data); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
+    try { const r = await api.post(`/tournaments/${tid}/roster-imports${fromImage ? "/from-image" : ""}`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 120000 }); toast.success(`${r.data.rows.length} giocatori letti ${fromImage ? "dall'immagine" : "dal modulo"}: rivedi e carica la rosa`); load(); setReview(r.data); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
   };
   return (
     <section className="fsl-card p-4 mb-5 space-y-3" data-testid="roster-import-admin">
-      <div className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-fsl-gold" /><span className="font-display font-bold uppercase">Moduli rosa Excel</span>{pending.length > 0 && <span className="h-6 px-2 rounded-full bg-fsl-warning text-ink-950 text-[11px] font-bold num" data-testid="roster-import-pending-count">{pending.length} da confermare</span>}</div>
+      <div className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-fsl-gold" /><span className="font-display font-bold uppercase">Rose: modulo Excel, foto o inserimento manuale</span>{pending.length > 0 && <span className="h-6 px-2 rounded-full bg-fsl-warning text-ink-950 text-[11px] font-bold num" data-testid="roster-import-pending-count">{pending.length} da confermare</span>}</div>
       <div className="rounded-xl border border-fsl-gold/30 bg-ink-950/50 p-3 flex flex-wrap items-end gap-3" data-testid="roster-import-admin-upload">
         <div className="flex-1 min-w-[200px]"><div className="fsl-label mb-1">Carica un modulo per una società</div><select className="fsl-input" value={clubId} onChange={(e) => setClubId(e.target.value)} data-testid="roster-admin-club-select"><option value="">Scegli la società…</option>{clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
         <div className="flex-1 min-w-[200px]"><div className="fsl-label mb-1">Squadra · categoria</div><select className="fsl-input" value={teamId} disabled={!clubId} onChange={(e) => setTeamId(e.target.value)} data-testid="roster-admin-team-select">{clubTeams.length === 0 && <option value="">{clubId ? "Nessuna squadra iscritta" : "—"}</option>}{clubTeams.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.category}</option>)}</select></div>
         <button className="btn-ghost h-10" disabled={!teamId} onClick={() => downloadTemplate(tid, teamId).catch((e) => toast.error(apiError(e)))} data-testid="roster-admin-template-download"><Download className="h-4 w-4" /> Modulo Excel</button>
-        <label className={`btn-gold h-10 cursor-pointer ${busy || !teamId ? "opacity-60 pointer-events-none" : ""}`} data-testid="roster-admin-upload-label"><Upload className="h-4 w-4" /> {busy ? "Leggo il file…" : "Carica modulo compilato"}<input type="file" accept=".xlsx" className="hidden" onChange={(e) => { upload(e.target.files[0]); e.target.value = ""; }} data-testid="roster-admin-upload-input" /></label>
+        <label className={`btn-gold h-10 cursor-pointer ${busy || !teamId ? "opacity-60 pointer-events-none" : ""}`} data-testid="roster-admin-upload-label"><Upload className="h-4 w-4" /> {busy === "xlsx" ? "Leggo il file…" : "Carica modulo compilato"}<input type="file" accept=".xlsx" className="hidden" onChange={(e) => { upload(e.target.files[0]); e.target.value = ""; }} data-testid="roster-admin-upload-input" /></label>
+        <label className={`btn-primary h-10 cursor-pointer ${busy || !teamId ? "opacity-60 pointer-events-none" : ""}`} title="Foto, screenshot WhatsApp o PDF della lista: la leggiamo in automatico e la rivedi prima di caricarla" data-testid="roster-admin-image-label"><Camera className="h-4 w-4" /> {busy === "image" ? "Leggo l'immagine…" : "Da foto / WhatsApp / PDF"}<input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => { upload(e.target.files[0], true); e.target.value = ""; }} data-testid="roster-admin-image-input" /></label>
       </div>
       {pendingGroups.length > 0 && (
         <div className="rounded-xl border border-fsl-warning/40 bg-fsl-warning/5 p-3 space-y-2" data-testid="pending-groups">

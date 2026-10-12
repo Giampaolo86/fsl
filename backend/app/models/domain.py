@@ -586,6 +586,14 @@ class OrgGroup(BaseDocument):
     tournament_id: Optional[str] = None
     team_id: Optional[str] = None
     note: str = ""
+    requested_tournament_id: Optional[str] = None  # torneo chiesto dalla società (da approvare)
+    request_note: str = ""
+    # rosa caricata "a prescindere" (prima di qualsiasi torneo): diventa un modulo da confermare all'invito
+    roster_rows: list[dict] = []
+    roster_head: dict = {}
+    roster_file_url: Optional[str] = None
+    roster_filename: str = ""
+    roster_media_id: Optional[str] = None
 
 
 class ApiKey(BaseDocument):

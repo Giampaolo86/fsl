@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel, Field
 
 from ..core.deps import CurrentUser, get_current_user, require_tournament
@@ -23,6 +23,8 @@ class GroupIn(BaseModel):
     level: str = ""
     description: str = Field(default="", max_length=600)
     club_id: Optional[str] = None
+    requested_tournament_id: Optional[str] = None
+    request_note: str = Field(default="", max_length=400)
 
 
 class ConfirmIn(BaseModel):
@@ -73,6 +75,10 @@ async def _org_for(user: CurrentUser) -> Optional[dict]:
 def _og_pub(g: OrgGroup, tnames: dict) -> dict:
     d = g.public()
     d["tournament_name"] = tnames.get(g.tournament_id, "") if g.tournament_id else ""
+    d["requested_tournament_name"] = tnames.get(g.requested_tournament_id, "") if g.requested_tournament_id else ""
+    d["roster"] = {"rows": len(g.roster_rows), "errors": sum(1 for r in g.roster_rows if r.get("errors")), "filename": g.roster_filename, "file_url": g.roster_file_url} if g.roster_rows else None
+    d.pop("roster_rows", None)
+    d.pop("roster_head", None)
     return d
 
 
@@ -97,7 +103,8 @@ async def my_club_overview(user: CurrentUser = Depends(get_current_user)):
             "groups": await _club_groups(t.id, club.id),
         })
     pend = await org_groups.list({"user_id": user.id, "status": "pending"}, sort=[("created_at", 1)])
-    return {"org": org, "pending_groups": [_og_pub(g, {}) for g in pend], "tournaments": blocks, "levels": LEVELS}
+    tnames = {t.id: t.name for t in await tournaments.list(limit=500)} if pend else {}
+    return {"org": org, "pending_groups": [_og_pub(g, tnames) for g in pend], "tournaments": blocks, "levels": LEVELS}
 
 
 @router.post("/me/club/groups", status_code=201)
@@ -109,11 +116,17 @@ async def propose_org_group(body: GroupIn, user: CurrentUser = Depends(get_curre
         raise bad_request("Società non trovata: contatta l'organizzazione")
     cat = body.category.strip()
     name = (body.name or "").strip() or f"{org['name']} {cat}"
-    g = await org_groups.insert(OrgGroup(org_key=org["org_key"], user_id=user.id, club_name=org["name"], category=cat, name=name, birth_year=body.birth_year, level=body.level.strip()[:40], description=body.description.strip()), user.id)
-    await audit.record(user, "org_group.propose", "org_group", g.id, None, after={"club": org["name"], "category": cat})
+    req_t = None
+    if body.requested_tournament_id:
+        req_t = await tournaments.get(body.requested_tournament_id)
+        if not req_t or req_t.status == "archived" or not req_t.published:
+            raise bad_request("Torneo non disponibile per le richieste")
+    g = await org_groups.insert(OrgGroup(org_key=org["org_key"], user_id=user.id, club_name=org["name"], category=cat, name=name, birth_year=body.birth_year, level=body.level.strip()[:40], description=body.description.strip(), requested_tournament_id=req_t.id if req_t else None, request_note=body.request_note.strip()), user.id)
+    await audit.record(user, "org_group.propose", "org_group", g.id, None, after={"club": org["name"], "category": cat, "requested_tournament_id": g.requested_tournament_id})
     extra = " · ".join(x for x in [f"anno {body.birth_year}" if body.birth_year else "", body.level.strip()] if x)
-    await staff_notify.notify_global("group", f"Nuovo gruppo da invitare: {org['name']} · {cat}", f"{name}{(' · ' + extra) if extra else ''}. Invitalo a un torneo da «Tutte le società».", "/admin/societa", f"orggroup:{g.id}")
-    return _og_pub(g, {})
+    ask = f" Richiesta di invito a {req_t.name}." if req_t else ""
+    await staff_notify.notify_global("group", f"Nuovo gruppo da invitare: {org['name']} · {cat}", f"{name}{(' · ' + extra) if extra else ''}.{ask} Approva o rifiuta da «Tutte le società».", "/admin/societa", f"orggroup:{g.id}")
+    return _og_pub(g, {req_t.id: req_t.name} if req_t else {})
 
 
 @router.delete("/me/club/groups/{group_id}")
@@ -220,6 +233,11 @@ async def invite_org_group(group_id: str, body: InviteIn, user: CurrentUser = De
         patch = {"competition_id": comp.id, "series": comp.series}
     tm = await teams_repo.insert(Team(tournament_id=t.id, club_id=club.id, name=name, category=g.category, status="active", birth_year=g.birth_year, level=g.level, description=g.description, proposed_by=g.user_id, **patch), user.id)
     await org_groups.update(g.id, {"status": "invited", "tournament_id": t.id, "team_id": tm.id, "note": body.note}, user.id)
+    if g.roster_rows:  # rosa caricata "a prescindere": entra in Control Room → Rose come modulo da confermare
+        from ..models.domain import RosterImport
+
+        await scoped("roster_imports", t.id).insert(RosterImport(tournament_id=t.id, club_id=club.id, team_id=tm.id, media_id=g.roster_media_id, file_url=g.roster_file_url, filename=g.roster_filename, submitted_by=g.user_id, rows=g.roster_rows, **{k: v for k, v in g.roster_head.items() if k in ("team_name", "coach", "contact", "phone")}), user.id)
+        await staff_notify.notify_staff(t.id, "roster", f"Rosa da confermare: {club.name} · {g.category}", f"{name} · {len(g.roster_rows)} giocatori caricati dalla società prima dell'invito. Rivedi e conferma da Rose.", f"/admin/t/{t.id}/rose", f"roster:org:{g.id}")
     await staff_notify.settle(f"orggroup:{g.id}")
     await audit.record(user, "org_group.invite", "team", tm.id, t.id, after={"club": club.name, "category": g.category, "competition_id": body.competition_id})
     await notify(t.id, club.id, "group", f"Gruppo «{name}» invitato a {t.name}", body.note or "Scarica il modulo rosa dalla tua home e caricalo compilato.", "/societa", f"orginvite:{g.id}")
@@ -364,3 +382,59 @@ async def put_my_club_profile(body: dict, user: CurrentUser = Depends(get_curren
     await staff_notify.notify_global("profile", f"Homepage da approvare: {oc.name}", "Il responsabile ha aggiornato il profilo unico della società.", "/admin/societa", f"orgprofile:{oc.org_key}")
     await audit.record(user, "org_club.profile_draft", "org_club", oc.id, None, after={"fields": list(data)})
     return {"approval_status": "pending_review", "draft": draft}
+
+
+# ---------- rosa "a prescindere" sui gruppi in attesa di invito ----------
+async def _own_pending_group(group_id: str, user: CurrentUser) -> OrgGroup:
+    g = await org_groups.get(group_id)
+    if not g or (g.user_id != user.id and not user.is_super_admin):
+        raise not_found("Gruppo")
+    if g.status != "pending":
+        raise conflict("Il gruppo è già in un torneo: carica la rosa dalla sezione del torneo")
+    return g
+
+
+@router.get("/me/club/groups/{group_id}/template")
+async def org_group_template(group_id: str, user: CurrentUser = Depends(get_current_user)):
+    from fastapi import Response
+
+    from ..services.roster_template import build_template
+
+    g = await _own_pending_group(group_id, user)
+    org = await _org_for(user)
+    club = type("C", (), {"name": org["name"] if org else g.club_name})()
+    team = type("T", (), {"name": g.name or f"{g.club_name} {g.category}", "category": g.category})()
+    data = build_template(None, club, team, "")
+    fname = f"FSL_Modulo_Rosa_{(g.name or g.category).replace(' ', '_')}.xlsx"
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
+@router.post("/me/club/groups/{group_id}/roster", status_code=201)
+async def org_group_roster(group_id: str, file: UploadFile = File(...), user: CurrentUser = Depends(get_current_user)):
+    """Modulo Excel oppure foto/screenshot/PDF: la rosa resta sul gruppo e diventa un modulo da confermare quando il gruppo viene invitato."""
+    from .club_extras import _store
+    from .roster_imports import _extract_rows_from_images, _pdf_pages_to_png, parse_workbook
+
+    g = await _own_pending_group(group_id, user)
+    data = await file.read()
+    if len(data) > 12 * 1024 * 1024:
+        raise bad_request("File troppo grande (max 12 MB)")
+    fname = file.filename or "rosa"
+    ct = (file.content_type or "").lower()
+    if fname.lower().endswith(".xlsx"):
+        parsed, ct = parse_workbook(data), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        if not parsed["rows"]:
+            raise bad_request("Il modulo non contiene giocatori: compila la tabella ROSA GIOCATORI")
+    elif ct == "application/pdf" or fname.lower().endswith(".pdf"):
+        parsed, ct = await _extract_rows_from_images(_pdf_pages_to_png(data), f"roster-vision:org:{g.id}"), "application/pdf"
+    elif ct.startswith("image/"):
+        parsed = await _extract_rows_from_images([data], f"roster-vision:org:{g.id}")
+    else:
+        raise bad_request("Carica il modulo Excel (.xlsx) oppure una foto/screenshot/PDF della rosa")
+    m = await _store("org", data, ct, fname, user.id, None)
+    rows = parsed.pop("rows")
+    g2 = await org_groups.update(g.id, {"roster_rows": rows, "roster_head": parsed, "roster_file_url": f"/api/media/{m.id}", "roster_filename": fname, "roster_media_id": m.id}, user.id)
+    await audit.record(user, "org_group.roster", "org_group", g.id, None, after={"rows": len(rows), "errors": sum(1 for r in rows if r["errors"]), "filename": fname})
+    out = _og_pub(g2, {})
+    out["rows"] = rows
+    return out
