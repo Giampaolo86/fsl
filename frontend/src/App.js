@@ -60,6 +60,7 @@ import PublicClubEntity from "@/pages/public/PublicClubEntity";
 import CodiceFSL from "@/pages/public/CodiceFSL";
 import { PublicNews, PublicPost } from "@/pages/public/PublicBlog";
 import ClubDashboard from "@/pages/club/ClubDashboard";
+import ClubTournaments from "@/pages/club/ClubTournaments";
 import { ClubTeams } from "@/pages/club/ClubModules";
 import RefereeMatches from "@/pages/referee/RefereeMatches";
 import PublicHub, { PublicTournamentsList } from "@/pages/public/PublicHub";
@@ -179,6 +180,7 @@ function AppRoutes() {
               <Route path="/societa" element={<ProtectedRoute roles={["club_manager"]}><ClubShell /></ProtectedRoute>}>
                 <Route index element={<ClubDashboard />} />
                 <Route path="squadre" element={<ClubTeams />} />
+                <Route path="tornei" element={<ClubTournaments />} />
                 <Route path="rose" element={<Rosters clubMode />} />
                 <Route path="rose/codici" element={<ChildCodesSheet mode="club" />} />
                 <Route path="calendario" element={<ClubCalendar />} />

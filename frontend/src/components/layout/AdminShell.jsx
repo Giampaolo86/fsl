@@ -6,6 +6,7 @@ import { NotificationsBell } from "@/components/fsl/NotificationsBell";
 import { api } from "@/lib/api";
 import { TournamentSwitcher } from "@/components/fsl/TournamentSwitcher";
 import { OfflineBanner } from "@/components/fsl/States";
+import { InstallBanner } from "@/components/fsl/InstallBanner";
 import { useAuth } from "@/context/AuthContext";
 import { useTournaments } from "@/context/TournamentContext";
 import { ROLE_LABELS } from "@/lib/format";
@@ -146,6 +147,7 @@ export default function AdminShell() {
       )}
       <div className="flex-1 min-w-0 flex flex-col">
         <OfflineBanner />
+        <InstallBanner />
         <header className="sticky top-0 z-40 h-[76px] flex items-center justify-between gap-4 px-4 md:px-6 bg-navy-900/85 backdrop-blur-md border-b border-white/10">
           <div className="flex items-center gap-3 min-w-0">
             <button className="xl:hidden h-11 w-11 rounded-md border border-white/20 flex items-center justify-center" onClick={() => setOpen(true)} aria-label="Apri menu" data-testid="sidebar-toggle">

@@ -1,13 +1,15 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { BedDouble, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, Flag, Globe, LayoutGrid, LogOut, Newspaper, Shield, Users, ShieldCheck } from "lucide-react";
+import { BedDouble, BookOpenCheck, CalendarDays, ClipboardList, CreditCard, FileText, Flag, Globe, LayoutGrid, LogOut, Newspaper, Shield, Trophy, Users, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
 import { useAuth } from "@/context/AuthContext";
 import { OfflineBanner } from "@/components/fsl/States";
+import { InstallBanner } from "@/components/fsl/InstallBanner";
 import { NotificationsBell } from "@/components/fsl/NotificationsBell";
 
 const CLUB_NAV = [
   ["Dashboard", "/societa", LayoutGrid],
   ["Squadre", "/societa/squadre", Users],
+  ["Tornei", "/societa/tornei", Trophy],
   ["Rose", "/societa/rose", ClipboardList],
   ["Documenti", "/societa/documenti", FileText],
   ["Calendario", "/societa/calendario", CalendarDays],
@@ -26,6 +28,7 @@ export default function ClubShell() {
   return (
     <div className="min-h-screen flex flex-col bg-navy-900">
       <OfflineBanner />
+      <InstallBanner />
       <header className="sticky top-0 z-40 h-[76px] bg-navy-900/85 backdrop-blur-md border-b border-white/10">
         <div className="mx-auto max-w-[1488px] px-4 md:px-6 h-full flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">

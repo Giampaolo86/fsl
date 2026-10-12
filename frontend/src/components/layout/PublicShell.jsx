@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom"
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { Facebook, Heart, Instagram, LogOut, Menu, ShieldCheck, UserRound, X, Youtube } from "lucide-react";
 import { Logo } from "@/components/fsl/Logo";
+import { InstallBanner } from "@/components/fsl/InstallBanner";
 import { NotificationsBell } from "@/components/fsl/NotificationsBell";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
@@ -106,6 +107,7 @@ export default function PublicShell() {
   const linkCls = ({ isActive }) => `h-11 px-3.5 inline-flex items-center font-display uppercase text-sm font-bold tracking-wide border-b-2 transition-colors ${isActive ? "text-fsl-white border-fsl-gold" : "text-fsl-white/75 border-transparent hover:text-fsl-white"}`;
   return (
     <div className="min-h-screen flex flex-col bg-navy-900">
+      <InstallBanner />
       <header className="sticky top-0 z-40 h-[76px] bg-ink-950/90 backdrop-blur-md border-b border-white/10">
         <div className="mx-auto max-w-[1488px] px-6 h-full flex items-center justify-between gap-6">
           <Logo />
