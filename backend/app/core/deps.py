@@ -75,6 +75,9 @@ async def load_current_user(user_id: str) -> Optional[CurrentUser]:
     if not user or user.status != "active":
         return None
     ms = await memberships.list({"user_id": user.id, "status": "active"})
+    tnames = {}
+    if any(m.role == "club_manager" for m in ms):
+        tnames = {t.id: t.name for t in await tournaments.list({"_id": {"$in": [__import__("bson").ObjectId(m.tournament_id) for m in ms if __import__("bson").ObjectId.is_valid(m.tournament_id)]}}, limit=100)}
     return CurrentUser(
         id=user.id,
         email=user.email,
@@ -84,7 +87,7 @@ async def load_current_user(user_id: str) -> Optional[CurrentUser]:
         role=user.role,
         is_super_admin=user.is_super_admin or user.is_owner,
         is_owner=user.is_owner,
-        memberships=[{"tournament_id": m.tournament_id, "role": m.role, "club_id": m.club_id} for m in ms],
+        memberships=[{"tournament_id": m.tournament_id, "role": m.role, "club_id": m.club_id, **({"tournament_name": tnames[m.tournament_id]} if m.tournament_id in tnames else {})} for m in ms],
         mfa_enabled=user.mfa_enabled,
         mfa_required=mfa_is_required(user),
         must_change_password=user.must_change_password,

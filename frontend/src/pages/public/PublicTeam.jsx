@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Trophy, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, Trophy, Upload, Users } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { FavButton } from "@/components/fsl/FavButton";
 import { HeroStage, SectionHead } from "@/components/fsl/ProfileKit";
@@ -11,12 +12,14 @@ import { MatchesTable } from "./PublicClubHome";
 
 export default function PublicTeam() {
   const { slug, clubSlug, teamId } = useParams();
+  const { user } = useAuth();
   const [d, setD] = useState(null);
   const [error, setError] = useState(null);
   useEffect(() => { api.get(`/public/tournaments/${slug}/teams/${teamId}`).then((r) => setD(r.data)).catch((e) => setError(apiError(e))); }, [slug, teamId]);
   if (error) return <ErrorState message={error} />;
   if (!d) return <LoadingState />;
   const { team: tm, club: c, standing: st, roster, matches } = d;
+  const isStaff = !!user && (user.is_super_admin || (user.memberships || []).some((m) => m.tournament_id === d.tournament.id && ["director", "secretary"].includes(m.role)));
   const now = Date.now();
   const upcoming = matches.filter((m) => m.status !== "final" && m.status !== "validated" && (!m.kickoff_at || new Date(m.kickoff_at).getTime() >= now - 36e5));
   const recent = matches.filter((m) => m.status === "final" || m.status === "validated").reverse();
@@ -37,6 +40,7 @@ export default function PublicTeam() {
       <div className="mx-auto max-w-[1488px] px-6 mt-10 grid lg:grid-cols-[1fr_1.2fr] gap-10">
         <section data-testid="public-team-roster">
           <SectionHead icon={Users} title="La rosa" count={roster.length} />
+          {isStaff && <Link to={`/admin/t/${d.tournament.id}/rose?team=${tm.id}`} className="btn-gold h-10 mb-3 inline-flex" title="Control Room → Rose con questa squadra già selezionata: modulo Excel, foto/WhatsApp/PDF o inserimento manuale" data-testid="public-team-admin-roster"><Upload className="h-4 w-4" /> {roster.length ? "Gestisci la rosa (admin)" : "Carica la rosa (admin)"}</Link>}
           {roster.length === 0 ? <p className="text-sm text-fsl-slate" data-testid="public-team-roster-empty">{d.roster_pending_review ? "Rosa inviata dalla società: in verifica da parte dell'organizzazione." : "La società non ha ancora caricato la rosa di questo gruppo."}</p> : (
             <div className="grid sm:grid-cols-2 gap-2">
               {roster.map((p) => (

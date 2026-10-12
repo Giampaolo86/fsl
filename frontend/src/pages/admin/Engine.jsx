@@ -71,8 +71,9 @@ export function Rosters({ clubMode = false }) {
   const params = useParams();
   const location = useLocation();
   const { user } = useAuth();
-  const membership = user.memberships.find((m) => m.role === "club_manager");
-  const tid = clubMode ? membership?.tournament_id : params.tournamentId;
+  const clubMemberships = user.memberships.filter((m) => m.role === "club_manager");
+  const [clubTid, setClubTid] = useState(clubMemberships[0]?.tournament_id || "");
+  const tid = clubMode ? clubTid : params.tournamentId;
   const [teams, setTeams] = useState([]);
   const [teamId, setTeamId] = useState("");
   const [players, setPlayers] = useState(null);
@@ -82,7 +83,8 @@ export function Rosters({ clubMode = false }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ first_name: "", last_name: "", birth_year: "", shirt_number: "", role: "Centrocampista", profile_visibility: "private", media_consent: false });
   const [refine, cutoutEditor] = useCutoutEditor();
-  useEffect(() => { if (tid) api.get(`/tournaments/${tid}/teams`).then((r) => { setTeams(r.data); setTeamId((x) => x || r.data[0]?.id || ""); }); }, [tid]);
+  const wantedTeam = new URLSearchParams(location.search).get("team");
+  useEffect(() => { if (tid) api.get(`/tournaments/${tid}/teams`).then((r) => { setTeams(r.data); setTeamId((x) => x || (wantedTeam && r.data.some((tm) => tm.id === wantedTeam) ? wantedTeam : r.data[0]?.id || "")); }); }, [tid]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (tid && teamId) { api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data)); api.get(`/tournaments/${tid}/badges`, { params: { team_id: teamId } }).then((r) => setBadges(r.data.reduce((acc, b) => { (acc[b.player_id] = acc[b.player_id] || []).push(b); return acc; }, {}))).catch(() => {}); } }, [tid, teamId]);
   if (!tid) return <EmptyState icon={Users} title="Nessuna società assegnata" />;
   const save = async () => {
@@ -99,9 +101,15 @@ export function Rosters({ clubMode = false }) {
     try { await api.delete(`/tournaments/${tid}/teams/${teamId}`); toast.success(`Squadra «${tm.name}» eliminata`); const r = await api.get(`/tournaments/${tid}/teams`); setTeams(r.data); setTeamId(r.data[0]?.id || ""); } catch (e) { toast.error(apiError(e)); }
   };
   const toggleConsent = async (p) => { try { await api.patch(`/tournaments/${tid}/players/${p.id}`, { media_consent: !p.media_consent, profile_visibility: !p.media_consent ? "public" : "private" }); api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data)); } catch (e) { toast.error(apiError(e)); } };
+  if (clubMode && !tid) return <EmptyState title="Nessun torneo ancora" description="Le rose dei tornei compaiono qui quando una tua squadra viene ammessa a una competizione. Nel frattempo aggiungi le squadre e carica le rose dalla pagina Squadre: saranno pronte al momento dell'invito." action={<Link to="/societa/squadre" className="btn-gold" data-testid="roster-go-teams"><Plus className="h-4 w-4" /> Squadre e rose</Link>} />;
   return (
     <div>
       {cutoutEditor}
+      {clubMode && <div className="mb-4 flex flex-wrap items-center gap-3" data-testid="roster-club-bar">
+        {clubMemberships.length > 1 && <select className="fsl-input w-72" value={clubTid} onChange={(e) => { setClubTid(e.target.value); setTeamId(""); }} data-testid="roster-tournament-select">{clubMemberships.map((m) => <option key={m.tournament_id} value={m.tournament_id}>{m.tournament_name || "Torneo"}</option>)}</select>}
+        <Link to="/societa/squadre" className="btn-ghost h-10" data-testid="roster-add-team-link"><Plus className="h-4 w-4" /> Squadra (anche fuori torneo)</Link>
+        <span className="text-xs text-fsl-slate">Le rose si caricano in blocco (modulo Excel o foto); «Giocatore» serve solo per aggiungere un singolo bambino a torneo in corso.</span>
+      </div>}
       <PageHeader kicker="Rose, documenti e idoneità" title="Rose" subtitle="Anagrafica privata (anno di nascita mai pubblico). Nome e foto compaiono sul sito solo con consenso immagine attivo." actions={<><Link to={clubMode ? "/societa/rose/codici" : `/admin/t/${tid}/rose/codici${teams.find((tm) => tm.id === teamId)?.club_id ? `?club=${teams.find((tm) => tm.id === teamId).club_id}` : ""}`} className="btn-ghost h-10" data-testid="child-codes-link"><Printer className="h-4 w-4" /> Codici figlio (PDF)</Link><BulkPhotoUpload tid={tid} clubId={teams.find((tm) => tm.id === teamId)?.club_id} onDone={() => api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data))} /><select className="fsl-input w-64" value={teamId} onChange={(e) => setTeamId(e.target.value)} data-testid="roster-team-select">{teams.map((tm) => <option key={tm.id} value={tm.id}>{tm.name}</option>)}</select>{teamId && <button className="btn-primary" onClick={() => setOpen(true)} data-testid="roster-add-button"><Plus className="h-4 w-4" /> Giocatore</button>}{teamId && !clubMode && <button className="btn-ghost h-10 text-fsl-danger" title="Elimina squadra e rosa (solo se non ha gare giocate)" onClick={deleteTeam} data-testid="roster-delete-team-button"><Trash2 className="h-4 w-4" /> Elimina squadra</button>}</>} />
       {clubMode ? <RosterImportClub tid={tid} teamId={teamId} /> : <RosterImportAdmin tid={tid} onImported={() => api.get(`/tournaments/${tid}/players`, { params: { team_id: teamId } }).then((r) => setPlayers(r.data))} />}
       {!players ? <LoadingState /> : players.length === 0 ? <EmptyState icon={Users} title="Rosa vuota" description="Aggiungi i giocatori per abilitare convocazioni ed eventi." /> : (

@@ -438,3 +438,24 @@ async def org_group_roster(group_id: str, file: UploadFile = File(...), user: Cu
     out = _og_pub(g2, {})
     out["rows"] = rows
     return out
+
+
+class RequestIn(BaseModel):
+    tournament_id: Optional[str] = None
+    note: str = Field(default="", max_length=400)
+
+
+@router.post("/me/club/groups/{group_id}/request")
+async def org_group_request(group_id: str, body: RequestIn, user: CurrentUser = Depends(get_current_user)):
+    """La società chiede (o ritira la richiesta) di partecipare con questo gruppo a un torneo pubblicato: l'organizzazione approva invitandolo."""
+    g = await _own_pending_group(group_id, user)
+    req_t = None
+    if body.tournament_id:
+        req_t = await tournaments.get(body.tournament_id)
+        if not req_t or req_t.status == "archived" or not req_t.published:
+            raise bad_request("Torneo non disponibile per le richieste")
+    g2 = await org_groups.update(g.id, {"requested_tournament_id": req_t.id if req_t else None, "request_note": body.note.strip()}, user.id)
+    if req_t:
+        await staff_notify.notify_global("group", f"Richiesta di partecipazione: {g.club_name} · {g.category}", f"{g.name} chiede di partecipare a {req_t.name}{(' · «' + body.note.strip() + '»') if body.note.strip() else ''}.{' Rosa già caricata.' if g.roster_rows else ''} Approva da «Tutte le società».", "/admin/societa", f"orggroup:{g.id}")
+    await audit.record(user, "org_group.request", "org_group", g.id, None, after={"tournament_id": body.tournament_id})
+    return _og_pub(g2, {req_t.id: req_t.name} if req_t else {})

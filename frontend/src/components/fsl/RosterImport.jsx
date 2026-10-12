@@ -84,9 +84,10 @@ export function RosterImportAdmin({ tid, onImported }) {
   const [teamId, setTeamId] = useState("");
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => api.get(`/tournaments/${tid}/roster-imports`).then((r) => setList(r.data)).catch(() => {}), [tid]);
-  useEffect(() => { load(); api.get(`/tournaments/${tid}/clubs`).then((r) => setClubs(r.data)).catch(() => {}); api.get(`/tournaments/${tid}/teams`).then((r) => setTeams(r.data)).catch(() => {}); }, [load, tid]);
+  const wantedTeam = new URLSearchParams(window.location.search).get("team");
+  useEffect(() => { load(); api.get(`/tournaments/${tid}/clubs`).then((r) => setClubs(r.data)).catch(() => {}); api.get(`/tournaments/${tid}/teams`).then((r) => { setTeams(r.data); const w = r.data.find((t) => t.id === wantedTeam); if (w?.club_id) { setClubId(w.club_id); setTeamId(w.id); } }).catch(() => {}); }, [load, tid]); // eslint-disable-line react-hooks/exhaustive-deps
   const clubTeams = teams.filter((t) => t.club_id === clubId);
-  useEffect(() => { setTeamId(clubTeams[0]?.id || ""); }, [clubId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setTeamId((x) => (x && clubTeams.some((t) => t.id === x) ? x : clubTeams[0]?.id || "")); }, [clubId]); // eslint-disable-line react-hooks/exhaustive-deps
   const pending = list.filter((i) => i.status === "submitted");
   const pendingGroups = teams.filter((t) => t.status === "pending");
   const reloadTeams = () => api.get(`/tournaments/${tid}/teams`).then((r) => setTeams(r.data)).catch(() => {});

@@ -60,8 +60,8 @@ function GroupCard({ tid, g, onChanged }) {
   );
 }
 
-function AddGroupDialog({ categories, levels, onClose, onDone }) {
-  const [f, setF] = useState(EMPTY);
+function AddGroupDialog({ categories, levels, onClose, onDone, initialTournament = "" }) {
+  const [f, setF] = useState({ ...EMPTY, requested_tournament_id: initialTournament });
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState([]);
   useEffect(() => { api.get("/public/tournaments").then((r) => setOpen(r.data.filter((t) => t.status !== "archived"))).catch(() => {}); }, []);
@@ -75,7 +75,7 @@ function AddGroupDialog({ categories, levels, onClose, onDone }) {
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl max-w-lg" aria-describedby={undefined} data-testid="add-group-dialog">
-        <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Aggiungi gruppo</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display uppercase text-2xl">{initialTournament ? "Richiedi partecipazione" : "Aggiungi squadra"}</DialogTitle></DialogHeader>
         <form onSubmit={submit} className="space-y-3" data-testid="add-group-form">
           <p className="text-xs text-fsl-slate">Indica categoria, anno e livello dei ragazzi. Puoi caricare la rosa da subito e, se vuoi, chiedere l'invito a un torneo già pubblicato: l'organizzazione approva e il gruppo entra in gara.</p>
           <div className="grid grid-cols-2 gap-3">
@@ -128,6 +128,11 @@ function PendingGroupCard({ g, onChanged }) {
     const fd = new FormData(); fd.append("file", file);
     try { const r = await api.post(`/me/club/groups/${g.id}/roster`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 120000 }); toast.success(`Rosa salvata: ${r.data.roster.rows} giocatori${r.data.roster.errors ? `, ${r.data.roster.errors} da controllare` : ""}. Sarà confermata dall'organizzazione all'invito.`); onChanged(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
   };
+  const [open, setOpen] = useState([]);
+  useEffect(() => { api.get("/public/tournaments").then((r) => setOpen(r.data.filter((t) => t.status !== "archived"))).catch(() => {}); }, []);
+  const request = async (tournament_id) => {
+    try { await api.post(`/me/club/groups/${g.id}/request`, { tournament_id: tournament_id || null, note: "" }); toast.success(tournament_id ? "Richiesta inviata all'organizzazione" : "Richiesta ritirata"); onChanged(); } catch (e) { toast.error(apiError(e)); }
+  };
   const meta = [g.birth_year && `Anno ${g.birth_year}`, g.level].filter(Boolean).join(" · ");
   return (
     <div className="fsl-card p-4 border-dashed border-fsl-warning/40 flex flex-col gap-3" data-testid={`pending-group-${g.id}`}>
@@ -137,7 +142,8 @@ function PendingGroupCard({ g, onChanged }) {
         <span className="h-6 px-2 rounded text-[10px] font-bold uppercase inline-flex items-center shrink-0 bg-fsl-warning/20 text-fsl-warning border border-fsl-warning/40" data-testid={`pending-group-status-${g.id}`}><Clock className="h-3 w-3 mr-1" /> In attesa di invito</span>
       </div>
       {g.description && <p className="text-xs text-fsl-slate line-clamp-2">{g.description}</p>}
-      {g.requested_tournament_name && <div className="text-xs text-fsl-gold" data-testid={`pending-group-requested-${g.id}`}>Richiesto invito a <strong>{g.requested_tournament_name}</strong> · in approvazione</div>}
+      {g.requested_tournament_name ? <div className="text-xs text-fsl-gold flex items-center gap-2" data-testid={`pending-group-requested-${g.id}`}><span>Richiesta per <strong>{g.requested_tournament_name}</strong> · in approvazione</span><button className="text-fsl-slate hover:text-fsl-white underline" onClick={() => request("")} data-testid={`pending-group-unrequest-${g.id}`}>ritira</button></div>
+        : <label className="block text-xs"><span className="fsl-label">Partecipa a un torneo</span><select className="fsl-input h-9 mt-1" value="" onChange={(e) => e.target.value && request(e.target.value)} data-testid={`pending-group-request-${g.id}`}><option value="">Scegli il torneo e invia la richiesta…</option>{open.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>}
       <div className="flex flex-wrap items-center gap-2">
         {g.roster ? <span className="h-6 px-2 rounded text-[10px] font-bold uppercase inline-flex items-center gap-1 bg-fsl-success text-ink-950" data-testid={`pending-group-roster-${g.id}`}><CheckCircle2 className="h-3 w-3" /> Rosa pronta · {g.roster.rows}{g.roster.errors ? ` (${g.roster.errors} da controllare)` : ""}</span> : <span className="h-6 px-2 rounded text-[10px] font-bold uppercase inline-flex items-center border border-white/15 text-fsl-slate" data-testid={`pending-group-roster-${g.id}`}>Nessuna rosa</span>}
       </div>
@@ -151,9 +157,9 @@ function PendingGroupCard({ g, onChanged }) {
   );
 }
 
-export function ClubGroups({ onLoaded }) {
+export function ClubGroups({ onLoaded, requestTournamentId = "" }) {
   const [data, setData] = useState(null);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(!!requestTournamentId);
   const loadedRef = useRef(onLoaded);
   loadedRef.current = onLoaded;
   const load = useCallback(() => api.get("/me/club/overview").then((r) => { setData(r.data); loadedRef.current?.(r.data); }).catch(() => setData({ org: null, pending_groups: [], tournaments: [], levels: [""] })), []);
@@ -164,11 +170,11 @@ export function ClubGroups({ onLoaded }) {
   return (
     <div className="space-y-8" data-testid="club-groups">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="fsl-section-title flex items-center gap-2"><Users className="h-5 w-5 text-fsl-gold" /> I nostri gruppi</h2>
+        <h2 className="fsl-section-title flex items-center gap-2"><Users className="h-5 w-5 text-fsl-gold" /> Le nostre squadre</h2>
         {pending.length > 0 && <span className="h-6 px-2 rounded-full bg-fsl-warning text-ink-950 text-xs font-bold num inline-flex items-center" data-testid="pending-groups-count">{pending.length} in attesa</span>}
         <div className="ml-auto flex items-center gap-3">
           {data.tournaments.length > 0 && <Link to="/societa/rose" className="text-xs text-fsl-gold hover:underline" data-testid="club-groups-go-rose">Vai alle rose →</Link>}
-          <button className="btn-gold h-10" onClick={() => setAdding(true)} data-testid="club-groups-add"><Plus className="h-4 w-4" /> Aggiungi gruppo</button>
+          <button className="btn-gold h-10" onClick={() => setAdding(true)} data-testid="club-groups-add"><Plus className="h-4 w-4" /> Aggiungi squadra</button>
         </div>
       </div>
       {pending.length === 0 && data.tournaments.length === 0 && (
@@ -176,12 +182,12 @@ export function ClubGroups({ onLoaded }) {
       )}
       {pending.length > 0 && (
         <section className="space-y-3" data-testid="club-groups-pending">
-          <div className="fsl-kicker">In attesa di invito a un torneo</div>
+          <div className="fsl-kicker">Squadre della società · non ancora in un torneo (carica la rosa e chiedi la partecipazione)</div>
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">{pending.map((g) => <PendingGroupCard key={g.id} g={g} onChanged={load} />)}</div>
         </section>
       )}
       {data.tournaments.map((b) => <TournamentBlock key={b.tournament.id} block={b} onChanged={load} />)}
-      {adding && <AddGroupDialog categories={categories} levels={data.levels || [""]} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
+      {adding && <AddGroupDialog categories={categories} levels={data.levels || [""]} initialTournament={requestTournamentId} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
     </div>
   );
 }

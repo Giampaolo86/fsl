@@ -10,6 +10,7 @@ import { HospitalitySection } from "@/components/fsl/Hospitality";
 import { ShopStrip } from "@/components/fsl/ShopStrip";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { usePublicTournament } from "@/hooks/usePublicTournament";
+import { useAuth } from "@/context/AuthContext";
 import { apiError } from "@/lib/api";
 import { fmtNum } from "@/lib/format";
 
@@ -34,6 +35,7 @@ function Panel({ title, right, children, testId }) {
 
 export default function TournamentHome() {
   const { slug, data, error, reload } = usePublicTournament();
+  const { user } = useAuth();
   const [cat, setCat] = useState("");
   if (error) return <div className="p-6"><ErrorState message={apiError(error)} onRetry={reload} /></div>;
   if (!data) return <LoadingState full />;
@@ -53,7 +55,7 @@ export default function TournamentHome() {
             <CategorySelector categories={s.categories} value={category} onChange={changeCat} />
           </div>
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[0.9] max-w-3xl" data-testid="public-tournament-title">{t.name}</h1>
-          <div className="mt-3"><FavButton kind="tournaments" id={slug} label="Segui il torneo" /></div>
+          <div className="mt-3 flex flex-wrap items-center gap-3"><FavButton kind="tournaments" id={slug} label="Segui il torneo" />{user?.role === "club_manager" && <Link to={`/societa/squadre?richiedi=${t.id}`} className="btn-gold h-10" title="Chiedi di partecipare con una squadra della tua società: l'organizzazione approva" data-testid="public-tournament-request"><Users className="h-4 w-4" /> Richiedi partecipazione</Link>}</div>
           <p className="mt-4 text-fsl-white/90 text-base md:text-lg num">{fmtNum(summary.teams_capacity)} squadre. {s.categories.length} categorie. Una sola ambizione.</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to={`/tornei/${slug}/squadre`} className="btn-gold" data-testid="public-hero-cta-teams">Scopri le squadre <ArrowRight className="h-4 w-4" /></Link>
