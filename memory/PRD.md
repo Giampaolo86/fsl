@@ -314,3 +314,9 @@ Provider email/SMS; policy retention; Pantone su mazzetta fisica. Stripe: sandbo
 
 ## BACKLOG MEMORIZZATO (richiesta utente 2026-10 — da fare DOPO che tutto funziona stabilmente)
 - [ ] **Apertura Pacchetti (gamification tifosi)**: i tifosi aprono pacchetti virtuali di figurine giornalieri (1 pacchetto/giorno per account, figurine = giocatori/squadre dei tornei seguiti) e scambiano i doppioni con altri supporter (proposta scambio → accettazione → swap atomico; anti-abuso: rate limit, nessun valore monetario). Collegato all'Album Figurine PDF (P0 in sospeso). Priorità: dopo stabilizzazione produzione.
+
+## Iterazione 50 (2026-10) · FIX «Upload non trovata» (logo/copertina società in produzione)
+- Causa: stato dell'upload a blocchi (`{upload_id}.json` + `.part`) salvato su disco locale del pod (`/app/backend/.uploads`); in produzione (più istanze / filesystem effimero) il blocco o il `complete` arrivavano a un'istanza senza quei file → 404 «Upload non trovata».
+- [x] Stato spostato in MongoDB: `upload_sessions` (meta, `next`, `bytes`, TTL 24h) + `upload_chunks` (`Binary` ≤4 MB per blocco, indice unico `upload_id+index`, TTL); avanzamento atomico `update_one({_id, next: index})`; `complete` ricompone i blocchi ordinati → object storage → pulizia. Rimossi `TMP`/`UPLOAD_TMP_DIR`.
+- [x] Verifica live (preview, Responsabile Società): init → blocco fuori ordine 409 → 2 blocchi → complete 201 → download identico → sessione/chunk puliti. Suite CI 43/43. **Richiede deploy in produzione.**
+- Nota: `tests/test_iteration33.py` ha 9 errori pre-esistenti (login con account `@fsl.demo` eliminati), non legati a questo fix.

@@ -1,14 +1,13 @@
-import json
-import os
 import re
 import uuid
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from bson.binary import Binary
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel
 
+from ..core.db import db
 from ..core.deps import CurrentUser, get_current_user, require_tournament
 from ..core.errors import bad_request, conflict, forbidden, not_found
 from ..models.domain import MediaFile, Post
@@ -22,7 +21,7 @@ STAFF = {"super_admin", "director", "secretary"}
 EDITORS = STAFF | {"club_manager"}
 FINAL = ["official", "rectified"]
 KINDS = ("news", "interview", "gallery", "video", "match_story", "weekly")
-TMP = Path(os.environ.get("UPLOAD_TMP_DIR") or "/app/backend/.uploads")
+UPLOAD_TTL_HOURS = 24
 MAX_BYTES = 300 * 1024 * 1024
 
 
@@ -239,7 +238,14 @@ async def match_story(tournament_id: str, match_id: str, user: CurrentUser = Dep
     return (await _decorate(tournament_id, [p]))[0]
 
 
-# ---------- media (chunked upload → object storage) ----------
+# ---------- media (chunked upload → MongoDB staging → object storage) ----------
+# Lo stato dell'upload vive in MongoDB (non su disco locale): funziona con più istanze/pod e filesystem effimeri.
+async def _ensure_upload_indexes():
+    await db.upload_sessions.create_index("expires_at", expireAfterSeconds=0, name="ttl_upload_sessions")
+    await db.upload_chunks.create_index("expires_at", expireAfterSeconds=0, name="ttl_upload_chunks")
+    await db.upload_chunks.create_index([("upload_id", 1), ("index", 1)], unique=True, name="uniq_upload_chunk")
+
+
 @router.post("/media/uploads", status_code=201)
 async def upload_init(tournament_id: str, body: UploadInit, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user, roles=EDITORS, writable=True)
@@ -247,48 +253,53 @@ async def upload_init(tournament_id: str, body: UploadInit, user: CurrentUser = 
         raise bad_request("Sono ammessi solo immagini, video e PDF")
     if body.size > MAX_BYTES:
         raise bad_request("File troppo grande (max 300 MB)")
-    TMP.mkdir(parents=True, exist_ok=True)
+    await _ensure_upload_indexes()
     upload_id = uuid.uuid4().hex
-    (TMP / f"{upload_id}.json").write_text(json.dumps({**body.model_dump(), "tournament_id": tournament_id, "user_id": user.id, "next": 0}))
-    (TMP / f"{upload_id}.part").write_bytes(b"")
+    await db.upload_sessions.insert_one({"_id": upload_id, **body.model_dump(), "tournament_id": tournament_id, "user_id": user.id, "next": 0, "bytes": 0, "created_at": datetime.now(timezone.utc), "expires_at": datetime.now(timezone.utc) + timedelta(hours=UPLOAD_TTL_HOURS)})
     return {"upload_id": upload_id, "chunk_size": 4 * 1024 * 1024}
 
 
-def _meta(upload_id: str, tournament_id: str) -> dict:
-    f = TMP / f"{upload_id}.json"
-    if not f.exists():
+async def _meta(upload_id: str, tournament_id: str) -> dict:
+    meta = await db.upload_sessions.find_one({"_id": upload_id})
+    if not meta:
         raise not_found("Upload")
-    meta = json.loads(f.read_text())
     if meta["tournament_id"] != tournament_id:
         raise forbidden()
     return meta
 
 
+async def _discard_upload(upload_id: str) -> None:
+    await db.upload_chunks.delete_many({"upload_id": upload_id})
+    await db.upload_sessions.delete_one({"_id": upload_id})
+
+
 @router.put("/media/uploads/{upload_id}/{index}")
 async def upload_chunk(tournament_id: str, upload_id: str, index: int, request: Request, user: CurrentUser = Depends(get_current_user)):
     await require_tournament(tournament_id, user, roles=EDITORS, writable=True)
-    meta = _meta(upload_id, tournament_id)
+    meta = await _meta(upload_id, tournament_id)
     if index != meta["next"]:
         raise conflict(f"Atteso il blocco {meta['next']}")
     data = await request.body()
-    part = TMP / f"{upload_id}.part"
-    if part.stat().st_size + len(data) > MAX_BYTES:
+    if meta["bytes"] + len(data) > MAX_BYTES:
         raise bad_request("File troppo grande")
-    with part.open("ab") as fh:
-        fh.write(data)
-    meta["next"] = index + 1
-    (TMP / f"{upload_id}.json").write_text(json.dumps(meta))
-    return {"received": index + 1, "total": meta["total_chunks"], "bytes": part.stat().st_size}
+    await db.upload_chunks.replace_one({"upload_id": upload_id, "index": index}, {"upload_id": upload_id, "index": index, "data": Binary(data), "expires_at": meta["expires_at"]}, upsert=True)
+    res = await db.upload_sessions.update_one({"_id": upload_id, "next": index}, {"$set": {"next": index + 1}, "$inc": {"bytes": len(data)}})
+    if not res.matched_count:
+        raise conflict("Blocco già ricevuto: riprova il caricamento")
+    return {"received": index + 1, "total": meta["total_chunks"], "bytes": meta["bytes"] + len(data)}
 
 
 @router.post("/media/uploads/{upload_id}/complete", status_code=201)
 async def upload_complete(tournament_id: str, upload_id: str, user: CurrentUser = Depends(get_current_user)):
     t, role = await require_tournament(tournament_id, user, roles=EDITORS, writable=True)
-    meta = _meta(upload_id, tournament_id)
+    meta = await _meta(upload_id, tournament_id)
     if meta["next"] < meta["total_chunks"]:
         raise conflict(f"Upload incompleto: {meta['next']}/{meta['total_chunks']} blocchi")
-    part = TMP / f"{upload_id}.part"
-    data = part.read_bytes()
+    chunks = await db.upload_chunks.find({"upload_id": upload_id}, {"index": 1, "data": 1}).sort("index", 1).to_list(None)
+    if len(chunks) != meta["total_chunks"]:
+        await _discard_upload(upload_id)
+        raise conflict("Upload danneggiato: ripeti il caricamento")
+    data = b"".join(bytes(c["data"]) for c in chunks)
     ext = meta["filename"].rsplit(".", 1)[-1].lower() if "." in meta["filename"] else "bin"
     path = f"{storage.APP_NAME}/{tournament_id}/{uuid.uuid4().hex}.{ext}"
     try:
@@ -296,8 +307,7 @@ async def upload_complete(tournament_id: str, upload_id: str, user: CurrentUser 
     except Exception as e:  # noqa: BLE001
         raise conflict(f"Caricamento su storage non riuscito: {e}")
     doc = await scoped("media", tournament_id).insert(MediaFile(tournament_id=tournament_id, storage_path=res["path"], original_filename=meta["filename"], content_type=meta["content_type"], size=res.get("size", len(data)), kind="image" if meta["content_type"].startswith("image/") else "video", uploaded_by=user.id, club_id=await _own_club(user, tournament_id, role)), user.id)
-    for f in (part, TMP / f"{upload_id}.json"):
-        f.unlink(missing_ok=True)
+    await _discard_upload(upload_id)
     await audit.record(user, "media.upload", "media", doc.id, tournament_id, after={"filename": doc.original_filename, "size": doc.size})
     d = doc.public()
     d["url"] = f"/api/media/{doc.id}"
