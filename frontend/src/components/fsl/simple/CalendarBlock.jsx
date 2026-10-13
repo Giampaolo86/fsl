@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { FileDown, GripVertical, LayoutGrid, List, Pencil, Plus, Star, Trash2, X } from "lucide-react";
+import { FileDown, FileUp, GripVertical, LayoutGrid, List, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import { TimeGrid } from "./TimeGrid";
+import { CsvImportDialog } from "./CsvImportDialog";
 
 export function MatchTable({ rows, onEdit, onSwap, canWrite, showGroup = true, testId, tid, onBulkDeleted }) {
   const [over, setOver] = useState(null);
@@ -82,6 +83,7 @@ const WEEKDAYS = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
 const dayLabel = (d) => (d ? `${WEEKDAYS[new Date(d + "T12:00").getDay()]} ${fmtDate(d)}` : "");
 
 export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, onMove, onBreaks, onSlots, onQuickTeam, onCreate }) {
+  const [csvOpen, setCsvOpen] = useState(false);
   const c = board.calendar;
   const [view, setView] = useState("grid");
   const today = new Date().toISOString().slice(0, 10);
@@ -151,6 +153,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
                 <button type="button" role="tab" aria-selected={view === "list"} onClick={() => setView("list")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "list" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-list"><List className="h-3.5 w-3.5" /> Per girone</button>
               </div>
               {canWrite && <button className="btn-ghost h-9" onClick={() => onCreate({ stage: "qualification" })} data-testid="cal-add-match"><Plus className="h-4 w-4" /> Partita</button>}
+              {canWrite && <button className="btn-ghost h-9" onClick={() => setCsvOpen(true)} title="Importa tutte le categorie da un file CSV «master gare»" data-testid="cal-import-csv"><FileUp className="h-4 w-4" /> Importa CSV</button>}
               <button className="btn-ghost h-9" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button>
             </div>
           </div>
@@ -158,6 +161,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
           {view === "list" && board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
         </div>
       )}
+      {csvOpen && <CsvImportDialog tid={tid} onClose={() => setCsvOpen(false)} onDone={() => { setCsvOpen(false); reload(); }} />}
     </section>
   );
 }
