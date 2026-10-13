@@ -153,18 +153,25 @@ async def registry() -> list[dict]:
 
 
 async def backfill() -> None:
-    """Allineamento una tantum e idempotente: ogni società per torneo ha la sua anagrafica FSL e il responsabile è collegato."""
-    n = 0
-    async for d in db.clubs.find({"deleted_at": None}).sort("updated_at", -1):
-        club = Club.from_mongo(d)
-        before = await get(key_of(club))
-        await ensure_for_club(club)
-        if not before:
-            n += 1
-    async for oc in db.org_clubs.find({"manager_user_id": None}):
-        ids = [str(c["_id"]) async for c in db.clubs.find({"org_club_id": oc["org_key"], "deleted_at": None}, {"_id": 1})]
-        m = await db.tournament_memberships.find_one({"club_id": {"$in": ids}, "role": "club_manager"}) if ids else None
-        if m:
-            await db.org_clubs.update_one({"_id": oc["_id"]}, {"$set": {"manager_user_id": m["user_id"]}})
-    if n:
-        log.info("Anagrafica FSL: create %d società dalle copie per torneo", n)
+    """Allineamento idempotente (mai bloccante per l'avvio): ogni società per torneo ha la sua anagrafica FSL e il responsabile è collegato."""
+    n = skipped = 0
+    try:
+        async for d in db.clubs.find({"deleted_at": None}).sort("updated_at", -1):
+            try:
+                club = Club.from_mongo(d)
+                before = await get(key_of(club))
+                await ensure_for_club(club)
+                if not before:
+                    n += 1
+            except Exception as e:  # noqa: BLE001 - un documento legacy non deve fermare gli altri né l'avvio
+                skipped += 1
+                log.warning("Anagrafica FSL: società %s saltata (%s)", d.get("_id"), e)
+        async for oc in db.org_clubs.find({"manager_user_id": None}):
+            ids = [str(c["_id"]) async for c in db.clubs.find({"org_club_id": oc["org_key"], "deleted_at": None}, {"_id": 1})]
+            m = await db.tournament_memberships.find_one({"club_id": {"$in": ids}, "role": "club_manager"}) if ids else None
+            if m:
+                await db.org_clubs.update_one({"_id": oc["_id"]}, {"$set": {"manager_user_id": m["user_id"]}})
+    except Exception as e:  # noqa: BLE001
+        log.error("Anagrafica FSL: backfill interrotto (%s)", e)
+    if n or skipped:
+        log.info("Anagrafica FSL: create %d società dalle copie per torneo, %d saltate", n, skipped)

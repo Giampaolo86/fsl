@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -156,7 +157,7 @@ async def startup():
     await ensure_link_codes()
     from app.services.org_clubs import backfill as org_clubs_backfill
 
-    await org_clubs_backfill()
+    asyncio.create_task(org_clubs_backfill())  # in background: l'avvio e la risposta alle richieste non dipendono dal backfill
     try:
         storage.init_storage()
     except Exception as e:  # noqa: BLE001
