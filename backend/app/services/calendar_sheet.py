@@ -34,7 +34,7 @@ def _slot_times(sessions, day, step, duration):
     return out
 
 
-def build(tournament_name: str, category: str, board: dict, days: set | None = None, durations: dict | None = None, match_day: int | None = None) -> bytes:
+def build(tournament_name: str, category: str, board: dict, days: set | None = None, durations: dict | None = None, match_day: int | None = None, referee: bool = False, end_time: bool = True) -> bytes:
     """`days`: limita alle date indicate. `durations`: {categoria: minuti} → modalità globale (tutte le categorie insieme, solo gli orari realmente usati)."""
     cal = board["calendar"]
     duration, step = cal.get("match_minutes") or 25, (cal.get("match_minutes") or 25) + (cal.get("buffer_minutes") or 0)
@@ -92,10 +92,16 @@ def build(tournament_name: str, category: str, board: dict, days: set | None = N
                 m = by_key.get((f"{day}T{t}", f["id"]))
                 if m:
                     score = f" <font color='#b45309'><b>{m['score']['home']}–{m['score']['away']}</b></font>" if m.get("played") else ""
-                    tag = f"<br/><font size='7.5' color='#6b7280'>{m['category']} · {m['round_name'] if m['stage'] == 'finals' else m['series'].replace('Girone', 'Gir.')}</font>" if global_mode else ""
+                    m_end = _hhmm_add(t, durations.get(m["category"], duration) if global_mode else duration)
+                    extra = [f"{m['category']} · {m['round_name'] if m['stage'] == 'finals' else m['series'].replace('Girone', 'Gir.')}"] if global_mode else []
+                    if end_time:
+                        extra.append(f"fine {m_end}")
+                    if referee:
+                        extra.append(f"Arb. {m['referee_name']}" if m.get("referee_name") else "Arb. da assegnare")
+                    tag = f"<br/><font size='7.5' color='#6b7280'>{' · '.join(extra)}</font>" if extra else ""
                     cells.append(Paragraph(f"<b>{m['home']}</b> vs <b>{m['away']}</b>{score}{tag}", cell))
                     notes.append(m["round_name"] if m["stage"] == "finals" or global_mode else f"{m.get('round_name', '')} – {m['series'].replace('Girone', 'Gir.')}")
-                    ends.add(_hhmm_add(t, durations.get(m["category"], duration) if global_mode else duration))
+                    ends.add(m_end)
                 else:
                     cells.append(Paragraph("—", note))
             end = ends.pop() if len(ends) == 1 else (None if ends else _hhmm_add(t, duration))

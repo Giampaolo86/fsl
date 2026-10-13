@@ -275,6 +275,15 @@ async def public_schedule(slug: str, request: Request):
     }
 
 
+@router.get("/tournaments/{slug}/calendar.pdf")
+async def public_calendar_pdf(slug: str, request: Request, category: str = "all", match_day: int | None = None, date: str | None = None, end_time: bool = True):
+    """Programma stampabile (tutte le categorie insieme o una sola), per giornata o singola data. Solo gare pubblicate, mai l'arbitro."""
+    from .simple_engine import calendar_pdf_response
+
+    t = await _published(slug, request)
+    return await calendar_pdf_response(t, category, match_day, date, referee=False, end_time=end_time, public=True)
+
+
 @router.get("/tournaments/{slug}/matches/{match_id}")
 async def public_match(slug: str, match_id: str):
     t = await _published(slug)

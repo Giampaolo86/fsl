@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Award, CalendarDays, LayoutGrid, List, Target, TrendingUp, Trophy } from "lucide-react";
+import { Award, CalendarDays, FileDown, LayoutGrid, List, Target, TrendingUp, Trophy } from "lucide-react";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { PublicTimeGrid } from "@/components/fsl/PublicTimeGrid";
 import { MatchCard, MatchStatusBadge, kickoffLabel } from "@/components/fsl/MatchCard";
@@ -19,6 +19,7 @@ import { StatTile } from "@/components/fsl/ProfileKit";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
 import { usePublicTournament } from "@/hooks/usePublicTournament";
 import { api, apiError } from "@/lib/api";
+import { toast } from "sonner";
 
 const Wrap = ({ children, gold = false }) => <div className={`mx-auto max-w-[1488px] px-6 py-10 ${gold ? "gold-skin" : ""}`}>{children}</div>;
 
@@ -46,12 +47,48 @@ export function PublicMatches() {
   const showGrid = view === "griglia" && schedule.fields.length > 0;
   return (
     <Wrap gold>
+      <PublicProgramDownload slug={slug} matches={data} />
       <PageHeader kicker={home.tournament.name} title="Partite" subtitle="Programma per giornata, orario e campo. Un risultato in verifica non incide sulla classifica." actions={<div className="flex items-center gap-2"><div className="inline-flex rounded-full border border-white/15 bg-ink-950/60 p-0.5" role="tablist" data-testid="public-matches-view"><button type="button" role="tab" aria-selected={view === "griglia"} onClick={() => setP({ vista: "griglia" })} className={`inline-flex items-center gap-1 rounded-full px-3 h-8 text-xs font-semibold uppercase tracking-wider ${view === "griglia" ? "bg-fsl-gold text-ink-950" : "text-fsl-slate hover:text-white"}`} data-testid="public-matches-view-grid"><LayoutGrid className="h-3.5 w-3.5" /> Griglia</button><button type="button" role="tab" aria-selected={view === "elenco"} onClick={() => setP({ vista: "elenco" })} className={`inline-flex items-center gap-1 rounded-full px-3 h-8 text-xs font-semibold uppercase tracking-wider ${view === "elenco" ? "bg-fsl-gold text-ink-950" : "text-fsl-slate hover:text-white"}`} data-testid="public-matches-view-list"><List className="h-3.5 w-3.5" /> Elenco</button></div><select className="fsl-input w-40" value={cat} onChange={(e) => setP({ cat: e.target.value })} data-testid="public-matches-category">{home.settings.categories.map((c) => <option key={c}>{c}</option>)}</select></div>} />
       <BracketSection slug={slug} category={cat} className="mb-10" />
       {data.length === 0 ? <EmptyState icon={CalendarDays} title="Calendario in preparazione" description="Le gare compariranno dopo la pubblicazione del calendario." /> : showGrid ? <PublicTimeGrid schedule={schedule} matches={data} slug={slug} /> : Object.entries(groups).map(([round, ms]) => (
         <section key={round} className="mb-8"><SectionTitle right={<span className="text-xs text-fsl-slate num">{kickoffLabel(ms[0].kickoff_at).split(" · ")[0]}</span>}>{round}</SectionTitle><div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="public-matches-grid">{ms.map((m) => <MatchCard key={m.id} m={m} to={`/tornei/${slug}/partite/${m.id}`} />)}</div></section>
       ))}
     </Wrap>
+  );
+}
+
+const WD = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+function PublicProgramDownload({ slug, matches }) {
+  const [round, setRound] = useState("");
+  const [busy, setBusy] = useState(false);
+  const rounds = useMemo(() => {
+    const map = {};
+    matches.filter((m) => m.stage !== "finals" && m.match_day).forEach((m) => { (map[m.match_day] ||= new Set()).add(m.kickoff_at.slice(0, 10)); });
+    return Object.entries(map).map(([r, d]) => ({ round: Number(r), dates: [...d].sort() })).sort((a, b) => a.round - b.round);
+  }, [matches]);
+  if (!rounds.length) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  const cur = round === "" ? (rounds.find((r) => r.dates[r.dates.length - 1] >= today) || rounds[rounds.length - 1]) : rounds.find((r) => r.round === Number(round));
+  const download = async (params, name) => {
+    setBusy(true);
+    try {
+      const r = await api.get(`/public/tournaments/${slug}/calendar.pdf`, { params, responseType: "blob" });
+      const url = URL.createObjectURL(r.data); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
+    } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
+  };
+  const lbl = (d) => `${WD[new Date(d + "T12:00").getDay()]} ${d.slice(8, 10)}/${d.slice(5, 7)}`;
+  return (
+    <div className="mb-8 rounded-2xl border border-fsl-gold/30 bg-ink-950/60 p-4 flex flex-wrap items-center gap-3" data-testid="public-program-download">
+      <div className="min-w-0 flex-1">
+        <div className="font-display font-extrabold uppercase text-lg leading-none text-fsl-gold">Programma della giornata da stampare</div>
+        <p className="text-xs text-fsl-slate mt-1">Tutte le categorie insieme, campo per campo e orario per orario: il foglio da portare al campo.</p>
+      </div>
+      <select className="fsl-input h-10 w-full sm:w-auto" value={cur?.round ?? ""} onChange={(e) => setRound(e.target.value)} aria-label="Giornata" data-testid="public-program-round">
+        {rounds.map((r) => <option key={r.round} value={r.round}>Giornata {r.round} · {r.dates.map(lbl).join(" + ")}</option>)}
+      </select>
+      <button type="button" className="btn-gold h-10" disabled={busy || !cur} onClick={() => download({ category: "all", match_day: cur.round }, `FSL_Programma_Giornata${cur.round}.pdf`)} data-testid="public-program-download-round"><FileDown className="h-4 w-4" /> {busy ? "Preparo…" : "Scarica programma della giornata"}</button>
+      <button type="button" className="btn-ghost h-10" disabled={busy} onClick={() => download({ category: "all" }, "FSL_Programma_Completo.pdf")} data-testid="public-program-download-all">Programma completo</button>
+    </div>
   );
 }
 

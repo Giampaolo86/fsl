@@ -67,7 +67,7 @@ async def _board(tid: str, cat: str) -> dict:
     fields = await scoped("fields", tid).list({"active": True}, sort=[("code", 1)])
 
     def mp(m):
-        return {"id": m.id, "category": m.category, "kickoff_at": m.kickoff_at, "field_id": m.field_id, "field_name": m.field_name, "competition_id": m.competition_id, "series": m.series, "round_name": m.round_name, "note": m.note, "is_grand_final": m.is_grand_final, "match_day": m.match_day, "stage": m.stage, "bracket_round": m.bracket_round, "home_team_id": m.home_team_id, "away_team_id": m.away_team_id, "home": names.get(m.home_team_id, "?"), "away": names.get(m.away_team_id, "?"), "status": m.status, "score": m.score, "played": m.status in PLAYED}
+        return {"id": m.id, "category": m.category, "kickoff_at": m.kickoff_at, "field_id": m.field_id, "field_name": m.field_name, "competition_id": m.competition_id, "series": m.series, "round_name": m.round_name, "note": m.note, "is_grand_final": m.is_grand_final, "match_day": m.match_day, "stage": m.stage, "bracket_round": m.bracket_round, "home_team_id": m.home_team_id, "away_team_id": m.away_team_id, "home": names.get(m.home_team_id, "?"), "away": names.get(m.away_team_id, "?"), "referee_name": m.referee_name, "status": m.status, "score": m.score, "played": m.status in PLAYED}
 
     gl = [{"id": g.id, "name": g.series, "size": g.teams_count, "teams": [_team_pub(tm, clubs) for tm in teams if tm.competition_id == g.id]} for g in groups]
     group_ms = [mp(m) for m in ms if m.stage == "qualification"]
@@ -94,6 +94,10 @@ async def _board(tid: str, cat: str) -> dict:
 async def overview(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
     """Calendario generale: tutte le categorie insieme, campo per campo e giornata per giornata (per gestire ogni weekend come un unico evento)."""
     await _ctx(tournament_id, user)
+    return await _overview(tournament_id)
+
+
+async def _overview(tournament_id: str) -> dict:
     s = await settings_repo.find_one({"tournament_id": tournament_id})
     cats = (s.categories if s else []) or []
     boards = [await _board(tournament_id, c) for c in cats]
@@ -601,26 +605,24 @@ async def fill_finals(tournament_id: str, category: str | None = None, force: bo
 
 
 # ---------- stampa calendario ----------
-@router.get("/calendar.pdf")
-async def calendar_pdf(tournament_id: str, category: str | None = None, match_day: int | None = None, date: str | None = None, user: CurrentUser = Depends(get_current_user)):
+async def calendar_pdf_response(t, category: str | None, match_day: int | None, date: str | None, referee: bool, end_time: bool, public: bool = False):
     """PDF ora × campo. `category=all` = programma globale (tutte le categorie insieme); `match_day` o `date` limitano a una giornata / singola data."""
     from fastapi import Response
 
-    from ..repositories.registry import tournaments as t_repo
     from ..services import calendar_sheet
 
-    await _ctx(tournament_id, user)
-    t = await t_repo.get(tournament_id)
+    s = await settings_repo.find_one({"tournament_id": t.id})
     if category == "all":
-        b = await overview(tournament_id, user)
-        s = await settings_repo.find_one({"tournament_id": tournament_id})
+        b = await _overview(t.id)
         durations = {c: svc.duration_for(s, c)[0] for c in b["categories"]}
         cat, label = "all", "Programma globale"
     else:
-        cat = await _category(tournament_id, category)
-        b = await _board(tournament_id, cat)
+        cat = await _category(t.id, category)
+        b = await _board(t.id, cat)
         durations, label = None, cat
     matches = b["matches"] + b["finals"]
+    if public:
+        matches = [m for m in matches if m["status"] != "draft"]
     if match_day is not None:
         matches = [m for m in matches if (m.get("match_day") or 0) == match_day]
     if date:
@@ -628,10 +630,17 @@ async def calendar_pdf(tournament_id: str, category: str | None = None, match_da
     if not matches:
         raise bad_request("Nessuna partita da stampare")
     days = {m["kickoff_at"][:10] for m in matches} if (match_day is not None or date) else None
-    pdf = calendar_sheet.build(t.name, label, {**b, "matches": [m for m in matches if m["stage"] != "finals"], "finals": [m for m in matches if m["stage"] == "finals"]}, days=days, durations=durations, match_day=match_day)
+    pdf = calendar_sheet.build(t.name, label, {**b, "matches": [m for m in matches if m["stage"] != "finals"], "finals": [m for m in matches if m["stage"] == "finals"]}, days=days, durations=durations, match_day=match_day, referee=referee, end_time=end_time)
     suffix = ("_Globale" if cat == "all" else f"_{cat}") + (f"_Giornata{match_day}" if match_day is not None else "") + (f"_{date}" if date else "")
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="FSL_Calendario_{t.slug}{suffix}.pdf"'})
 
+
+@router.get("/calendar.pdf")
+async def calendar_pdf(tournament_id: str, category: str | None = None, match_day: int | None = None, date: str | None = None, referee: bool = False, end_time: bool = True, user: CurrentUser = Depends(get_current_user)):
+    from ..repositories.registry import tournaments as t_repo
+
+    await _ctx(tournament_id, user)
+    return await calendar_pdf_response(await t_repo.get(tournament_id), category, match_day, date, referee, end_time)
 
 
 class ProgramOptsIn(BaseModel):

@@ -116,10 +116,11 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
       toast.success(`${data.count} partite distribuite su ${data.sessions} session${data.sessions === 1 ? "e" : "i"}`); reload();
     } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
   };
+  const [pdfOpts, setPdfOpts] = useState({ end_time: true, referee: false });
   const downloadPdf = async (params, name) => {
     setPdfBusy(true);
     try {
-      const r = await api.get(`/tournaments/${tid}/simple/calendar.pdf`, { params, responseType: "blob" });
+      const r = await api.get(`/tournaments/${tid}/simple/calendar.pdf`, { params: { ...params, ...pdfOpts }, responseType: "blob" });
       const url = URL.createObjectURL(r.data); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
     } catch (e) { toast.error(apiError(e)); } finally { setPdfBusy(false); }
   };
@@ -172,6 +173,11 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
               {canWrite && board.matches?.length > 0 && <button className="btn-ghost h-9 text-fsl-danger" disabled={clearing} onClick={clearCalendar} title="Elimina tutte le gare del calendario di questa categoria (gironi e squadre restano). Possibile solo se nessuna gara è stata giocata." data-testid="cal-clear-button"><Trash2 className="h-4 w-4" /> {clearing ? "Cancello…" : "Cancella calendario"}</button>}
               {canWrite && <button className="btn-ghost h-9" onClick={() => setCsvOpen(true)} title="Importa tutte le categorie da un file CSV o Excel «master gare»" data-testid="cal-import-csv"><FileUp className="h-4 w-4" /> Importa CSV / Excel</button>}
               <button className="btn-ghost h-9" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button>
+              <div className="inline-flex items-center gap-3 h-9 px-3 rounded-md border border-white/15 text-xs text-fsl-slate" title="Cosa stampare in ogni riquadro del PDF" data-testid="cal-pdf-options">
+                <span className="uppercase tracking-wider text-[10px]">Nel PDF:</span>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" className="accent-[#F4AE2B]" checked={pdfOpts.end_time} onChange={(e) => setPdfOpts({ ...pdfOpts, end_time: e.target.checked })} data-testid="cal-pdf-opt-end" /> orario fine</label>
+                <label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" className="accent-[#F4AE2B]" checked={pdfOpts.referee} onChange={(e) => setPdfOpts({ ...pdfOpts, referee: e.target.checked })} data-testid="cal-pdf-opt-referee" /> arbitro</label>
+              </div>
             </div>
           </div>
           {view === "grid" && <TimeGrid board={board} canWrite={canWrite} onMove={onMove} onEdit={onEdit} onBreaks={onBreaks} onSlots={onSlots} onQuickTeam={onQuickTeam} />}
