@@ -41,6 +41,68 @@ async def my_club(tournament_id: str, user: CurrentUser = Depends(get_current_us
     }
 
 
+async def _club_rows(tournament_id: str, user: CurrentUser):
+    if user.role_in(tournament_id) != "club_manager":
+        raise forbidden("Area riservata al Responsabile Società")
+    club = await scoped("clubs", tournament_id).get(user.club_in(tournament_id))
+    if not club:
+        raise not_found("Società")
+    teams = {tm.id: tm for tm in await scoped("teams", tournament_id).list({"club_id": club.id})}
+    all_teams = {tm.id: tm.name for tm in await scoped("teams", tournament_id).list(limit=3000)}
+    ms = await scoped("matches", tournament_id).list({"$or": [{"home_team_id": {"$in": list(teams)}}, {"away_team_id": {"$in": list(teams)}}], "status": {"$nin": ["cancelled", "draft"]}}, sort=[("kickoff_at", 1)], limit=2000)
+    rows = []
+    for m in ms:
+        is_home = m.home_team_id in teams
+        rows.append({"kickoff_at": m.kickoff_at, "field_name": m.field_name, "venue_name": m.venue_name, "category": m.category, "series": m.series, "round_name": m.round_name, "match_day": m.match_day or 0, "stage": m.stage, "home": all_teams.get(m.home_team_id, "?"), "away": all_teams.get(m.away_team_id, "?"), "is_home": is_home, "team_name": teams[m.home_team_id if is_home else m.away_team_id].name})
+    return club, rows
+
+
+def _rounds(rows: list[dict]) -> list[dict]:
+    out = {}
+    for r in rows:
+        k = r["match_day"] if r["stage"] != "finals" else 0
+        o = out.setdefault(k, {"match_day": k, "dates": set(), "matches": 0})
+        o["dates"].add(r["kickoff_at"][:10])
+        o["matches"] += 1
+    return [{**o, "dates": sorted(o["dates"])} for _, o in sorted(out.items())]
+
+
+@router.get("/club/program")
+async def my_club_program(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Giornate con gare della società (per il selettore di stampa)."""
+    _, rows = await _club_rows(tournament_id, user)
+    rounds = _rounds(rows)
+    today = date.today().isoformat()
+    nxt = next((r for r in rounds if r["dates"] and r["dates"][-1] >= today), rounds[-1] if rounds else None)
+    return {"rounds": rounds, "next_match_day": nxt["match_day"] if nxt else None}
+
+
+@router.get("/club/program.pdf")
+async def my_club_program_pdf(tournament_id: str, match_day: int | None = None, user: CurrentUser = Depends(get_current_user)):
+    """Una pagina A4 con le sole gare della società nella giornata (tutte le sue squadre e categorie)."""
+    from fastapi import Response
+
+    from ..core.errors import bad_request
+    from ..repositories.registry import settings_repo
+    from ..services import club_program
+    from ..services.tournaments import duration_for
+
+    club, rows = await _club_rows(tournament_id, user)
+    if match_day is not None:
+        rows = [r for r in rows if (r["match_day"] if r["stage"] != "finals" else 0) == match_day]
+    if not rows:
+        raise bad_request("Nessuna gara della società da stampare")
+    t = await tournaments.get(tournament_id)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    durations = {c: duration_for(s, c)[0] for c in {r["category"] for r in rows}}
+    pdf = club_program.build(t.name, club.name, match_day, rows, durations)
+    import re, unicodedata
+
+    safe = re.sub(r"[^A-Za-z0-9]+", "_", unicodedata.normalize("NFKD", club.name).encode("ascii", "ignore").decode()).strip("_")
+    name = f"FSL_Programma_{safe}{f'_Giornata{match_day}' if match_day else ''}.pdf"
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
 @router.get("/referee/matches")
 async def my_matches(user: CurrentUser = Depends(get_current_user)):
     if user.role != "referee" and not user.is_super_admin:

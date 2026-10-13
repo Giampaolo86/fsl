@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, ClipboardList, Flag } from "lucide-react";
+import { CalendarDays, ClipboardList, Flag, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { MatchCard } from "@/components/fsl/MatchCard";
 import MatchWorkspace from "@/components/fsl/MatchWorkspace";
@@ -19,7 +19,37 @@ export function ClubCalendar() {
   return (
     <div>
       <PageHeader kicker={data.tournament.name} title="Calendario" subtitle={upcoming ? `${list.length} gare nei prossimi 7 giorni: prepara le distinte in anticipo.` : `${list.length} gare delle tue squadre. Convoca i giocatori aprendo la gara.`} actions={<button className={upcoming ? "btn-gold" : "btn-ghost"} onClick={() => setUpcoming(!upcoming)} aria-pressed={upcoming} data-testid="club-upcoming-button">Prossimi impegni · 7 giorni</button>} />
+      <ClubProgramPrint tid={membership.tournament_id} clubName={data.club.name} />
       {list.length === 0 ? <EmptyState icon={CalendarDays} title="Nessuna gara programmata" /> : <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">{list.map((m) => <MatchCard key={m.id} m={m} to={`/societa/partite/${m.id}`} />)}</div>}
+    </div>
+  );
+}
+
+const WD = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+function ClubProgramPrint({ tid, clubName }) {
+  const [info, setInfo] = useState(null);
+  const [round, setRound] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api.get("/me/club/program", { params: { tournament_id: tid } }).then((r) => { setInfo(r.data); setRound(r.data.next_match_day); }).catch(() => setInfo({ rounds: [] })); }, [tid]);
+  if (!info?.rounds?.length) return null;
+  const lbl = (d) => `${WD[new Date(d + "T12:00").getDay()]} ${d.slice(8, 10)}/${d.slice(5, 7)}`;
+  const download = async () => {
+    setBusy(true);
+    try {
+      const r = await api.get("/me/club/program.pdf", { params: { tournament_id: tid, match_day: round }, responseType: "blob" });
+      const url = URL.createObjectURL(r.data); const a = document.createElement("a"); a.href = url; a.download = `FSL_Programma_${clubName.replace(/\s+/g, "_")}_Giornata${round}.pdf`; a.click(); URL.revokeObjectURL(url);
+    } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
+  };
+  return (
+    <div className="mb-6 rounded-2xl border border-fsl-gold/30 bg-ink-950/60 p-4 flex flex-wrap items-center gap-3" data-testid="club-program-print">
+      <div className="min-w-0 flex-1">
+        <div className="font-display font-extrabold uppercase text-lg leading-none text-fsl-gold">Programma della giornata</div>
+        <p className="text-xs text-fsl-slate mt-1">Una pagina con le sole gare di {clubName}: orari, campi, avversarie e casa/ospite di tutte le tue squadre.</p>
+      </div>
+      <select className="fsl-input h-10 w-full sm:w-auto" value={round ?? ""} onChange={(e) => setRound(Number(e.target.value))} aria-label="Giornata" data-testid="club-program-round">
+        {info.rounds.map((r) => <option key={r.match_day} value={r.match_day}>{r.match_day ? `Giornata ${r.match_day}` : "Fase finale"} · {r.dates.map(lbl).join(" + ")} · {r.matches} gare</option>)}
+      </select>
+      <button type="button" className="btn-gold h-10" disabled={busy || round == null} onClick={download} data-testid="club-program-pdf"><Printer className="h-4 w-4" /> {busy ? "Preparo…" : "Stampa programma"}</button>
     </div>
   );
 }
