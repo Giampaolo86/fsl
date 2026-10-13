@@ -1,0 +1,22 @@
+{
+  "summary": "Iter 56 (SOLO FRONTEND) — Verificati i due flussi richiesti sul Campionato FSL (tid 6ace2360642d7fa9d9ac6496). Login QA MFA via UI /login?area=staff → Control Room → /admin/t/{tid}/calendario, categoria 2014 attiva di default. (A) Toggle 'Tutte le categorie' (cal-view-all): compare cal-all con cal-all-summary che mostra '960 gare · 30 date · 4 campi' e i 4 chip categoria (2014·240 gare·35'+10', 2015·240 gare·35'+10', 2016·240 gare·30'+10', 2017·240 gare·30'+10'). La griglia espone esattamente 30 blocchi [data-testid^='grid-day-']; grid-day-2026-11-28 presente e contiene '32 partite', 4 colonne CAMPO 1..4 e tessere di TUTTE le categorie con kicker tipo '2014 · GIRONE 2', '2015 · GIRONE 2', '2016 · GIRONE 1', '2017 · GIRONE 2' sugli stessi slot 08:30, 09:10, 09:15, 09:50, 10:00, ecc. Click su cal-view-grid → cal-all rimosso (count=0) e il primo grid-day mostra solo gare 2014 (kicker 'GIRONE 1/2', nessun '2015 ·'/'2016 ·'/'2017 ·'). (B) Dialog Importa CSV/Excel (cal-import-csv): box csv-import-builtin-box 'CALENDARIO UFFICIALE FSL 2026/27' con descrizione (128 segnaposto · 8 gironi · 15 giornate · 960 gare · 4 campi · sab+dom 08:30–14:30) e bottone csv-import-builtin 'Usa il calendario ufficiale'. Click SENZA caricare alcun file → anteprima csv-import-table con esattamente 4 righe (2014/2015/2016/2017, ognuna 32 squadre · 15 turni · 240 gare · 240 collocate · 0 da collocare · 240 già presenti · 2026-11-28 → 2027-04-25). Mostrato box csv-import-settings ('4 campi · 16 squadre per girone · Girone 1, Girone 2 · sab/dom 08:30–14:30 · 30 sessioni · durate: 2014 35'+10', 2015 35'+10', 2016 30'+10', 2017 30'+10'') e messaggio 'Nessuna collisione: ogni slot campo/orario è unico…'. Checkbox csv-import-replace presente E visibile (gare già presenti nel torneo). Dialog chiuso con 'Annulla' (NON premuto Importa). 0 errori JS raccolti via pageerror. Cleanup: account qa.superadmin@fsl.demo rimosso con scripts/qa_admin.py delete. Nessuna modifica a torneo/gare/settings.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/test_reports/iter56_all.png",
+    "/app/test_reports/iter56_csv.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "CalendarBlock.jsx — AllCategoriesView (cal-all / cal-all-summary) correttamente collegata al toggle a 3+1 stati (grid/rounds/list/all), con chip categoria dinamici dal payload overview.per_category e warning condizionale quando una data non ha tutte le categorie. TimeGrid rende la vista di sola lettura (canWrite=false) coerentemente — nessun drag abilitato.",
+    "CsvImportDialog.jsx — csv-import-builtin-box + csv-import-builtin innescano run(null, '', 'fsl_2026_27') senza richiedere file. Preview backend risponde entro ~15s con 4 righe × 240 gare. Checkbox csv-import-replace mostrata quando esistono gare preesistenti; messaggio 'Nessuna collisione' coerente."
+  ],
+  "updated_files": [],
+  "success_rate": {"frontend": "100% (2/2 scenari — vista Tutte le categorie e preview calendario ufficiale)"},
+  "test_credentials": "QA Super Admin creato ad hoc con scripts/qa_admin.py create e rimosso a fine run con delete; credenziali/TOTP letti SOLO da backend/.env, non riportati nel report.",
+  "seed_data_creation": "Nessuna. Nessun Importa cliccato, nessun drag, nessuna modifica a gare/settings del torneo Campionato FSL (tid 6ace2360642d7fa9d9ac6496).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rotta UI del simple engine: /admin/t/{tid}/calendario (non /simple). Toggle calendario (cal-view-toggle) ha 4 stati: cal-view-grid, cal-view-rounds, cal-view-list, cal-view-all. 'Tutte le categorie' richiede ~5–10s per renderizzare 30 giornate × fino a 32 tessere → usare timeout generosi (90s+) su cal-all. Il builtin FSL 2026/27 è disponibile via bottone csv-import-builtin SENZA bisogno di file e la preview restituisce 4 righe × 240 gare, 'Nessuna collisione', 240 già presenti; csv-import-replace appare SOLO se esistono gare preesistenti nelle categorie importate. ATTENZIONE: nel DB di anteprima esiste SOLO 'Campionato FSL'; non eliminarlo, non premere Importa, non trascinare gare.",
+  "rca of the issue": "N/A — nessun bug trovato."
+}
