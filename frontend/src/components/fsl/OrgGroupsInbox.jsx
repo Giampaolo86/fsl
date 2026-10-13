@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Clock, Send, Shield, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Send, Shield, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useTournaments } from "@/context/TournamentContext";
@@ -45,6 +45,17 @@ export function OrgGroupsInbox({ onChanged }) {
   const [inviting, setInviting] = useState(null);
   const [sel, setSel] = useState([]);
   const load = useCallback(() => api.get("/org-groups").then((r) => setData(r.data)).catch(() => setData({ pending: [], recent: [], clubs_without_tournament: [] })), []);
+  const [purging, setPurging] = useState(false);
+  const unregistered = (data?.clubs_without_tournament || []).filter((c) => !c.registered);
+  const removeOrg = async (c) => {
+    if (!window.confirm(`Eliminare definitivamente «${c.name}» dall'anagrafe FSL? Nessun account è collegato: l'operazione è irreversibile.`)) return;
+    try { await api.delete(`/org-clubs/${c.org_key}`); toast.success(`«${c.name}» eliminata dall'anagrafe`); load(); onChanged?.(); } catch (e) { toast.error(apiError(e)); }
+  };
+  const purgeUnregistered = async () => {
+    if (!window.confirm(`Eliminare definitivamente ${unregistered.length} società senza responsabile registrato e senza tornei?\n\n${unregistered.slice(0, 12).map((c) => c.name).join(", ")}${unregistered.length > 12 ? "…" : ""}\n\nLe società con un account registrato o presenti in un torneo NON vengono toccate.`)) return;
+    setPurging(true);
+    try { const { data: r } = await api.post("/org-clubs/purge-unregistered", { keys: unregistered.map((c) => c.org_key) }); toast.success(`${r.deleted.length} società eliminate dall'anagrafe`); load(); onChanged?.(); } catch (e) { toast.error(apiError(e)); } finally { setPurging(false); }
+  };
   useEffect(() => { load(); }, [load]);
   if (!data) return null;
   const active = (tournaments || []).filter((t) => t.status !== "archived");
@@ -75,8 +86,10 @@ export function OrgGroupsInbox({ onChanged }) {
       )}
       {data.clubs_without_tournament.length > 0 && (
         <div className="fsl-card p-4 space-y-2" data-testid="org-clubs-orphans">
-          <div className="flex items-center gap-2 text-sm font-semibold"><Shield className="h-4 w-4 text-fsl-gold" /> Società registrate senza torneo <span className="text-xs text-fsl-slate font-normal">· entrano nell'Area Società e aggiungono i gruppi; tu li inviti qui sopra</span></div>
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2">{data.clubs_without_tournament.map((c) => <div key={c.id} className="rounded-md border border-white/10 px-3 py-2 text-xs" data-testid={`org-club-${c.id}`}><div className="font-semibold text-sm">{c.name}{c.city ? <span className="text-fsl-slate font-normal"> · {c.city}</span> : null}</div><div className="text-fsl-slate truncate">{c.contact_name} · {c.email}{c.phone ? ` · ${c.phone}` : ""}</div></div>)}</div>
+          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold"><Shield className="h-4 w-4 text-fsl-gold" /> Società registrate senza torneo <span className="text-xs text-fsl-slate font-normal">· entrano nell'Area Società e aggiungono i gruppi; tu li inviti qui sopra</span>
+            {unregistered.length > 0 && <button className="btn-ghost h-8 ml-auto text-xs text-fsl-danger border-fsl-danger/40" disabled={purging} onClick={purgeUnregistered} title="Elimina dall'anagrafe le società senza responsabile registrato e senza tornei (fittizie o di prova)" data-testid="org-clubs-purge-unregistered"><Trash2 className="h-3.5 w-3.5" /> Elimina le {unregistered.length} senza registrazione</button>}
+          </div>
+          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-2">{data.clubs_without_tournament.map((c) => <div key={c.id} className="rounded-md border border-white/10 px-3 py-2 text-xs flex items-start gap-2" data-testid={`org-club-${c.id}`}><div className="flex-1 min-w-0"><div className="font-semibold text-sm">{c.name}{c.city ? <span className="text-fsl-slate font-normal"> · {c.city}</span> : null}</div><div className="text-fsl-slate truncate">{c.registered ? <span className="text-fsl-success">Responsabile registrato</span> : <span className="text-fsl-warning">Nessun account</span>}{c.contact_name || c.email ? ` · ${[c.contact_name, c.email].filter(Boolean).join(" · ")}` : ""}</div></div>{!c.registered && <button className="text-fsl-slate/60 hover:text-fsl-danger shrink-0" title="Elimina definitivamente dall'anagrafe" onClick={() => removeOrg(c)} data-testid={`org-club-delete-${c.id}`}><Trash2 className="h-4 w-4" /></button>}</div>)}</div>
         </div>
       )}
       {data.recent.length > 0 && <div className="text-xs text-fsl-slate flex items-center gap-2" data-testid="org-groups-recent"><CheckCircle2 className="h-3.5 w-3.5 text-fsl-success" /> Ultimi inviti: {data.recent.slice(0, 4).map((g) => `${g.club_name} ${g.category} → ${g.tournament_name}`).join(" · ")}</div>}

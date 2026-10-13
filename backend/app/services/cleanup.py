@@ -37,9 +37,23 @@ async def disable_test_accounts_in_production() -> list[str]:
     return out
 
 
+async def demo_seed_blocked() -> bool:
+    """Il seed demo non deve mai tornare: bloccato se è stato cancellato un torneo demo o se esistono tornei reali."""
+    if await db.system_flags.find_one({"key": "demo_seed_disabled"}):
+        return True
+    return await db.tournaments.count_documents({"slug": {"$nin": list(DEMO_TOURNAMENT_SLUGS)}}) > 0
+
+
+async def block_demo_seed(reason: str) -> None:
+    await db.system_flags.update_one({"key": "demo_seed_disabled"}, {"$set": {"key": "demo_seed_disabled", "reason": reason, "at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()}}, upsert=True)
+
+
 async def delete_tournament(tournament_id: str) -> dict:
     """Hard delete: the tournament and every document scoped to it, in every collection."""
     removed = {}
+    t = await db.tournaments.find_one({"_id": ObjectId(tournament_id)}, {"slug": 1})
+    if t and t.get("slug") in DEMO_TOURNAMENT_SLUGS:
+        await block_demo_seed(f"torneo demo «{t['slug']}» eliminato dall'utente")
     for name in await db.list_collection_names():
         if name in ("tournaments", "schema_migrations", "backups", "security_events", "audit_logs", "stripe_events", "rate_limits"):
             continue

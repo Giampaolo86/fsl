@@ -157,7 +157,7 @@ async def list_org_groups(user: CurrentUser = Depends(get_current_user)):
     pend = await org_groups.list({"status": "pending"}, sort=[("created_at", 1)])
     recent = await org_groups.list({"status": "invited"}, sort=[("updated_at", -1)], limit=20)
     linked = {d["org_club_id"] async for d in __import__("app.core.db", fromlist=["db"]).db.clubs.find({"deleted_at": None, "org_club_id": {"$ne": None}}, {"org_club_id": 1})}
-    orphans = [{"id": c.id, "name": c.name, "city": c.city, "contact_name": c.contact_name, "email": c.email, "phone": c.phone, "org_key": c.org_key, "created_at": c.created_at} for c in await org_clubs.list(sort=[("created_at", -1)], limit=500) if c.org_key not in linked]
+    orphans = [{"id": c.id, "name": c.name, "city": c.city, "contact_name": c.contact_name, "email": c.email, "phone": c.phone, "org_key": c.org_key, "created_at": c.created_at, "registered": bool(c.manager_user_id)} for c in await org_clubs.list(sort=[("created_at", -1)], limit=500) if c.org_key not in linked]
     return {"pending": [_og_pub(g, tnames) for g in pend], "recent": [_og_pub(g, tnames) for g in recent], "clubs_without_tournament": orphans}
 
 

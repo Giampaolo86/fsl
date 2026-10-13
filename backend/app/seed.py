@@ -149,6 +149,11 @@ async def seed_all():
     if not os.environ.get("QA_PASSWORD"):
         logging.getLogger("fsl").warning("SEED_DEMO attivo ma QA_PASSWORD mancante: account demo non creati")
         return
+    from .services.cleanup import demo_seed_blocked
+
+    if await demo_seed_blocked():
+        logging.getLogger("fsl").warning("SEED_DEMO attivo ma il database contiene tornei reali o un torneo demo è stato eliminato: seed demo saltato")
+        return
     qa_admin = await upsert_user("qa.superadmin@fsl.demo", os.environ["QA_PASSWORD"], "QA Super Admin", "super_admin", is_super_admin=True)
     demo_director = await users.find_one({"email": "direttore@fsl.demo"})
     await enroll_demo_mfa(*[u for u in (qa_admin, demo_director) if u])

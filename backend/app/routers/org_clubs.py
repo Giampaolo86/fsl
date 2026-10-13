@@ -107,6 +107,67 @@ async def create_invite(key: str, user: CurrentUser = Depends(get_current_user))
     return inv.public()
 
 
+async def _org_in_use(key: str) -> dict:
+    from ..core.db import db
+    from .club_groups import org_groups
+
+    clubs = await db.clubs.count_documents({"deleted_at": None, "org_club_id": key})
+    groups = await org_groups.list({"org_key": key}, limit=200)
+    return {"clubs": clubs, "groups": [g.id for g in groups]}
+
+
+@router.delete("/{key}")
+async def delete_org_club(key: str, user: CurrentUser = Depends(get_current_user)):
+    """Elimina definitivamente una società dall'anagrafe FSL: solo se non ha un responsabile registrato e non partecipa ad alcun torneo."""
+    _staff(user)
+    from ..core.db import db
+    from .club_groups import org_groups
+
+    c = await svc.get(key)
+    if not c:
+        raise not_found("Società")
+    if c.manager_user_id:
+        raise conflict("La società ha un responsabile registrato: non si elimina dall'anagrafe")
+    use = await _org_in_use(key)
+    if use["clubs"]:
+        raise conflict(f"La società partecipa a {use['clubs']} torneo/i: toglila prima dai tornei")
+    for gid in use["groups"]:
+        await org_groups.soft_delete(gid, user.id)
+    await db.org_clubs.delete_one({"org_key": key})
+    await db.org_invites.delete_many({"org_key": key}) if "org_invites" in await db.list_collection_names() else None
+    await audit.record(user, "org_club.delete", "org_club", c.id, None, before={"org_key": key, "name": c.name})
+    return {"ok": True, "deleted": c.name, "groups_removed": len(use["groups"])}
+
+
+@router.get("/purge-unregistered/preview")
+async def purge_unregistered_preview(user: CurrentUser = Depends(get_current_user)):
+    """Società in anagrafe senza responsabile registrato e senza alcun torneo: candidate alla pulizia (società fittizie/di prova)."""
+    _staff(user)
+    from ..core.db import db
+
+    linked = {d["org_club_id"] async for d in db.clubs.find({"deleted_at": None, "org_club_id": {"$ne": None}}, {"org_club_id": 1})}
+    out = [{"org_key": c.org_key, "name": c.name, "city": c.city} for c in await svc.org_clubs.list(limit=2000) if not c.manager_user_id and c.org_key not in linked]
+    return {"items": out}
+
+
+class PurgeKeysIn(BaseModel):
+    keys: list[str] = []
+
+
+@router.post("/purge-unregistered")
+async def purge_unregistered(body: PurgeKeysIn, user: CurrentUser = Depends(get_current_user)):
+    _staff(user)
+    if not user.is_super_admin:
+        raise forbidden("Solo il Super Admin")
+    allowed = {x["org_key"] for x in (await purge_unregistered_preview(user))["items"]}
+    deleted = []
+    for key in body.keys:
+        if key in allowed:
+            r = await delete_org_club(key, user)
+            deleted.append(r["deleted"])
+    return {"ok": True, "deleted": deleted}
+
+
 @router.post("/{key}/enroll", status_code=201)
 async def enroll(key: str, body: EnrollIn, user: CurrentUser = Depends(get_current_user)):
     """Iscrive una società FSL già registrata a un torneo: nessun nuovo invito, il responsabile entra subito; una squadra (e una rosa) per ogni categoria scelta.

@@ -468,7 +468,7 @@ async def clubs_overview(user: CurrentUser = Depends(get_current_user)):
         for c in clubs:
             comp = club_completeness(c, bool(c.venue_id))
             ready = await club_readiness(t.id, c, comp["missing"])
-            out.append({"id": c.id, "tournament_id": t.id, "tournament_name": t.name, "tournament_slug": t.slug, "name": c.name, "slug": c.slug, "city": c.city, "crest_url": c.crest_url, "crest_is_placeholder": c.crest_is_placeholder, "colors": c.colors, "org_club_id": c.org_club_id, "teams_count": counts.get(c.id, 0), "approval_status": c.approval_status, "has_draft": bool(c.profile_draft), "readiness": {"score": ready["score"], "done": ready["done"], "total": ready["total"], "todo": [i["label"] for i in ready["items"] if not i["info"] and i["done"] is False]}, **comp})
+            out.append({"id": c.id, "org_key": c.org_club_id, "tournament_id": t.id, "tournament_name": t.name, "tournament_slug": t.slug, "name": c.name, "slug": c.slug, "city": c.city, "crest_url": c.crest_url, "crest_is_placeholder": c.crest_is_placeholder, "colors": c.colors, "org_club_id": c.org_club_id, "teams_count": counts.get(c.id, 0), "approval_status": c.approval_status, "has_draft": bool(c.profile_draft), "readiness": {"score": ready["score"], "done": ready["done"], "total": ready["total"], "todo": [i["label"] for i in ready["items"] if not i["info"] and i["done"] is False]}, **comp})
     return {"items": out, "labels": dict(COMPLETENESS)}
 
 
