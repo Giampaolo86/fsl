@@ -147,7 +147,8 @@ def duration_for(s: TournamentSettings, cat: str | None) -> tuple[int, int]:
 def apply_structure(s: TournamentSettings) -> TournamentSettings:
     if is_groups(s):
         s.groups_count = max(1, s.groups_count)
-        s.series = [f"Girone {chr(65 + i)}" for i in range(s.groups_count)]
+        if len(s.series) != s.groups_count:
+            s.series = [f"Girone {chr(65 + i)}" for i in range(s.groups_count)]
         s.teams_per_series = max(group_sizes(s))
     return s
 
@@ -210,7 +211,7 @@ async def sync_competitions(t: Tournament, s: TournamentSettings, actor):
             n = sizes[idx] if idx < len(sizes) else s.teams_per_series
             summary_rounds = _rounds(n, s.formula == "double_round_robin")
             data = {"teams_count": n, "rounds": summary_rounds, "points": s.points, "tiebreakers": s.tiebreakers, "zones": s.playoff_rules.get(ser, {})}
-            if groups:
+            if groups and not data["zones"]:
                 data["zones"] = {"qualificate": [1, s.qualifiers_per_group]}
             if code in existing:
                 await repo.update(existing[code].id, data, uid)

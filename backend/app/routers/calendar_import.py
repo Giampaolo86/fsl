@@ -188,7 +188,7 @@ def _settings_patch(a: dict, s) -> dict:
         "match_days": [WEEKDAYS[i] for i in sorted({datetime.strptime(x["date"], "%Y-%m-%d").weekday() for x in sess})],
         "day_start": day_start, "day_end": day_end,
         "calendar_sessions": sorted(keep + sess, key=lambda x: (x["date"], x["start_time"])),
-        "teams_per_series": max(sizes), "series": series, "groups_count": len(series), "teams_total": 0,
+        "teams_per_series": max(sizes), "series": series, "groups_count": len(series), "teams_total": sum(first["groups"].values()),
         "match_duration_min": min(all_mins), "buffer_min": min(all_buf),
         "duration_by_category": {**(s.duration_by_category or {}), **durations},
         "max_matches_per_team_per_weekend": s.max_matches_per_team_per_weekend if a["week_overlaps"] else 1,

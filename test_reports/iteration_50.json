@@ -1,0 +1,58 @@
+{
+  "summary": "Testing completo dell'import FSL 960 gare sul torneo 'La Serie A dei Bambini' (tid 6a9b5b045d9e0985643d0a9f). Backend: 12/12 pytest OK (preview, apply-409, settings shape, PATCH durata, board 2014/2016, groups/conflicts, public schedule+matches, templates, CSV incoerenti con avvisi). Frontend: login QA MFA OK, pagina Impostazioni mostra 'Durata per categoria' con 4 card e valori corretti, pagina Calendario mostra Girone 1/Girone 2 (16+16) e 240 partite 2014, dialog Importa CSV con tabella 4 righe, formato 9v9/7v7, box impostazioni corretto, 'Nessuna collisione', bottone Importa disabilitato senza spunta replace. Portale pubblico /tornei/.../partite mostra correttamente 4 campi e gare del 2026-11-28.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "PATCH /api/tournaments/{tid}",
+        "issue": "settings.duration_by_category viene REPLACED (sostituito interamente) invece di MERGED quando il body contiene solo alcune categorie. Esempio: PATCH {settings:{duration_by_category:{'2014':{...}}}} elimina 2015/2016/2017 dal DB. Verificato in test: dopo la PATCH con solo 2014, GET /api/tournaments/{tid} restituisce duration_by_category contenente SOLO 2014. Impatto: la UI di Impostazioni che salva una categoria alla volta cancellerà silenziosamente le altre (es. board 2015 ricadrà sul match_minutes di default invece che su quello importato). _settings_patch in calendar_import.py fa merge corretto, ma la rotta PATCH generale no.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {"endpoint": "preview categories[].formato", "issue": "chiave 'formato' (italiano) invece di 'format' indicata nel problem statement; non è un bug ma un nome diverso dalla documentazione del test."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Settings / 'Durata per categoria' + 'Salva impostazioni'",
+        "issue": "Dopo aver modificato settings-duration-2014 da 35 a 36 (campo dirty), il pulsante settings-save-button rimane disabled per 30s+ (timeout di click). Causa probabile: validazione pre-esistente 'Servono almeno 3 squadre' nel blocco Playoff/Finale disabilita il save globale indipendentemente dalla modifica alla durata. Il salvataggio è stato possibile solo via API PATCH.",
+        "selector": "[data-testid=\"settings-save-button\"]",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Settings 'Squadre per serie'",
+        "issue": "data-testid 'settings-teams-input' non trovato nella pagina (teams_per_series = 16 presente nel DB ma non associato al testid richiesto). Il campo 'Numero campi' viene trovato come input name=fields_count (valore 4 corretto).",
+        "selector": "[data-testid=\"settings-teams-input\"]",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fsl_import_960.py",
+    "/app/test_reports/pytest/fsl_960.xml"
+  ],
+  "action_items": [
+    "Fix PATCH /api/tournaments/{tid}: eseguire deep-merge di settings.duration_by_category (e in generale dei dict annidati di settings) anziché sostituzione completa, oppure far sì che la UI invii SEMPRE l'intero dict delle 4 categorie quando salva una singola card.",
+    "Fix Settings page: scorporare la validazione 'Servono almeno 3 squadre' dal pulsante Salva globale, oppure consentire comunque il salvataggio dei campi non-finali (es. duration_by_category). In alternativa, mostrare un errore chiaro accanto al Save (al momento appare 'inerte').",
+    "Aggiungere data-testid='settings-teams-input' al campo 'Squadre per serie' nella Settings page.",
+    "Dopo il fix del PATCH, lo stato del torneo 'La Serie A dei Bambini' è stato ripristinato con tutte e 4 le categorie in duration_by_category (via PATCH completa durante il test). Non è richiesta pulizia aggiuntiva."
+  ],
+  "critical_code_review_comments": [
+    "calendar_import._settings_patch unisce correttamente duration_by_category, ma la rotta PATCH /api/tournaments/{tid} non fa deep-merge: verificare update() dict shallow in services/tournaments.py.",
+    "test_tournament_templates: endpoint /api/tournaments/templates esiste e include serie_a_bambini con teams_per_series=16, fields_count=4, series Girone 1/Girone 2 e duration_by_category: OK.",
+    "Public /api/public/tournaments/{slug}/schedule espone correttamente duration_by_category, fields_count=4, sessions=30."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fsl_import_960.py (nuovo)"
+  ],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "85%"},
+  "test_credentials": "QA Super Admin creato con scripts/qa_admin.py create (qa.superadmin@fsl.demo + password/TOTP da backend/.env) ed eliminato con 'delete' a fine test.",
+  "seed_data_creation": "Nessuna. Non sono stati creati tornei QA aggiuntivi: i CSV di prova (formato incoerente, stessa squadra nel weekend) sono stati inviati SOLO al preview del torneo 'La Serie A dei Bambini' (nessun apply), quindi nessun dato è stato modificato.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "L'import 960 è funzionante. Dopo i test, duration_by_category sul torneo contiene tutte e 4 le categorie con valori 2014/2015=35+10 e 2016/2017=30+10. Il bug principale da verificare dopo il fix è: PATCH /api/tournaments/{tid} con duration_by_category parziale deve fare MERGE (non replace). Il pulsante Salva su /admin/t/{tid}/impostazioni va sbloccato o la validazione finali va isolata.",
+  "rca_of_the_issue": "PATCH tournament settings esegue dict.update shallow su settings, quindi settings['duration_by_category'] viene sovrascritto per intero dal payload. La fix richiede un merge ricorsivo (o whitelist di chiavi 'merge-only' tra cui duration_by_category e playoff_rules). Mitigazione lato UI: inviare sempre l'intero dict delle 4 categorie quando si salva una card."
+}
