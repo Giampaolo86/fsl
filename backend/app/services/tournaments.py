@@ -262,7 +262,8 @@ async def create_tournament(payload: dict, actor, mode: str = "scratch") -> Tour
             raise not_found("Torneo di origine")
         settings_data = src_settings.model_dump(exclude={"id", "tournament_id", "created_at", "updated_at", "created_by", "updated_by", "deleted_at"})
 
-    settings_data.update({k: v for k, v in (payload.get("settings") or {}).items() if v is not None or k in ("break_start", "break_end")})
+    META = {"id", "_id", "tournament_id", "created_at", "updated_at", "created_by", "updated_by", "deleted_at", "slots"}
+    settings_data.update({k: v for k, v in (payload.get("settings") or {}).items() if k not in META and (v is not None or k in ("break_start", "break_end"))})
     settings_data.setdefault("categories", [])
     settings_data.setdefault("series", ["Girone unico"])
 
@@ -279,13 +280,21 @@ async def create_tournament(payload: dict, actor, mode: str = "scratch") -> Tour
         end_date=payload.get("end_date"),
         visual=payload.get("visual") or {},
     )
+    try:
+        s = TournamentSettings(tournament_id="pending", **settings_data)
+    except (TypeError, ValueError) as e:
+        raise bad_request(f"Impostazioni non valide: {e}")
     t = await tournaments.insert(t, actor.id if actor else None)
-    s = TournamentSettings(tournament_id=t.id, **settings_data)
-    s.slots = compute_slots(s.day_start, s.day_end, s.match_duration_min, s.buffer_min, s.break_start, s.break_end)
-    apply_structure(s)
-    await settings_repo.insert(s, actor.id if actor else None)
-    await sync_competitions(t, s, actor)
-    await ensure_fields(t, s, actor)
+    try:
+        s.tournament_id = t.id
+        s.slots = compute_slots(s.day_start, s.day_end, s.match_duration_min, s.buffer_min, s.break_start, s.break_end)
+        apply_structure(s)
+        await settings_repo.insert(s, actor.id if actor else None)
+        await sync_competitions(t, s, actor)
+        await ensure_fields(t, s, actor)
+    except Exception:
+        await tournaments.hard_delete(t.id)
+        raise
 
     if mode == "duplicate" and payload.get("copy_clubs", True):
         src_clubs = await scoped("clubs", source_id).list()

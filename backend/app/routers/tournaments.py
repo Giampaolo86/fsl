@@ -77,6 +77,9 @@ async def _enrich(t, include_settings=True) -> dict:
     elif s:
         data["settings"] = {"categories": s.categories, "series": s.series, "teams_per_series": s.teams_per_series, "fields_count": s.fields_count, "formula": s.formula}
         data["summary"] = svc.compute_summary(s)
+    else:
+        data["settings"] = {"categories": [], "series": [], "teams_per_series": 0, "fields_count": 0, "formula": "league"}
+        data["summary"] = {"competitions": 0, "teams_capacity": 0, "matches_per_competition": 0, "group_matches": 0, "finals_matches": 0, "group_sizes": [], "rounds": 0, "matches_total": 0, "matches_per_day": 0, "matches_per_weekend": 0, "weekends_needed": None, "incomplete": True}
     data["counts"] = await _counts(t.id)
     return data
 

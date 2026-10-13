@@ -82,7 +82,7 @@ export default function NewTournament() {
       const src = tournaments.find((x) => x.id === sourceId);
       if (src) {
         api.get(`/tournaments/${src.id}`).then(({ data }) => {
-          const s = data.settings;
+          const { id, tournament_id, created_at, updated_at, created_by, updated_by, deleted_at, slots, ...s } = data.settings; // eslint-disable-line no-unused-vars
           setSettings({ ...DEFAULT_SETTINGS, ...s });
           setForm((f) => ({ ...f, name: f.name || `${src.name} (copia)`, payoff: src.payoff, description: src.description }));
         });

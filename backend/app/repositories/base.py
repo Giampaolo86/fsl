@@ -73,6 +73,9 @@ class Repository:
         )
         return self.model.from_mongo(res)
 
+    async def hard_delete(self, id: str):
+        await self.col.delete_one({"_id": ObjectId(id)})
+
     async def soft_delete(self, id: str, actor_id: Optional[str] = None):
         await self.col.update_one(self._base_filter({"_id": oid(id)}), {"$set": {"deleted_at": utcnow(), "updated_by": actor_id}})
 
