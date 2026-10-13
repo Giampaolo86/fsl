@@ -277,7 +277,7 @@ async def import_preview(tournament_id: str, file: UploadFile = File(...), optio
 
 
 @router.post("/import-csv/apply", status_code=201)
-async def import_apply(tournament_id: str, file: UploadFile = File(...), option: str = Form(""), replace: bool = Form(False), user: CurrentUser = Depends(get_current_user)):
+async def import_apply(tournament_id: str, file: UploadFile = File(...), option: str = Form(""), replace: bool = Form(False), force: bool = Form(False), user: CurrentUser = Depends(get_current_user)):
     """Crea gironi, squadre segnaposto (o reali se il nome coincide), campi e gare per tutte le categorie del CSV; aggiorna le impostazioni del torneo."""
     t, _ = await _ctx(tournament_id, user, writable=True)
     rows, cols = _parse(await file.read(), file.filename or "")
@@ -302,8 +302,8 @@ async def import_apply(tournament_id: str, file: UploadFile = File(...), option:
         cat = c["category"]
         old = await matches_repo.list({"category": cat, "stage": "qualification", "status": {"$ne": "cancelled"}}, limit=5000)
         if old:
-            if any(m.status in PLAYED for m in old):
-                raise conflict(f"Categoria {cat}: ci sono gare già giocate, importazione bloccata")
+            if any(m.status in PLAYED for m in old) and not (force and user.is_super_admin):
+                raise conflict(f"Categoria {cat}: ci sono gare già giocate, importazione bloccata" + (". Come Super Admin puoi forzare la sostituzione" if user.is_super_admin else ""))
             if not replace:
                 raise conflict(f"Categoria {cat}: esistono già {len(old)} gare dei gironi. Spunta «Sostituisci il calendario esistente» per rimpiazzarle")
             for m in old:
@@ -340,6 +340,10 @@ async def import_apply(tournament_id: str, file: UploadFile = File(...), option:
             f = fields.get(it["field"]) if it["field"] else None
             await matches_repo.insert(Match(tournament_id=tournament_id, competition_id=groups[it["girone"]].id, home_team_id=team_ids[it["home"]], away_team_id=team_ids[it["away"]], category=cat, series=it["girone"], match_day=it["round"], round_name=f"Giornata {it['round']}", kickoff_at=it["kickoff_at"], field_id=f.id if f else None, field_name=f.name if f else "", venue_name=venue.name if venue else ""), user.id)
             created += 1
+        for gir, g in groups.items():
+            for tm in await teams_repo.list({"competition_id": g.id, "placeholder": True}, limit=200):
+                if tm.id not in team_ids.values():
+                    await teams_repo.soft_delete(tm.id, user.id)
         await _knockout(tournament_id, cat, create=True, actor=user)
         report.append({"category": cat, "groups": len(groups), "teams_created": created_teams, "matches_created": created, "matches_skipped": skipped, "replaced": len(old)})
     patch = {}

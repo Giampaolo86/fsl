@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { CalendarRange, FileDown, FileUp, GripVertical, LayoutGrid, List, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { api, apiError } from "@/lib/api";
+import { api, apiError, withForce } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import { TimeGrid } from "./TimeGrid";
 import { CsvImportDialog } from "./CsvImportDialog";
@@ -90,7 +90,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
     if (!window.confirm(`Cancellare tutte le ${board.matches.length} gare del calendario della categoria ${board.category}? Gironi e squadre restano; nessuna gara giocata verrà toccata.`)) return;
     const withFinals = finalsCount > 0 && window.confirm(`Cancellare anche le ${finalsCount} gare della fase finale?`);
     setClearing(true);
-    try { const { data } = await api.delete(`/tournaments/${tid}/simple/calendar`, { params: { category: board.category, finals: withFinals } }); toast.success(`Calendario cancellato: ${data.deleted} gare${data.finals_deleted ? ` + ${data.finals_deleted} di fase finale` : ""}`); reload(); } catch (e) { toast.error(apiError(e)); } finally { setClearing(false); }
+    try { const { data } = await withForce((force) => api.delete(`/tournaments/${tid}/simple/calendar`, { params: { category: board.category, finals: withFinals, force } })); toast.success(`Calendario cancellato: ${data.deleted} gare${data.finals_deleted ? ` + ${data.finals_deleted} di fase finale` : ""}`); reload(); } catch (e) { toast.error(apiError(e)); } finally { setClearing(false); }
   };
   const c = board.calendar;
   const [view, setView] = useState("grid");
@@ -149,7 +149,10 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
         )}
       </div>
       {board.matches.length === 0 ? (
-        <p className="text-sm text-fsl-slate" data-testid="cal-empty">{board.groups.length ? "Indica quando si gioca (es. sabato 15:00→19:00 e domenica 08:30→12:30), campi e durata, poi premi «Genera calendario»." : "Crea prima i gironi."}</p>
+        <div className="flex flex-wrap items-center gap-3" data-testid="cal-empty-wrap">
+          <p className="text-sm text-fsl-slate" data-testid="cal-empty">{board.groups.length ? "Indica quando si gioca (es. sabato 15:00→19:00 e domenica 08:30→12:30), campi e durata, poi premi «Genera calendario»." : "Crea prima i gironi."} Hai già il calendario in un file? Usa «Importa CSV / Excel»: carica tutte le categorie in un colpo solo.</p>
+          {canWrite && <button className="btn-gold h-9" onClick={() => setCsvOpen(true)} title="Importa tutte le categorie da un file CSV o Excel «master gare»" data-testid="cal-import-csv"><FileUp className="h-4 w-4" /> Importa CSV / Excel</button>}
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3 text-xs text-fsl-slate">
@@ -163,7 +166,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
               </div>
               {canWrite && <button className="btn-ghost h-9" onClick={() => onCreate({ stage: "qualification" })} data-testid="cal-add-match"><Plus className="h-4 w-4" /> Partita</button>}
               {canWrite && board.matches?.length > 0 && <button className="btn-ghost h-9 text-fsl-danger" disabled={clearing} onClick={clearCalendar} title="Elimina tutte le gare del calendario di questa categoria (gironi e squadre restano). Possibile solo se nessuna gara è stata giocata." data-testid="cal-clear-button"><Trash2 className="h-4 w-4" /> {clearing ? "Cancello…" : "Cancella calendario"}</button>}
-              {canWrite && <button className="btn-ghost h-9" onClick={() => setCsvOpen(true)} title="Importa tutte le categorie da un file CSV «master gare»" data-testid="cal-import-csv"><FileUp className="h-4 w-4" /> Importa CSV</button>}
+              {canWrite && <button className="btn-ghost h-9" onClick={() => setCsvOpen(true)} title="Importa tutte le categorie da un file CSV o Excel «master gare»" data-testid="cal-import-csv"><FileUp className="h-4 w-4" /> Importa CSV / Excel</button>}
               <button className="btn-ghost h-9" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button>
             </div>
           </div>

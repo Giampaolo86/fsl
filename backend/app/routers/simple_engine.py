@@ -159,32 +159,37 @@ async def setup_groups(tournament_id: str, body: SetupIn, user: CurrentUser = De
     return await _board(tournament_id, cat)
 
 
-async def _clear_group_matches(tid: str, cat: str, user, label="rigenerare il calendario") -> int:
+def _forced(user, force: bool) -> bool:
+    """Solo il Super Admin può forzare le operazioni che toccano gare già giocate."""
+    return bool(force and user.is_super_admin)
+
+
+async def _clear_group_matches(tid: str, cat: str, user, label="rigenerare il calendario", force: bool = False) -> int:
     repo = scoped("matches", tid)
     ms = await repo.list({"category": cat, "stage": "qualification", "status": {"$ne": "cancelled"}}, limit=5000)
-    if any(m.status in PLAYED for m in ms):
-        raise conflict(f"Ci sono gare dei gironi già giocate: non è possibile {label}. Modifica le singole partite.")
+    if any(m.status in PLAYED for m in ms) and not _forced(user, force):
+        raise conflict(f"Ci sono gare dei gironi già giocate: non è possibile {label}. Modifica le singole partite." + (" Come Super Admin puoi forzare l'operazione." if user.is_super_admin else ""))
     for m in ms:
         await repo.soft_delete(m.id, user.id)
     return len(ms)
 
 
 @router.delete("/calendar")
-async def clear_calendar(tournament_id: str, category: str | None = None, finals: bool = False, user: CurrentUser = Depends(get_current_user)):
-    """Cancella il calendario della categoria (gare dei gironi, opzionalmente anche la fase finale) se nessuna gara è stata giocata. Gironi e squadre restano."""
+async def clear_calendar(tournament_id: str, category: str | None = None, finals: bool = False, force: bool = False, user: CurrentUser = Depends(get_current_user)):
+    """Cancella il calendario della categoria (gare dei gironi, opzionalmente anche la fase finale). Gironi e squadre restano. `force` (Super Admin) elimina anche gare giocate."""
     t, _ = await _ctx(tournament_id, user, writable=True)
     cat = await _category(tournament_id, category)
-    n = await _clear_group_matches(tournament_id, cat, user, label="cancellare il calendario")
+    n = await _clear_group_matches(tournament_id, cat, user, label="cancellare il calendario", force=force)
     nf = 0
     if finals:
         repo = scoped("matches", tournament_id)
         fm = await repo.list({"category": cat, "stage": "finals", "status": {"$ne": "cancelled"}}, limit=2000)
-        if any(m.status in PLAYED for m in fm):
+        if any(m.status in PLAYED for m in fm) and not _forced(user, force):
             raise conflict("Ci sono gare della fase finale già giocate: non è possibile cancellarla")
         for m in fm:
             await repo.soft_delete(m.id, user.id)
         nf = len(fm)
-    await audit.record(user, "simple.calendar_clear", "tournament", t.id, t.id, after={"category": cat, "group_matches": n, "finals_matches": nf})
+    await audit.record(user, "simple.calendar_clear", "tournament", t.id, t.id, after={"category": cat, "group_matches": n, "finals_matches": nf, "forced": _forced(user, force)})
     return {"ok": True, "deleted": n, "finals_deleted": nf}
 
 
@@ -647,17 +652,17 @@ async def program_pdf_download(tournament_id: str, category: str | None = None, 
 
 
 # ---------- eliminazioni ----------
-async def _delete_team_matches(tid: str, team_id: str, user) -> None:
+async def _delete_team_matches(tid: str, team_id: str, user, force: bool = False) -> None:
     repo = scoped("matches", tid)
     ms = await repo.list({"$or": [{"home_team_id": team_id}, {"away_team_id": team_id}], "status": {"$ne": "cancelled"}}, limit=2000)
-    if any(m.status in PLAYED for m in ms):
-        raise conflict("La squadra ha gare già giocate: non può essere eliminata")
+    if any(m.status in PLAYED for m in ms) and not _forced(user, force):
+        raise conflict("La squadra ha gare già giocate: non può essere eliminata" + (". Come Super Admin puoi forzare l'operazione" if user.is_super_admin else ""))
     for m in ms:
         await repo.soft_delete(m.id, user.id)
 
 
 @router.delete("/teams/{team_id}")
-async def delete_team(tournament_id: str, team_id: str, hard: bool = False, user: CurrentUser = Depends(get_current_user)):
+async def delete_team(tournament_id: str, team_id: str, hard: bool = False, force: bool = False, user: CurrentUser = Depends(get_current_user)):
     """Segnaposto: eliminato con le sue gare non giocate. Squadra reale in un girone: esce dal girone e al suo posto resta un segnaposto con le stesse gare.
     `hard=true`: la squadra reale viene eliminata del tutto (con la rosa), possibile solo senza gare giocate."""
     t, _ = await _ctx(tournament_id, user, writable=True)
@@ -666,13 +671,13 @@ async def delete_team(tournament_id: str, team_id: str, hard: bool = False, user
     if not tm:
         raise not_found("Squadra")
     if not tm.club_id and tm.placeholder:
-        await _delete_team_matches(tournament_id, tm.id, user)
+        await _delete_team_matches(tournament_id, tm.id, user, force=force)
         await teams_repo.soft_delete(tm.id, user.id)
         await audit.record(user, "simple.team_delete", "team", tm.id, t.id, before={"name": tm.name})
         return await _board(tournament_id, tm.category)
     ms = await matches_repo.list({"$or": [{"home_team_id": tm.id}, {"away_team_id": tm.id}], "status": {"$ne": "cancelled"}}, limit=2000)
-    if any(m.status in PLAYED for m in ms):
-        raise conflict("La squadra ha gare già giocate: non può essere tolta né eliminata")
+    if any(m.status in PLAYED for m in ms) and not _forced(user, force):
+        raise conflict("La squadra ha gare già giocate: non può essere tolta né eliminata" + (". Come Super Admin puoi forzare l'operazione" if user.is_super_admin else ""))
     placeholder_name = None
     if tm.competition_id and ms:
         n = await teams_repo.count({"competition_id": tm.competition_id, "placeholder": True}) + 1
@@ -694,21 +699,21 @@ async def delete_team(tournament_id: str, team_id: str, hard: bool = False, user
 
 
 @router.delete("/groups/{competition_id}")
-async def delete_group(tournament_id: str, competition_id: str, user: CurrentUser = Depends(get_current_user)):
-    """Elimina un girone: via i segnaposto e le gare non giocate; le squadre reali restano fuori girone."""
+async def delete_group(tournament_id: str, competition_id: str, force: bool = False, user: CurrentUser = Depends(get_current_user)):
+    """Elimina un girone: via i segnaposto e le gare non giocate; le squadre reali restano fuori girone. `force` (Super Admin) anche con gare giocate."""
     t, _ = await _ctx(tournament_id, user, writable=True)
     g = await scoped("competitions", tournament_id).get(competition_id)
     if not g:
         raise not_found("Girone")
-    await _remove_competition(t, g, user)
+    await _remove_competition(t, g, user, force=force)
     return await _board(tournament_id, g.category)
 
 
-async def _remove_competition(t, g: Competition, user) -> None:
+async def _remove_competition(t, g: Competition, user, force: bool = False) -> None:
     comps_repo, teams_repo, matches_repo = scoped("competitions", t.id), scoped("teams", t.id), scoped("matches", t.id)
     ms = await matches_repo.list({"competition_id": g.id, "status": {"$ne": "cancelled"}}, limit=5000)
-    if any(m.status in PLAYED for m in ms):
-        raise conflict(f"{g.name} ha gare già giocate: non può essere eliminata. Elimina o riapri prima le singole gare.")
+    if any(m.status in PLAYED for m in ms) and not _forced(user, force):
+        raise conflict(f"{g.name} ha gare già giocate: non può essere eliminata. Elimina o riapri prima le singole gare." + (" Come Super Admin puoi forzare l'operazione." if user.is_super_admin else ""))
     for m in ms:
         await matches_repo.soft_delete(m.id, user.id)
     for tm in await teams_repo.list({"competition_id": g.id}, limit=2000):

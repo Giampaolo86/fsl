@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRightLeft, Check, Pencil, Shuffle, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { api, apiError } from "@/lib/api";
+import { api, apiError, withForce } from "@/lib/api";
 import { PlaceholderPicker } from "./PlaceholderPicker";
 
 function TeamRow({ tid, team, groups, clubs, onDone, canWrite, registry, unassigned }) {
@@ -24,7 +24,7 @@ function TeamRow({ tid, team, groups, clubs, onDone, canWrite, registry, unassig
       : `Togliere «${team.name}» dal girone? Al suo posto resta un segnaposto con le stesse gare; la squadra va «fuori girone», da dove potrai eliminarla.`;
     if (!window.confirm(msg)) return;
     try {
-      const { data } = await api.delete(`/tournaments/${tid}/simple/teams/${team.id}`, { params: hard ? { hard: true } : {} });
+      const { data } = await withForce((force) => api.delete(`/tournaments/${tid}/simple/teams/${team.id}`, { params: { ...(hard ? { hard: true } : {}), ...(force ? { force: true } : {}) } }));
       toast.success(hard ? `Squadra eliminata${data.players_removed ? ` · ${data.players_removed} giocatori rimossi` : ""}` : data.placeholder ? `Squadra fuori girone · al suo posto «${data.placeholder}»` : "Squadra rimossa");
       onDone();
     } catch (e) { toast.error(apiError(e)); }
@@ -85,7 +85,7 @@ export function GroupsBlock({ tid, board, reload, canWrite }) {
   };
   const removeGroup = (g) => {
     if (!window.confirm(`Eliminare ${g.name}? Segnaposto e gare non giocate verranno rimossi; le squadre reali restano fuori girone.`)) return;
-    run(() => api.delete(`/tournaments/${tid}/simple/groups/${g.id}`), `${g.name} eliminato`);
+    run(() => withForce((force) => api.delete(`/tournaments/${tid}/simple/groups/${g.id}`, { params: force ? { force: true } : {} })), `${g.name} eliminato`);
   };
   const shuffle = () => {
     if (board.matches.length && !window.confirm("Sorteggiando, il calendario dei gironi verrà eliminato: dovrai rigenerarlo. Continuare?")) return;

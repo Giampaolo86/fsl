@@ -62,3 +62,12 @@ export function apiError(err, fallback = "Si è verificato un errore. Riprova.")
 export function apiCode(err) {
   return err?.response?.data?.detail?.code || null;
 }
+
+/** Se il server risponde 409 per «gare già giocate», chiede conferma e ripete la chiamata con force=true (solo Super Admin lato server). */
+export async function withForce(run, label = "Le gare giocate e i loro risultati verranno eliminati.") {
+  try { return await run(false); } catch (e) {
+    const msg = apiError(e);
+    if (e?.response?.status === 409 && /già giocat/i.test(msg) && /Super Admin/i.test(msg) && window.confirm(`${msg}\n\nForzare comunque? ${label}`)) return run(true);
+    throw e;
+  }
+}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, FileUp, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { api, apiError } from "@/lib/api";
+import { api, apiError, withForce } from "@/lib/api";
 
 export function CsvImportDialog({ tid, onClose, onDone }) {
   const [file, setFile] = useState(null);
@@ -18,16 +18,16 @@ export function CsvImportDialog({ tid, onClose, onDone }) {
   };
   const apply = async () => {
     setBusy(true);
-    const fd = new FormData(); fd.append("file", file); fd.append("option", option); fd.append("replace", replace ? "true" : "false");
     try {
-      const { data } = await api.post(`/tournaments/${tid}/simple/import-csv/apply`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 300000 });
+      const { data } = await withForce((force) => { const fd = new FormData(); fd.append("file", file); fd.append("option", option); fd.append("replace", replace ? "true" : "false"); fd.append("force", force ? "true" : "false"); return api.post(`/tournaments/${tid}/simple/import-csv/apply`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 300000 }); });
       const tot = data.report.reduce((a, r) => a + r.matches_created, 0);
       toast.success(`Importate ${tot} gare in ${data.report.length} categorie`);
       onDone(data);
     } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
   };
   const needsReplace = preview?.categories.some((c) => c.existing.matches > 0);
-  const blocked = preview?.problems.some((p) => p.startsWith("Riga")) || preview?.categories.some((c) => c.existing.played > 0);
+  const blocked = preview?.problems.some((p) => p.startsWith("Riga"));
+  const hasPlayed = preview?.categories.some((c) => c.existing.played > 0);
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl max-w-3xl" data-testid="csv-import-dialog" aria-describedby={undefined}>
@@ -43,6 +43,7 @@ export function CsvImportDialog({ tid, onClose, onDone }) {
               <tbody>{preview.categories.map((c) => <tr key={c.category} data-testid={`csv-import-cat-${c.category}`}><td className="font-bold text-fsl-gold num">{c.category}</td><td>{Object.entries(c.groups).map(([g, n]) => `${g} (${n})`).join(" · ")}</td><td className="num">{c.teams}</td><td className="num">{c.rounds}</td><td className="num">{c.matches}</td><td className="num text-fsl-success">{c.placed}</td><td className={`num ${c.unplaced ? "text-fsl-warning" : ""}`}>{c.unplaced}</td><td className="num whitespace-nowrap">{[Object.keys(c.formato || {}).join("/"), c.match_minutes ? `${c.match_minutes}'${c.buffer_minutes != null ? `+${c.buffer_minutes}'` : ""}` : ""].filter(Boolean).join(" · ") || "—"}</td><td className="num">{c.from ? `${c.from} → ${c.to}` : "—"}</td><td className="num">{c.existing.matches}{c.existing.played ? ` (${c.existing.played} giocate!)` : ""}</td></tr>)}</tbody>
             </table></div>
             <div className="text-xs text-fsl-slate">Campi nel file: {preview.fields_needed.join(", ") || "—"}{preview.fields_to_create.length > 0 && <span> · verranno creati: <strong className="text-fsl-white">{preview.fields_to_create.join(", ")}</strong></span>}</div>
+            {hasPlayed && <p className="text-xs text-fsl-warning" data-testid="csv-import-played-note">Alcune categorie hanno gare già giocate: l'importazione le sostituisce solo se confermi la forzatura (riservata al Super Admin).</p>}
             {preview.settings?.sessions > 0 && <div className="rounded-md border border-fsl-gold/30 bg-fsl-gold/5 p-3 text-xs" data-testid="csv-import-settings"><span className="fsl-label block mb-1">Impostazioni che verranno aggiornate</span><span className="num">{preview.settings.fields_count} campi · {preview.settings.teams_per_series} squadre per girone · {(preview.settings.series || []).join(", ")} · {(preview.settings.match_days || []).map((d) => ({ mon: "lun", tue: "mar", wed: "mer", thu: "gio", fri: "ven", sat: "sab", sun: "dom" }[d] || d)).join("/")} {preview.settings.day_start}–{preview.settings.day_end} · {preview.settings.sessions} sessioni{Object.keys(preview.settings.duration_by_category || {}).length > 0 && <> · durate: {Object.entries(preview.settings.duration_by_category).map(([k, v]) => `${k} ${v.match_minutes}'+${v.buffer_minutes}'`).join(", ")}</>}</span></div>}
             {preview.problems.length > 0 ? <ul className="space-y-1" data-testid="csv-import-problems">{preview.problems.map((p, i) => <li key={i} className="text-xs text-fsl-warning flex items-start gap-1.5"><AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" /> {p}</li>)}</ul> : <p className="text-xs text-fsl-success inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> Nessuna collisione: ogni slot campo/orario è unico e nessuna squadra gioca due gare allo stesso orario.</p>}
             {preview.categories.some((c) => c.unplaced > 0) && <p className="text-xs text-fsl-warning">Le gare «da collocare» non vengono create: potrai aggiungerle dalla griglia o importare l'opzione con più campi.</p>}
