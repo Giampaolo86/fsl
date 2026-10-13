@@ -34,20 +34,27 @@ def _slot_times(sessions, day, step, duration):
     return out
 
 
-def build(tournament_name: str, category: str, board: dict) -> bytes:
+def build(tournament_name: str, category: str, board: dict, days: set | None = None, durations: dict | None = None, match_day: int | None = None) -> bytes:
+    """`days`: limita alle date indicate. `durations`: {categoria: minuti} → modalità globale (tutte le categorie insieme, solo gli orari realmente usati)."""
     cal = board["calendar"]
     duration, step = cal.get("match_minutes") or 25, (cal.get("match_minutes") or 25) + (cal.get("buffer_minutes") or 0)
     fields = board["fields"][: max(cal.get("fields_count") or 1, 1)] or [{"id": None, "name": "Campo"}]
     matches = board["matches"] + board["finals"]
     breaks = cal.get("breaks") or []
-    days = sorted({*[s["date"] for s in cal.get("sessions") or []], *[m["kickoff_at"][:10] for m in matches], *[b["date"] for b in breaks]})
+    global_mode = durations is not None
+    used_fields = {m["field_id"] for m in matches}
+    fields = fields + [f for f in board["fields"] if f["id"] in used_fields and f not in fields]
+    all_days = sorted({*[s["date"] for s in cal.get("sessions") or []], *[m["kickoff_at"][:10] for m in matches], *[b["date"] for b in breaks]})
+    if days is not None:
+        all_days = [d for d in all_days if d in days]
+    days = all_days
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=12 * mm, rightMargin=12 * mm, topMargin=12 * mm, bottomMargin=10 * mm, title=f"Calendario {tournament_name}", author="Future Stars League")
     ss = getSampleStyleSheet()
     h1 = ParagraphStyle("h1", parent=ss["Title"], fontName="Helvetica-Bold", fontSize=20, textColor=NAVY, alignment=0, spaceAfter=0)
     h2 = ParagraphStyle("h2", parent=ss["Normal"], fontName="Helvetica-Bold", fontSize=14, textColor=GOLD, spaceAfter=6)
-    cell = ParagraphStyle("cell", parent=ss["Normal"], fontSize=10, leading=12, alignment=1)
+    cell = ParagraphStyle("cell", parent=ss["Normal"], fontSize=8.5 if global_mode else 10, leading=10 if global_mode else 12, alignment=1)
     note = ParagraphStyle("note", parent=ss["Normal"], fontSize=9, leading=11, alignment=1, textColor=colors.HexColor("#374151"))
     brk = ParagraphStyle("brk", parent=ss["Normal"], fontName="Helvetica-Bold", fontSize=10, alignment=1, textColor=colors.HexColor("#4c1d95"))
     small = ParagraphStyle("small", parent=ss["Normal"], fontSize=8, textColor=colors.HexColor("#6b7280"))
@@ -59,14 +66,19 @@ def build(tournament_name: str, category: str, board: dict) -> bytes:
             story.append(PageBreak())
         day_matches = [m for m in matches if m["kickoff_at"].startswith(day)]
         ov = (cal.get("slots") or {}).get(day) or {}
-        times = (_slot_times(cal.get("sessions") or [], day, step, duration) | set(ov.get("add") or [])) - set(ov.get("remove") or []) | {m["kickoff_at"][11:16] for m in day_matches}
+        used_times = {m["kickoff_at"][11:16] for m in day_matches}
+        times = used_times if global_mode else (_slot_times(cal.get("sessions") or [], day, step, duration) | set(ov.get("add") or [])) - set(ov.get("remove") or []) | used_times
         rows_src = [("slot", t) for t in times] + [("break", b) for b in breaks if b["date"] == day]
         rows_src.sort(key=lambda x: x[1] if x[0] == "slot" else x[1]["start_time"])
         wd = WEEKDAYS[datetime.strptime(day, "%Y-%m-%d").weekday()]
+        rounds = sorted({m.get("match_day") or 0 for m in day_matches if m["stage"] != "finals"})
+        day_label = f"Giornata {match_day}" if match_day is not None else (f"Giornata {rounds[0]}" if len(rounds) == 1 and rounds[0] else "")
         stages = sorted({m["round_name"] if m["stage"] == "finals" else "Fase a gironi" for m in day_matches}, key=lambda x: x != "Fase a gironi")
-        story += [Paragraph(tournament_name, h1), Paragraph(f"{wd} {_date_it(day)}{' · ' + category if category and category != 'Unica' else ''} · {' / '.join(stages) if stages else 'Programma'}", h2)]
+        cats = sorted({m["category"] for m in day_matches}) if global_mode else []
+        sub = " · ".join(x for x in [category if category and category != "Unica" else "", day_label, " / ".join(stages) if stages and not day_label else "", f"{len(day_matches)} gare", "Categorie " + ", ".join(cats) if cats else ""] if x)
+        story += [Paragraph(tournament_name, h1), Paragraph(f"{wd} {_date_it(day)} · {sub or 'Programma'}", h2)]
         data = [["Ora", *[f["name"] for f in fields], "Note"]]
-        style = [("BACKGROUND", (0, 0), (-1, 0), NAVY), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"), ("FONTSIZE", (0, 0), (-1, -1), 10), ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cbd5e1")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"), ("LINEBELOW", (0, 0), (-1, 0), 1.5, GOLD), ("TOPPADDING", (0, 1), (-1, -1), 6), ("BOTTOMPADDING", (0, 1), (-1, -1), 6)]
+        style = [("BACKGROUND", (0, 0), (-1, 0), NAVY), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"), ("FONTSIZE", (0, 0), (-1, -1), 8.5 if global_mode else 10), ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cbd5e1")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"), ("LINEBELOW", (0, 0), (-1, 0), 1.5, GOLD), ("TOPPADDING", (0, 1), (-1, -1), 3 if global_mode else 6), ("BOTTOMPADDING", (0, 1), (-1, -1), 3 if global_mode else 6)]
         zebra = 0
         for kind, item in rows_src:
             r = len(data)
@@ -75,21 +87,27 @@ def build(tournament_name: str, category: str, board: dict) -> bytes:
                 style += [("SPAN", (1, r), (len(fields), r)), ("BACKGROUND", (0, r), (-1, r), BREAK_BG)]
                 continue
             t = item
-            cells, notes = [], []
+            cells, notes, ends = [], [], set()
             for f in fields:
                 m = by_key.get((f"{day}T{t}", f["id"]))
                 if m:
                     score = f" <font color='#b45309'><b>{m['score']['home']}–{m['score']['away']}</b></font>" if m.get("played") else ""
-                    cells.append(Paragraph(f"<b>{m['home']}</b> vs <b>{m['away']}</b>{score}", cell))
-                    notes.append(m["round_name"] if m["stage"] == "finals" else f"{m.get('round_name', '')} – {m['series'].replace('Girone', 'Gir.')}")
+                    tag = f"<br/><font size='7.5' color='#6b7280'>{m['category']} · {m['round_name'] if m['stage'] == 'finals' else m['series'].replace('Girone', 'Gir.')}</font>" if global_mode else ""
+                    cells.append(Paragraph(f"<b>{m['home']}</b> vs <b>{m['away']}</b>{score}{tag}", cell))
+                    notes.append(m["round_name"] if m["stage"] == "finals" or global_mode else f"{m.get('round_name', '')} – {m['series'].replace('Girone', 'Gir.')}")
+                    ends.add(_hhmm_add(t, durations.get(m["category"], duration) if global_mode else duration))
                 else:
                     cells.append(Paragraph("—", note))
-            data.append([f"{t} – {_hhmm_add(t, duration)}", *cells, Paragraph(" · ".join(dict.fromkeys(notes)) or "", note)])
+            end = ends.pop() if len(ends) == 1 else (None if ends else _hhmm_add(t, duration))
+            data.append([f"{t} – {end}" if end else t, *cells, Paragraph(" · ".join(dict.fromkeys(notes)) or "", note)])
             if zebra % 2:
                 style.append(("BACKGROUND", (0, r), (-1, r), GREY))
             zebra += 1
         avail = landscape(A4)[0] - 24 * mm
         widths = [30 * mm, *[(avail - 30 * mm - 48 * mm) / len(fields)] * len(fields), 48 * mm]
+        if global_mode:
+            data = [row[:-1] for row in data]
+            widths = [26 * mm, *[(avail - 26 * mm) / len(fields)] * len(fields)]
         t = Table(data, colWidths=widths, repeatRows=1)
         t.setStyle(TableStyle(style))
         story += [t, Spacer(1, 8), Paragraph("Future Stars League · Codice FSL: rispetto, correttezza, gioco. Il programma può subire variazioni: fa fede la Control Room.", small)]

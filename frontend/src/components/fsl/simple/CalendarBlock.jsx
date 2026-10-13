@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { CalendarRange, FileDown, Layers, FileUp, GripVertical, LayoutGrid, List, Pencil, Plus, Star, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarRange, ChevronLeft, ChevronRight, FileDown, Layers, FileUp, GripVertical, LayoutGrid, List, Pencil, Plus, Printer, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError, withForce } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -116,13 +116,14 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
       toast.success(`${data.count} partite distribuite su ${data.sessions} session${data.sessions === 1 ? "e" : "i"}`); reload();
     } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
   };
-  const pdf = async () => {
+  const downloadPdf = async (params, name) => {
     setPdfBusy(true);
     try {
-      const r = await api.get(`/tournaments/${tid}/simple/calendar.pdf`, { params: { category: board.category }, responseType: "blob" });
-      const url = URL.createObjectURL(r.data); const a = document.createElement("a"); a.href = url; a.download = `FSL_Calendario_${board.category}.pdf`; a.click(); URL.revokeObjectURL(url);
+      const r = await api.get(`/tournaments/${tid}/simple/calendar.pdf`, { params, responseType: "blob" });
+      const url = URL.createObjectURL(r.data); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
     } catch (e) { toast.error(apiError(e)); } finally { setPdfBusy(false); }
   };
+  const pdf = () => downloadPdf({ category: board.category }, `FSL_Calendario_${board.category}.pdf`);
   const days = [...new Set(board.matches.map((m) => m.kickoff_at.slice(0, 10)))];
   return (
     <section className="fsl-card p-5" data-testid="block-calendar">
@@ -174,8 +175,8 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
             </div>
           </div>
           {view === "grid" && <TimeGrid board={board} canWrite={canWrite} onMove={onMove} onEdit={onEdit} onBreaks={onBreaks} onSlots={onSlots} onQuickTeam={onQuickTeam} />}
-          {view === "all" && (overview ? <AllCategoriesView overview={overview} /> : <p className="text-sm text-fsl-slate">Carico il calendario generale…</p>)}
-          {view === "rounds" && <RoundsView board={board} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} />}
+          {view === "all" && (overview ? <AllCategoriesView overview={overview} onPdf={downloadPdf} pdfBusy={pdfBusy} /> : <p className="text-sm text-fsl-slate">Carico il calendario generale…</p>)}
+          {view === "rounds" && <RoundsView board={board} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} onPdf={downloadPdf} pdfBusy={pdfBusy} />}
           {view === "list" && board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
         </div>
       )}
@@ -184,7 +185,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
   );
 }
 
-function RoundsView({ board, onEdit, onSwap, canWrite }) {
+function RoundsView({ board, onEdit, onSwap, canWrite, onPdf, pdfBusy }) {
   const rounds = [...new Set(board.matches.map((m) => m.match_day || 0))].sort((a, b) => a - b);
   return (
     <div className="space-y-6" data-testid="cal-rounds">
@@ -194,7 +195,10 @@ function RoundsView({ board, onEdit, onSwap, canWrite }) {
         const days = [...new Set(rows.map((m) => m.kickoff_at.slice(0, 10)))].sort();
         return (
           <div key={r} data-testid={`cal-round-${r}`}>
-            <h3 className="fsl-section-title mb-2">{r ? `Giornata ${r}` : "Senza giornata"} <span className="text-fsl-slate text-sm font-sans normal-case">· {days.map((d) => fmtDate(d)).join(" – ")} · {rows.length} partite</span></h3>
+            <div className="flex flex-wrap items-center gap-3 mb-2">
+              <h3 className="fsl-section-title">{r ? `Giornata ${r}` : "Senza giornata"} <span className="text-fsl-slate text-sm font-sans normal-case">· {days.map((d) => fmtDate(d)).join(" – ")} · {rows.length} partite</span></h3>
+              {r > 0 && <button type="button" className="btn-ghost h-8 px-3 text-xs" disabled={pdfBusy} onClick={() => onPdf({ category: board.category, match_day: r }, `FSL_Calendario_${board.category}_Giornata${r}.pdf`)} title={`Stampa solo la giornata ${r} di ${board.category}`} data-testid={`cal-round-pdf-${r}`}><Printer className="h-3.5 w-3.5" /> Stampa giornata {r}</button>}
+            </div>
             <MatchTable rows={rows} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup testId={`cal-round-table-${r}`} />
           </div>
         );
@@ -203,17 +207,46 @@ function RoundsView({ board, onEdit, onSwap, canWrite }) {
   );
 }
 
-function AllCategoriesView({ overview }) {
-  const cats = Object.entries(overview.per_category || {});
+const roundsOf = (matches) => {
+  const map = {};
+  matches.forEach((m) => { const r = m.match_day || 0; (map[r] ||= { round: r, dates: new Set(), n: 0 }); map[r].dates.add(m.kickoff_at.slice(0, 10)); map[r].n += 1; });
+  return Object.values(map).map((x) => ({ ...x, dates: [...x.dates].sort() })).sort((a, b) => a.round - b.round);
+};
+
+function AllCategoriesView({ overview, onPdf, pdfBusy }) {
+  const [round, setRound] = useState("all");
+  const rounds = useMemo(() => roundsOf(overview.matches), [overview.matches]);
+  const cur = round === "all" ? null : rounds.find((r) => r.round === round);
+  const idx = cur ? rounds.indexOf(cur) : -1;
+  const dates = cur ? new Set(cur.dates) : null;
+  const matches = cur ? overview.matches.filter((m) => (m.match_day || 0) === cur.round) : overview.matches;
+  const board = useMemo(() => ({ ...overview, matches, finals: [], calendar: { ...overview.calendar, sessions: (overview.calendar.sessions || []).filter((s) => !dates || dates.has(s.date)), breaks: (overview.calendar.breaks || []).filter((b) => !dates || dates.has(b.date)) } }), [overview, matches, round]); // eslint-disable-line react-hooks/exhaustive-deps
+  const perCat = overview.categories.map((c) => ({ c, n: matches.filter((m) => m.category === c).length }));
+  const roundLabel = (r) => (r.round ? `Giornata ${r.round}` : "Senza giornata");
   return (
     <div className="space-y-4" data-testid="cal-all">
+      <div className="flex flex-wrap items-center gap-2" data-testid="cal-all-rounds">
+        <div className="inline-flex items-center rounded-md border border-white/15 overflow-hidden">
+          <button type="button" className="h-9 px-2 hover:bg-white/5 disabled:opacity-30" disabled={round === "all" || idx <= 0} onClick={() => setRound(rounds[idx - 1].round)} aria-label="Giornata precedente" data-testid="cal-all-prev"><ChevronLeft className="h-4 w-4" /></button>
+          <select className="fsl-input h-9 rounded-none border-0 border-x border-white/15 text-sm min-w-[200px]" value={round} onChange={(e) => setRound(e.target.value === "all" ? "all" : Number(e.target.value))} aria-label="Giornata" data-testid="cal-all-round-select">
+            <option value="all">Tutte le giornate · {overview.matches.length} gare</option>
+            {rounds.map((r) => <option key={r.round} value={r.round}>{roundLabel(r)} · {r.dates.map(dayLabel).join(" + ")} · {r.n} gare</option>)}
+          </select>
+          <button type="button" className="h-9 px-2 hover:bg-white/5 disabled:opacity-30" disabled={round === "all" || idx >= rounds.length - 1} onClick={() => setRound(rounds[idx + 1].round)} aria-label="Giornata successiva" data-testid="cal-all-next"><ChevronRight className="h-4 w-4" /></button>
+        </div>
+        {round !== "all" && <button type="button" className="btn-ghost h-9 text-xs" onClick={() => setRound("all")} data-testid="cal-all-reset">Tutte</button>}
+        <div className="sm:ml-auto flex flex-wrap gap-2">
+          {cur && cur.round > 0 && <button type="button" className="btn-gold h-9" disabled={pdfBusy} onClick={() => onPdf({ category: "all", match_day: cur.round }, `FSL_Programma_Globale_Giornata${cur.round}.pdf`)} title="PDF della sola giornata selezionata, tutte le categorie insieme (una pagina per data)" data-testid="cal-all-pdf-round"><Printer className="h-4 w-4" /> {pdfBusy ? "Preparo…" : `Stampa giornata ${cur.round}`}</button>}
+          <button type="button" className="btn-ghost h-9" disabled={pdfBusy} onClick={() => onPdf({ category: "all" }, "FSL_Programma_Globale.pdf")} title="PDF completo: tutte le categorie insieme, una pagina per ogni data di gioco" data-testid="cal-all-pdf-full"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo…" : "Stampa programma globale"}</button>
+        </div>
+      </div>
       <div className="flex flex-wrap gap-2 text-xs" data-testid="cal-all-summary">
-        <span className="rounded-full border border-fsl-gold/40 px-3 py-1 num">{overview.matches.length} gare · {overview.days.length} date · {overview.calendar.fields_count} campi</span>
-        {cats.map(([c, v]) => <span key={c} className="rounded-full border border-white/15 px-3 py-1 num"><span className="text-fsl-gold font-bold">{c}</span> · {v.matches} gare · {v.match_minutes}'+{v.buffer_minutes}'</span>)}
-        {overview.days.some((d) => d.categories.length < overview.categories.length) && <span className="rounded-full border border-fsl-warning/50 text-fsl-warning px-3 py-1">Alcune date non hanno tutte le categorie</span>}
+        <span className="rounded-full border border-fsl-gold/40 px-3 py-1 num">{cur ? `${roundLabel(cur)} · ` : ""}{matches.length} gare · {cur ? cur.dates.length : overview.days.length} date · {overview.calendar.fields_count} campi</span>
+        {perCat.map(({ c, n }) => <span key={c} className="rounded-full border border-white/15 px-3 py-1 num" data-testid={`cal-all-cat-${c}`}><span className="text-fsl-gold font-bold">{c}</span> · {n} gare · {overview.per_category?.[c]?.match_minutes}'+{overview.per_category?.[c]?.buffer_minutes}'</span>)}
+        {round === "all" && overview.days.some((d) => d.categories.length < overview.categories.length) && <span className="rounded-full border border-fsl-warning/50 text-fsl-warning px-3 py-1">Alcune date non hanno tutte le categorie</span>}
       </div>
       <p className="text-xs text-fsl-slate">Vista di sola lettura con tutte le categorie insieme, come si vive il weekend al campo. Per spostare una gara usa la griglia della sua categoria.</p>
-      <TimeGrid board={overview} canWrite={false} />
+      <TimeGrid board={board} canWrite={false} />
     </div>
   );
 }

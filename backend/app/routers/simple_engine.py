@@ -602,20 +602,35 @@ async def fill_finals(tournament_id: str, category: str | None = None, force: bo
 
 # ---------- stampa calendario ----------
 @router.get("/calendar.pdf")
-async def calendar_pdf(tournament_id: str, category: str | None = None, user: CurrentUser = Depends(get_current_user)):
+async def calendar_pdf(tournament_id: str, category: str | None = None, match_day: int | None = None, date: str | None = None, user: CurrentUser = Depends(get_current_user)):
+    """PDF ora × campo. `category=all` = programma globale (tutte le categorie insieme); `match_day` o `date` limitano a una giornata / singola data."""
     from fastapi import Response
 
     from ..repositories.registry import tournaments as t_repo
     from ..services import calendar_sheet
 
     await _ctx(tournament_id, user)
-    cat = await _category(tournament_id, category)
     t = await t_repo.get(tournament_id)
-    b = await _board(tournament_id, cat)
-    if not b["matches"] and not b["finals"]:
+    if category == "all":
+        b = await overview(tournament_id, user)
+        s = await settings_repo.find_one({"tournament_id": tournament_id})
+        durations = {c: svc.duration_for(s, c)[0] for c in b["categories"]}
+        cat, label = "all", "Programma globale"
+    else:
+        cat = await _category(tournament_id, category)
+        b = await _board(tournament_id, cat)
+        durations, label = None, cat
+    matches = b["matches"] + b["finals"]
+    if match_day is not None:
+        matches = [m for m in matches if (m.get("match_day") or 0) == match_day]
+    if date:
+        matches = [m for m in matches if m["kickoff_at"].startswith(date)]
+    if not matches:
         raise bad_request("Nessuna partita da stampare")
-    pdf = calendar_sheet.build(t.name, cat, b)
-    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="FSL_Calendario_{t.slug}.pdf"'})
+    days = {m["kickoff_at"][:10] for m in matches} if (match_day is not None or date) else None
+    pdf = calendar_sheet.build(t.name, label, {**b, "matches": [m for m in matches if m["stage"] != "finals"], "finals": [m for m in matches if m["stage"] == "finals"]}, days=days, durations=durations, match_day=match_day)
+    suffix = ("_Globale" if cat == "all" else f"_{cat}") + (f"_Giornata{match_day}" if match_day is not None else "") + (f"_{date}" if date else "")
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="FSL_Calendario_{t.slug}{suffix}.pdf"'})
 
 
 
