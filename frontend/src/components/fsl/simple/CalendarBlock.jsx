@@ -95,7 +95,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
   const c = board.calendar;
   const [view, setView] = useState("grid");
   const [overview, setOverview] = useState(null);
-  useEffect(() => { if (view === "all") api.get(`/tournaments/${tid}/simple/overview`).then((r) => setOverview(r.data)).catch((e) => toast.error(apiError(e))); }, [view, tid, board.matches.length]);
+  useEffect(() => { if (view === "all") api.get(`/tournaments/${tid}/simple/overview`).then((r) => setOverview(r.data)).catch((e) => toast.error(apiError(e))); }, [view, tid, board]);
   const today = new Date().toISOString().slice(0, 10);
   const [sessions, setSessions] = useState(c.sessions?.length ? c.sessions : [{ date: c.date || today, start_time: c.start_time || "15:00", end_time: c.end_time || "19:00" }]);
   const [f, setF] = useState({ fields_count: c.fields_count || 2, match_minutes: c.match_minutes || 25, buffer_minutes: c.buffer_minutes ?? 10 });
@@ -181,7 +181,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
             </div>
           </div>
           {view === "grid" && <TimeGrid board={board} canWrite={canWrite} onMove={onMove} onEdit={onEdit} onBreaks={onBreaks} onSlots={onSlots} onQuickTeam={onQuickTeam} />}
-          {view === "all" && (overview ? <AllCategoriesView overview={overview} onPdf={downloadPdf} pdfBusy={pdfBusy} /> : <p className="text-sm text-fsl-slate">Carico il calendario generale…</p>)}
+          {view === "all" && (overview ? <AllCategoriesView overview={overview} onPdf={downloadPdf} pdfBusy={pdfBusy} canWrite={canWrite} onMove={onMove} onEdit={onEdit} onBreaks={onBreaks} onSlots={onSlots} onQuickTeam={onQuickTeam} /> : <p className="text-sm text-fsl-slate">Carico il calendario generale…</p>)}
           {view === "rounds" && <RoundsView board={board} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} onPdf={downloadPdf} pdfBusy={pdfBusy} />}
           {view === "list" && board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
         </div>
@@ -219,7 +219,7 @@ const roundsOf = (matches) => {
   return Object.values(map).map((x) => ({ ...x, dates: [...x.dates].sort() })).sort((a, b) => a.round - b.round);
 };
 
-function AllCategoriesView({ overview, onPdf, pdfBusy }) {
+function AllCategoriesView({ overview, onPdf, pdfBusy, canWrite, onMove, onEdit, onBreaks, onSlots, onQuickTeam }) {
   const [round, setRound] = useState("all");
   const rounds = useMemo(() => roundsOf(overview.matches), [overview.matches]);
   const cur = round === "all" ? null : rounds.find((r) => r.round === round);
@@ -251,8 +251,8 @@ function AllCategoriesView({ overview, onPdf, pdfBusy }) {
         {perCat.map(({ c, n }) => <span key={c} className="rounded-full border border-white/15 px-3 py-1 num" data-testid={`cal-all-cat-${c}`}><span className="text-fsl-gold font-bold">{c}</span> · {n} gare · {overview.per_category?.[c]?.match_minutes}'+{overview.per_category?.[c]?.buffer_minutes}'</span>)}
         {round === "all" && overview.days.some((d) => d.categories.length < overview.categories.length) && <span className="rounded-full border border-fsl-warning/50 text-fsl-warning px-3 py-1">Alcune date non hanno tutte le categorie</span>}
       </div>
-      <p className="text-xs text-fsl-slate">Vista di sola lettura con tutte le categorie insieme, come si vive il weekend al campo. Per spostare una gara usa la griglia della sua categoria.</p>
-      <TimeGrid board={board} canWrite={false} />
+      <p className="text-xs text-fsl-slate">Tutte le categorie insieme, come si vive il weekend al campo.{canWrite ? " Trascina una gara in uno slot libero (o su un'altra per scambiarle, anche di categoria diversa), clicca una squadra per cambiarla o la matita per modificare data, ora e campo." : ""}</p>
+      <TimeGrid board={board} canWrite={canWrite} onMove={onMove} onEdit={onEdit} onBreaks={onBreaks} onSlots={onSlots} onQuickTeam={onQuickTeam} />
     </div>
   );
 }

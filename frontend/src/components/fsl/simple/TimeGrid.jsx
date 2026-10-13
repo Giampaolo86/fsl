@@ -45,10 +45,11 @@ function TeamBox({ m, side, teams, canWrite, onQuickTeam, conflict }) {
   const [open, setOpen] = useState(false);
   const id = m[`${side}_team_id`];
   const team = teams.find((t) => t.id === id) || { id, name: m[side] };
+  const options = teams.filter((t) => !m.category || !t.category || t.category === m.category);
   if (open) {
     return (
       <select autoFocus className="fsl-input h-7 w-full text-xs py-0 px-1" value={id} onBlur={() => setOpen(false)} onChange={(e) => { setOpen(false); if (e.target.value !== id) onQuickTeam(m.id, side, e.target.value); }} aria-label={side === "home" ? "Squadra casa" : "Squadra ospite"} data-testid={`grid-team-select-${side}-${m.id}`}>
-        {teams.map((t) => <option key={t.id} value={t.id}>{t.name}{t.series && t.series !== "Fase finale" ? ` · ${t.series}` : ""}</option>)}
+        {options.map((t) => <option key={t.id} value={t.id}>{t.name}{t.series && t.series !== "Fase finale" ? ` · ${t.series}` : ""}</option>)}
       </select>
     );
   }

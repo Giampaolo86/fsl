@@ -31,12 +31,18 @@ export default function SimpleEngine() {
   }, [tid, category]);
   useEffect(load, [load]);
 
+  const apply = (data) => { if (data.category === board?.category) setBoard(data); else load(); };
   const swap = async (a, b) => {
-    try { const { data } = await api.post(`/tournaments/${tid}/simple/matches/swap`, { a, b }); setBoard(data); toast.success("Orario e campo scambiati"); } catch (e) { toast.error(apiError(e)); }
+    try { const { data } = await api.post(`/tournaments/${tid}/simple/matches/swap`, { a, b }); apply(data); toast.success("Orario e campo scambiati"); } catch (e) { toast.error(apiError(e)); }
   };
 
   const move = async (matchId, kickoff, fieldId) => {
-    try { const { data } = await api.post(`/tournaments/${tid}/simple/matches/move`, { match_id: matchId, kickoff_at: kickoff, field_id: fieldId }); setBoard(data); toast.success(data.swapped ? "Partite scambiate" : "Partita spostata"); } catch (e) { toast.error(apiError(e)); }
+    try { const { data } = await api.post(`/tournaments/${tid}/simple/matches/move`, { match_id: matchId, kickoff_at: kickoff, field_id: fieldId }); apply(data); toast.success(data.swapped ? "Partite scambiate" : "Partita spostata"); } catch (e) { toast.error(apiError(e)); }
+  };
+
+  const openEdit = async (m) => {
+    if (!m.category || m.category === board?.category) return setEditM(m);
+    try { const { data } = await api.get(`/tournaments/${tid}/simple/board`, { params: { category: m.category } }); setEditM({ ...m, _teams: data.teams }); } catch (e) { toast.error(apiError(e)); }
   };
 
   const saveSlots = async (date, add, remove) => {
@@ -75,12 +81,12 @@ export default function SimpleEngine() {
         </div>}
       />
       <GroupsBlock tid={tid} board={board} reload={load} canWrite={canWrite} />
-      <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} onMove={move} onBreaks={saveBreaks} onSlots={saveSlots} onQuickTeam={quickTeam} onCreate={setCreateM} />
-      <FinalsBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={setEditM} onSwap={swap} onCreate={setCreateM} />
+      <CalendarBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={openEdit} onSwap={swap} onMove={move} onBreaks={saveBreaks} onSlots={saveSlots} onQuickTeam={quickTeam} onCreate={setCreateM} />
+      <FinalsBlock tid={tid} board={board} reload={load} canWrite={canWrite} onEdit={openEdit} onSwap={swap} onCreate={setCreateM} />
       {ai && <AiCalendarAssistant tid={tid} board={board} onApplied={(data) => setBoard(data)} onClose={() => setAi(false)} />}
       {createM && <SimpleMatchCreate tid={tid} board={board} defaults={createM} onClose={() => setCreateM(null)} onDone={load} />}
       <ProgramPdfDialog open={pdfOpen} onOpenChange={setPdfOpen} tid={tid} categories={board.categories.length ? board.categories : [board.category]} category={board.category} />
-      {editM && <SimpleMatchEdit tid={tid} m={editM} teams={board.teams} fields={board.fields} onClose={() => setEditM(null)} onDone={load} />}
+      {editM && <SimpleMatchEdit tid={tid} m={editM} teams={editM._teams || board.teams} fields={board.fields} onClose={() => setEditM(null)} onDone={load} />}
     </div>
   );
 }
