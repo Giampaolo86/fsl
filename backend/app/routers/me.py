@@ -89,7 +89,34 @@ async def my_club_invite(tournament_id: str, user: CurrentUser = Depends(get_cur
     inv = next(iter(await invites.list({"org_key": key, "tournament_id": None}, sort=[("created_at", -1)], limit=1)), None)
     valid = bool(inv and not inv.used_by and inv.expires_at.replace(tzinfo=None) > utcnow().replace(tzinfo=None))
     row = next((r for r in await org_clubs_svc.registry() if r["org_key"] == key), None)
-    return {"invite": inv.public() if inv else None, "valid": valid, "managers": row["managers"] if row else []}
+    oc = await org_clubs_svc.get(key)
+    return {"invite": inv.public() if inv else None, "valid": valid, "managers": row["managers"] if row else [], "responsabile_id": oc.manager_user_id if oc else None, "can_manage": bool(oc and oc.manager_user_id == user.id)}
+
+
+@router.delete("/club/managers/{manager_id}")
+async def my_club_remove_manager(manager_id: str, tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Solo il Responsabile toglie un dirigente: perde l'accesso alla società in tutti i tornei (l'account resta)."""
+    from ..core import sessions
+    from ..core.errors import bad_request
+    from ..repositories.registry import memberships
+    from ..services import audit
+    from ..services import org_clubs as org_clubs_svc
+
+    key = await _my_org_key(tournament_id, user)
+    oc = await org_clubs_svc.get(key)
+    if not oc or oc.manager_user_id != user.id:
+        raise forbidden("Solo il Responsabile della società può rimuovere un dirigente")
+    if manager_id == user.id:
+        raise bad_request("Il Responsabile non può rimuovere sé stesso: chiedi all'organizzazione")
+    club_ids = [c.id for c in await org_clubs_svc.tournament_clubs(key)]
+    ms = await memberships.list({"user_id": manager_id, "role": "club_manager", "club_id": {"$in": club_ids}, "status": "active"})
+    if not ms:
+        raise not_found("Dirigente")
+    for m in ms:
+        await memberships.update(m.id, {"status": "revoked"}, user.id)
+    await sessions.revoke_user_sessions(manager_id, reason="club_manager_removed")
+    await audit.record(user, "club.remove_manager", "org_club", key, tournament_id, before={"user_id": manager_id, "memberships": len(ms)})
+    return {"ok": True, "removed": len(ms)}
 
 
 @router.post("/club/invite")

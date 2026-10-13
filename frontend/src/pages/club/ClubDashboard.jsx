@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, Copy, CreditCard, FileText, KeyRound, Shield, UserRound, Users } from "lucide-react";
+import { CalendarDays, Copy, CreditCard, FileText, KeyRound, Shield, Trash2, UserRound, Users } from "lucide-react";
 import { toast } from "sonner";
 import { ReadinessCard } from "@/components/fsl/ReadinessCard";
 import { KpiTile } from "@/components/fsl/Primitives";
@@ -86,6 +86,10 @@ function ClubManagersCard({ tid }) {
   const inv = data.valid ? data.invite : null;
   const link = inv ? `${window.location.origin}/registrati-societa?codice=${inv.code}` : "";
   const copy = (t) => navigator.clipboard?.writeText(t).then(() => toast.success("Copiato"));
+  const remove = (m) => {
+    if (!window.confirm(`Togliere ${m.full_name || m.email} dai dirigenti? Perderà subito l'accesso all'Area Società (l'account resta e potrà essere reinvitato).`)) return;
+    api.delete(`/me/club/managers/${m.id}`, { params: { tournament_id: tid } }).then(() => { toast.success("Dirigente rimosso"); load(); }).catch((e) => toast.error(apiError(e)));
+  };
   return (
     <section className="fsl-card p-5 md:p-6" data-testid="club-managers-card">
       <div className="flex flex-wrap items-start gap-4">
@@ -93,7 +97,7 @@ function ClubManagersCard({ tid }) {
           <div className="fsl-section-title">Dirigenti della società</div>
           <p className="text-xs text-fsl-slate mt-1">Chi accede all'Area Società con pieni poteri (rose, convocazioni, documenti, pagamenti). Invita un altro dirigente con un codice: si registra su /registrati-societa e trova subito tutte le squadre della società.</p>
           <ul className="mt-3 space-y-1 text-sm" data-testid="club-managers-list">
-            {data.managers.map((m, i) => <li key={m.id} className="flex items-center gap-2"><UserRound className="h-4 w-4 text-fsl-gold" /> <span className="font-semibold">{m.full_name || m.email}</span><span className="text-xs text-fsl-slate">{m.email}{i === 0 ? " · responsabile" : ""}</span></li>)}
+            {data.managers.map((m) => <li key={m.id} className="flex items-center gap-2" data-testid={`club-manager-${m.id}`}><UserRound className="h-4 w-4 text-fsl-gold" /> <span className="font-semibold">{m.full_name || m.email}</span><span className="text-xs text-fsl-slate">{m.email}{m.id === data.responsabile_id ? " · responsabile" : ""}</span>{data.can_manage && m.id !== data.responsabile_id && <button type="button" className="btn-ghost h-7 px-2 text-fsl-danger" onClick={() => remove(m)} title="Rimuovi dirigente" aria-label={`Rimuovi ${m.full_name || m.email}`} data-testid={`club-manager-remove-${m.id}`}><Trash2 className="h-3.5 w-3.5" /></button>}</li>)}
           </ul>
         </div>
         <div className="w-full sm:w-auto sm:min-w-[280px] space-y-2">

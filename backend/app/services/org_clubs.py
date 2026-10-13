@@ -85,8 +85,12 @@ async def manager_memberships(key: str, user_id: str, actor_id: Optional[str] = 
     """Il responsabile della società entra come club_manager in tutti i tornei dove la società è iscritta."""
     n = 0
     for c in await tournament_clubs(key):
-        if not await memberships.find_one({"user_id": user_id, "tournament_id": c.tournament_id, "role": "club_manager"}):
+        existing = await memberships.find_one({"user_id": user_id, "tournament_id": c.tournament_id, "role": "club_manager"})
+        if not existing:
             await memberships.insert(TournamentMembership(user_id=user_id, tournament_id=c.tournament_id, role="club_manager", club_id=c.id), actor_id)
+            n += 1
+        elif existing.status == "revoked":
+            await memberships.update(existing.id, {"status": "active", "club_id": c.id}, actor_id)
             n += 1
     return n
 
@@ -134,7 +138,7 @@ async def registry() -> list[dict]:
     club_to_key = {c["club_id"]: k for k, cs in by_key.items() for c in cs}
     mgr_by_key: dict[str, list] = {}
     if club_to_key:
-        ms = [m async for m in db.tournament_memberships.find({"club_id": {"$in": list(club_to_key)}, "role": "club_manager"}, {"user_id": 1, "club_id": 1})]
+        ms = [m async for m in db.tournament_memberships.find({"club_id": {"$in": list(club_to_key)}, "role": "club_manager", "status": {"$ne": "revoked"}}, {"user_id": 1, "club_id": 1})]
         uids = {m["user_id"] for m in ms}
         umap = {str(u["_id"]): u async for u in db.users.find({"_id": {"$in": [ObjectId(x) for x in uids if ObjectId.is_valid(x)]}}, {"email": 1, "full_name": 1, "status": 1})}
         for m in ms:
