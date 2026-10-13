@@ -1,3 +1,4 @@
+import re
 from bson import ObjectId
 
 from ..core.db import db
@@ -8,6 +9,15 @@ _TEST_RE = __import__("re").compile("|".join(TEST_USER_PATTERNS), __import__("re
 
 def is_test_account(email: str) -> bool:
     return bool(_TEST_RE.search((email or "").lower()))
+
+
+DEMO_TOURNAMENT_SLUGS = {"la-serie-a-dei-bambini", "torneo-degli-amici", "future-cup-weekend", "winter-stars-2025"}
+_TEST_TOURNAMENT_RE = re.compile(r"^(test|qa|demo|prova)[-_]", re.I)
+
+
+def is_test_tournament(slug: str, name: str = "") -> bool:
+    """Tornei demo del seed o di collaudo: gli unici eliminabili in blocco anche in produzione."""
+    return (slug or "") in DEMO_TOURNAMENT_SLUGS or bool(_TEST_TOURNAMENT_RE.search(slug or "")) or bool(_TEST_TOURNAMENT_RE.search(name or ""))
 
 
 async def disable_test_accounts_in_production() -> list[str]:

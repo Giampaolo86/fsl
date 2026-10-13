@@ -128,8 +128,10 @@ async def _purge_guard(user: CurrentUser, body: PurgeIn, request) -> None:
 
     _super_admin_only(user, "Solo il Super Admin può eseguire la pulizia")
     if backups.db_is_production_like():
-        await record_event("purge_blocked", request, user_id=user.id, email=user.email, severity="high", detail={"env": __import__("os").environ.get("APP_ENV"), "db": __import__("os").environ.get("DB_NAME")})
-        raise ApiError(403, "PURGE_BLOCKED_IN_PRODUCTION", "La pulizia massiva dei dati di test è disabilitata in produzione: elimina i singoli tornei dalla card (con backup) oppure usa un ambiente di anteprima")
+        real = [t.get("name") or t["slug"] async for t in db.tournaments.find({"slug": {"$nin": body.keep_slugs}}, {"slug": 1, "name": 1}) if not cleanup.is_test_tournament(t["slug"], t.get("name", ""))]
+        if real:
+            await record_event("purge_blocked", request, user_id=user.id, email=user.email, severity="high", detail={"env": __import__("os").environ.get("APP_ENV"), "db": __import__("os").environ.get("DB_NAME"), "tournaments": real})
+            raise ApiError(403, "PURGE_BLOCKED_IN_PRODUCTION", f"In produzione la pulizia in blocco vale solo per i tornei demo/di test. Tornei reali selezionati: {', '.join(real[:5])}. Deselezionali oppure eliminali singolarmente dalla card (con backup)")
 
 
 @router.post("/purge-test-data/preview")

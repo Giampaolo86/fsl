@@ -1,0 +1,30 @@
+{
+  "summary": "Testing completo iter 52 della nuova dinamica Società (anagrafe org_clubs + enroll per categoria) sul torneo 'La Serie A dei Bambini' (tid 6a9b5b045d9e0985643d0a9f). Backend pytest 8/8 OK (test_org_clubs_dynamics.py): GET /api/tournaments/{tid}/clubs ritorna manager/categories/org_key; Sporting Eur ha manager.email=societa.prova@futurestarsleague.com; POST /api/org-clubs/{key}/enroll idempotente (ripetere ['2015'] → teams [], created false); nuova categoria aggiunge 1 squadra con competition_id null; GET /api/org-clubs/items contiene qa-dinamica-test con tournament collegato; team enrollati compaiono in GET .../simple/board?category=2016 unassigned. Frontend (login QA MFA via API+cookies, viewport 1600x1000): pagina /admin/t/{tid}/societa carica con header 'Società/Città/Responsabile/Categorie/Stemma/Homepage/Azioni'; NESSUN bottone «Invito» generico; Sporting Eur mostra manager (data-testid club-manager-sporting-eur) senza bottone invito; società senza account mostrano bottone 'Nessun account · Codice FSL' (data-testid club-invite-{org-key}) che apre org-invite-dialog con 'INVITO FSL · {CLUB}' e tasto 'Genera codice FSL' — chiuso senza generare. Click 'Aggiungi società' → club-add-dialog con club-add-search; cercando 'Sporting' la riga Sporting Eur è disabilitata con 'già nel torneo'; 'Non c'è: registra una nuova società FSL' apre club-add-new-form; nome 'QA Dinamica Test', club-category-2015 + club-category-2017 → submit 'Iscrivi con 2 squadre' → toast '«QA Dinamica Test» partecipa a La Serie A dei Bambini con 2 squadre' → tabella mostra riga con chip 2015/2017 e bottone 'Nessun account · Codice FSL'. Click Categorie su quella riga (club-add-team-qa-dinamica-test) → club-categories-dialog con 2015 e 2017 checked+disabled; selezionando 2014 → submit 'Iscrivi 1 squadra' → toast '1 squadra iscritta per QA Dinamica Test' → riga mostra chip 2014/2015/2017. Verifica API finale: categories=['2014','2015','2017']. Cleanup eseguito: DELETE club 'QA Dinamica Test' force=true, delete org_clubs doc qa-dinamica-test, delete notifications dedupe_key enroll:*, delete QA super admin account. Nessuna regressione.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Clubs → colonna Responsabile (Sporting Eur)", "issues": ["Il manager cell mostra solo il full_name 'Responsabile Sporting Eur (prova)' senza l'email (societa.prova@futurestarsleague.com). La richiesta chiedeva nome/email; valutare se aggiungere l'email in sottotesto per riconoscere i responsabili (minor UX)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_org_clubs_dynamics.py",
+    "/app/test_reports/pytest/iter52.xml"
+  ],
+  "action_items": [
+    "(Opzionale) Nella colonna Responsabile del torneo mostrare anche l'email del manager accanto al full_name, per allineare la UI alla richiesta ('nome/email del responsabile')."
+  ],
+  "critical_code_review_comments": [
+    "org_clubs.enroll() verificato idempotente lato server: nuova categoria ripetuta non duplica team; categoria mai iscritta ne crea 1 con competition_id null (fuori girone) → coerente con board unassigned.",
+    "clubs() di structure.py espone correttamente i tre nuovi campi (manager, categories, org_key) necessari alla UI; nessun ObjectId mongo nel payload.",
+    "TournamentClubAdd.jsx: il CategoryPicker disabilita correttamente le categorie già iscritte (checked+disabled) e il submit calcola il numero di squadre in modo preciso (Iscrivi con N squadre / Iscrivi 1 squadra)."
+  ],
+  "updated_files": ["/app/backend/tests/test_org_clubs_dynamics.py"],
+  "success_rate": {"backend": "100% (8/8 pytest)", "frontend": "100% (flussi Aggiungi società / Codice FSL / Categorie end-to-end OK)"},
+  "test_credentials": "QA Super Admin creato con scripts/qa_admin.py create ed eliminato con delete a fine test (credenziali solo in backend/.env, non riportate).",
+  "seed_data_creation": "Nessuna seed persistente. Tutti gli artefatti di test (club QA Dinamica Test, org_clubs qa-dinamica-test, notifications enroll:*) sono stati cancellati a fine run; verificato con count=0 e GET /api/tournaments/{tid}/clubs filtrato.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Torneo 'La Serie A dei Bambini' (tid 6a9b5b045d9e0985643d0a9f) con 19 società rimaste (stato come iter 51). Suite pytest /app/backend/tests/test_org_clubs_dynamics.py riusabile per regressione sulla dinamica org_clubs: usa REACT_APP_BACKEND_URL (fallback a /app/frontend/.env), token QA via scripts/qa_token.py. Il cleanup è nel fixture module-scope autouse. Per login UI con MFA, il percorso più stabile è ottenere access_token+csrf_token+refresh_token via /api/auth/login + /api/auth/mfa/verify (helper /tmp/get_qa_cookies.py) e iniettare i cookies in Playwright context (dominio preview.emergentagent.com, httpOnly per access/refresh)."
+}
