@@ -168,6 +168,25 @@ async def _clear_group_matches(tid: str, cat: str, user, label="rigenerare il ca
     return len(ms)
 
 
+@router.delete("/calendar")
+async def clear_calendar(tournament_id: str, category: str | None = None, finals: bool = False, user: CurrentUser = Depends(get_current_user)):
+    """Cancella il calendario della categoria (gare dei gironi, opzionalmente anche la fase finale) se nessuna gara è stata giocata. Gironi e squadre restano."""
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    cat = await _category(tournament_id, category)
+    n = await _clear_group_matches(tournament_id, cat, user, label="cancellare il calendario")
+    nf = 0
+    if finals:
+        repo = scoped("matches", tournament_id)
+        fm = await repo.list({"category": cat, "stage": "finals", "status": {"$ne": "cancelled"}}, limit=2000)
+        if any(m.status in PLAYED for m in fm):
+            raise conflict("Ci sono gare della fase finale già giocate: non è possibile cancellarla")
+        for m in fm:
+            await repo.soft_delete(m.id, user.id)
+        nf = len(fm)
+    await audit.record(user, "simple.calendar_clear", "tournament", t.id, t.id, after={"category": cat, "group_matches": n, "finals_matches": nf})
+    return {"ok": True, "deleted": n, "finals_deleted": nf}
+
+
 @router.post("/groups/shuffle")
 async def shuffle(tournament_id: str, category: str | None = None, user: CurrentUser = Depends(get_current_user)):
     t, _ = await _ctx(tournament_id, user, writable=True)

@@ -353,3 +353,6 @@ Provider email/SMS; policy retention; Pantone su mazzetta fisica. Stripe: sandbo
 - [x] UI: Calendario (SimpleEngine → blocco Calendario) pulsante «Importa CSV» → `CsvImportDialog` (scelta opzione collocazione, tabella anteprima, problemi, checkbox sostituzione, Importa).
 - [x] Test reale con il master dell'utente (1.224 gare, 4 categorie × 2 gironi × 18 squadre, 17 turni): preview OK (6 campi tutte collocate; 4 campi 228/306 per categoria), apply 0,6 s → 4×306 gare, 6 campi creati, board 2015 corretta; re-apply senza replace → 409. Copia del CSV in `/app/memory/FSL_Master_1224_gare.csv`.
 - Nota per l'utente: con 18 squadre i turni di sola andata sono 17 (non 18 come nell'infografica).
+
+## Iterazione 56 (2026-10) · «CANCELLA CALENDARIO»
+- [x] `DELETE /tournaments/{tid}/simple/calendar?category=&finals=` → elimina (soft) tutte le gare dei gironi della categoria (e, se `finals=true`, anche la fase finale); bloccato con 409 se esistono gare giocate; gironi e squadre restano. Pulsante rosso «Cancella calendario» nel blocco Calendario (doppia conferma: gironi, poi fase finale). Verificato via API (3 gare → 0, guard su gara giocata → 409).

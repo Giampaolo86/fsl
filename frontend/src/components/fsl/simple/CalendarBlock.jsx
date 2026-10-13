@@ -84,6 +84,14 @@ const dayLabel = (d) => (d ? `${WEEKDAYS[new Date(d + "T12:00").getDay()]} ${fmt
 
 export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, onMove, onBreaks, onSlots, onQuickTeam, onCreate }) {
   const [csvOpen, setCsvOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const clearCalendar = async () => {
+    const finalsCount = (board.finals || []).length;
+    if (!window.confirm(`Cancellare tutte le ${board.matches.length} gare del calendario della categoria ${board.category}? Gironi e squadre restano; nessuna gara giocata verrà toccata.`)) return;
+    const withFinals = finalsCount > 0 && window.confirm(`Cancellare anche le ${finalsCount} gare della fase finale?`);
+    setClearing(true);
+    try { const { data } = await api.delete(`/tournaments/${tid}/simple/calendar`, { params: { category: board.category, finals: withFinals } }); toast.success(`Calendario cancellato: ${data.deleted} gare${data.finals_deleted ? ` + ${data.finals_deleted} di fase finale` : ""}`); reload(); } catch (e) { toast.error(apiError(e)); } finally { setClearing(false); }
+  };
   const c = board.calendar;
   const [view, setView] = useState("grid");
   const today = new Date().toISOString().slice(0, 10);
@@ -153,6 +161,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
                 <button type="button" role="tab" aria-selected={view === "list"} onClick={() => setView("list")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "list" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-list"><List className="h-3.5 w-3.5" /> Per girone</button>
               </div>
               {canWrite && <button className="btn-ghost h-9" onClick={() => onCreate({ stage: "qualification" })} data-testid="cal-add-match"><Plus className="h-4 w-4" /> Partita</button>}
+              {canWrite && board.matches?.length > 0 && <button className="btn-ghost h-9 text-fsl-danger" disabled={clearing} onClick={clearCalendar} title="Elimina tutte le gare del calendario di questa categoria (gironi e squadre restano). Possibile solo se nessuna gara è stata giocata." data-testid="cal-clear-button"><Trash2 className="h-4 w-4" /> {clearing ? "Cancello…" : "Cancella calendario"}</button>}
               {canWrite && <button className="btn-ghost h-9" onClick={() => setCsvOpen(true)} title="Importa tutte le categorie da un file CSV «master gare»" data-testid="cal-import-csv"><FileUp className="h-4 w-4" /> Importa CSV</button>}
               <button className="btn-ghost h-9" disabled={pdfBusy} onClick={pdf} data-testid="cal-pdf-button"><FileDown className="h-4 w-4" /> {pdfBusy ? "Preparo il PDF…" : "Stampa PDF"}</button>
             </div>
