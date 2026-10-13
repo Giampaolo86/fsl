@@ -195,7 +195,7 @@ async def preview_plan(tid: str, cat: str, plan: dict) -> dict:
     ko_ids = {c.id for c in await scoped("competitions", tid).list({"category": cat, "kind": "knockout"})}
     other = {(m.kickoff_at, m.field_name) for m in await scoped("matches", tid).list({"status": {"$ne": "cancelled"}, "category": {"$ne": cat}}, limit=5000)}
     existing_finals = [m for m in await scoped("matches", tid).list({"status": {"$ne": "cancelled"}, "category": cat, "competition_id": {"$in": list(ko_ids)}}, limit=500)] if ko_ids else []
-    sim = Sim(fields, groups, other, s.match_duration_min if s else 25, s.buffer_min if s else 10)
+    sim = Sim(fields, groups, other, *svc.duration_for(s, cat))
     sim.breaks = list((s.calendar_breaks if s else None) or [])
     steps = plan.get("steps") or []
     by_tool = {}

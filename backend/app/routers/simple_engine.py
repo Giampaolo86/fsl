@@ -71,6 +71,7 @@ async def _board(tid: str, cat: str) -> dict:
     gl = [{"id": g.id, "name": g.series, "size": g.teams_count, "teams": [_team_pub(tm, clubs) for tm in teams if tm.competition_id == g.id]} for g in groups]
     group_ms = [mp(m) for m in ms if m.stage == "qualification"]
     finals_ms = [mp(m) for m in ms if m.stage == "finals"]
+    mm, bb = svc.duration_for(s, cat)
     return {
         "category": cat,
         "categories": s.categories if s else [],
@@ -82,7 +83,7 @@ async def _board(tid: str, cat: str) -> dict:
         "matches": group_ms,
         "finals": finals_ms,
         "finals_competition_id": ko.id if ko else None,
-        "calendar": {"fields_count": s.fields_count, "start_time": s.day_start, "end_time": s.day_end, "match_minutes": s.match_duration_min, "buffer_minutes": s.buffer_min, "date": group_ms[0]["kickoff_at"][:10] if group_ms else None, "sessions": s.calendar_sessions or [], "breaks": s.calendar_breaks or [], "slots": s.calendar_slots or {}},
+        "calendar": {"fields_count": s.fields_count, "start_time": s.day_start, "end_time": s.day_end, "match_minutes": mm, "buffer_minutes": bb, "date": group_ms[0]["kickoff_at"][:10] if group_ms else None, "sessions": s.calendar_sessions or [], "breaks": s.calendar_breaks or [], "slots": s.calendar_slots or {}},
         "played": sum(1 for m in group_ms if m["played"]),
         "finals_played": sum(1 for m in finals_ms if m["played"]),
     }
@@ -232,7 +233,8 @@ async def move_team(tournament_id: str, team_id: str, body: MoveIn, user: Curren
     regenerated = False
     if had:
         s = await settings_repo.find_one({"tournament_id": tournament_id})
-        await _generate(tournament_id, cat, user, CalendarIn(category=cat, date=first[0].kickoff_at[:10], sessions=[SessionIn(**w) for w in (s.calendar_sessions or [])], fields_count=s.fields_count, start_time=s.day_start, end_time=s.day_end, match_minutes=s.match_duration_min, buffer_minutes=s.buffer_min))
+        mm, bb = svc.duration_for(s, cat)
+        await _generate(tournament_id, cat, user, CalendarIn(category=cat, date=first[0].kickoff_at[:10], sessions=[SessionIn(**w) for w in (s.calendar_sessions or [])], fields_count=s.fields_count, start_time=s.day_start, end_time=s.day_end, match_minutes=mm, buffer_minutes=bb))
         regenerated = True
     await audit.record(user, "simple.move", "team", tm.id, t.id, after={"to": g.series, "regenerated": regenerated})
     return {"regenerated": regenerated, **await _board(tournament_id, cat)}
@@ -278,7 +280,11 @@ async def _generate(tid: str, cat: str, user, body: CalendarIn) -> dict:
     if not any(slot_times.values()):
         raise bad_request("Nessuna sessione consente almeno una gara: allarga la fascia oraria")
     first = windows[0]
-    s = await settings_repo.update(s.id, {"fields_count": body.fields_count, "day_start": first.start_time, "day_end": first.end_time, "match_duration_min": body.match_minutes, "buffer_min": body.buffer_minutes, "slots": slot_times[id(first)], "calendar_sessions": [w.model_dump() for w in windows]}, user.id)
+    patch = {"fields_count": body.fields_count, "day_start": first.start_time, "day_end": first.end_time, "match_duration_min": body.match_minutes, "buffer_min": body.buffer_minutes, "slots": slot_times[id(first)], "calendar_sessions": [w.model_dump() for w in windows]}
+    if s.duration_by_category:
+        patch["duration_by_category"] = {**s.duration_by_category, cat: {"match_minutes": body.match_minutes, "buffer_minutes": body.buffer_minutes}}
+        patch.pop("match_duration_min"), patch.pop("buffer_min")
+    s = await settings_repo.update(s.id, patch, user.id)
     await svc.ensure_fields(await t_repo.get(tid), s, user)
     fields = (await scoped("fields", tid).list({"active": True}, sort=[("code", 1)]))[: body.fields_count]
     groups = await _groups(tid, cat)
@@ -380,9 +386,10 @@ async def _placement_finals(tournament_id, cat, ko, groups, n, body, user, s):
     fields = await scoped("fields", tournament_id).list({"active": True}, sort=[("code", 1)])
     if not fields:
         raise bad_request("Configura almeno un campo (genera prima il calendario dei gironi)")
-    times = svc.compute_slots(body.start_time, "23:00", s.match_duration_min, s.buffer_min)
+    mm, bb = svc.duration_for(s, cat)
+    times = svc.compute_slots(body.start_time, "23:00", mm, bb)
     taken = {(m.kickoff_at, m.field_id) for m in await matches_repo.list({"status": {"$ne": "cancelled"}}, limit=5000)}
-    free = [sl for sl in _slots_for(body.date, times, fields) if (sl["kickoff_at"], sl["field_id"]) not in taken and not in_break(sl["kickoff_at"], s.match_duration_min, s.calendar_breaks or [])]
+    free = [sl for sl in _slots_for(body.date, times, fields) if (sl["kickoff_at"], sl["field_id"]) not in taken and not in_break(sl["kickoff_at"], mm, s.calendar_breaks or [])]
     if len(free) < len(pairs):
         raise conflict("Slot insufficienti nella giornata della fase finale: anticipa l'orario o aggiungi campi")
     # la finalissima per ultima: le finali minori prima
@@ -437,9 +444,10 @@ async def generate_finals(tournament_id: str, body: FinalsIn, user: CurrentUser 
     fields = await scoped("fields", tournament_id).list({"active": True}, sort=[("code", 1)])
     if not fields:
         raise bad_request("Configura almeno un campo (genera prima il calendario dei gironi)")
-    times = svc.compute_slots(body.start_time, "23:00", s.match_duration_min, s.buffer_min)
+    mm, bb = svc.duration_for(s, cat)
+    times = svc.compute_slots(body.start_time, "23:00", mm, bb)
     taken = {(m.kickoff_at, m.field_id) for m in await matches_repo.list({"status": {"$ne": "cancelled"}}, limit=5000)}
-    slots = iter([sl for sl in _slots_for(body.date, times, fields) if (sl["kickoff_at"], sl["field_id"]) not in taken and not in_break(sl["kickoff_at"], s.match_duration_min, s.calendar_breaks or [])])
+    slots = iter([sl for sl in _slots_for(body.date, times, fields) if (sl["kickoff_at"], sl["field_id"]) not in taken and not in_break(sl["kickoff_at"], mm, s.calendar_breaks or [])])
 
     def next_slot():
         try:

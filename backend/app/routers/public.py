@@ -271,6 +271,7 @@ async def public_schedule(slug: str, request: Request):
         "slots": (s.calendar_slots if s else None) or {},
         "match_minutes": s.match_duration_min if s else 25,
         "buffer_minutes": s.buffer_min if s else 10,
+        "duration_by_category": (s.duration_by_category if s else None) or {},
     }
 
 

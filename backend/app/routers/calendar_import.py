@@ -1,9 +1,9 @@
-"""Importa calendario da CSV (tracciato «master gare»): tutte le categorie in un colpo solo, con anteprima e controllo collisioni."""
+"""Importa calendario da CSV (tracciato «master gare»): tutte le categorie in un colpo solo, con anteprima, controllo collisioni e aggiornamento impostazioni."""
 import csv
 import io
 import re
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 
@@ -20,10 +20,18 @@ router = APIRouter(prefix="/tournaments/{tournament_id}/simple", tags=["simple-e
 
 REQUIRED = ("categoria", "girone", "turno", "squadra_casa", "squadra_ospite")
 UNPLACED = {"", "NON COLLOCATA", "DA COLLOCARE"}
+WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 
 def _norm(h: str) -> str:
     return re.sub(r"\s+", "_", h.strip().lstrip("\ufeff").lower())
+
+
+def _field_key(code: str) -> str:
+    """«Campo 1», «campo1», «C1», «1» → «C1»; altri nomi restano in maiuscolo."""
+    c = (code or "").strip().upper()
+    m = re.fullmatch(r"(?:CAMPO|C)?\s*0*(\d+)", c)
+    return f"C{int(m.group(1))}" if m else c
 
 
 def _parse(data: bytes) -> tuple[list[dict], list[str]]:
@@ -68,28 +76,47 @@ def _time(s: str) -> str | None:
     return f"{int(m.group(1)):02d}:{m.group(2)}" if m else None
 
 
+def _int(s: str) -> int | None:
+    try:
+        return int(float(s))
+    except (TypeError, ValueError):
+        return None
+
+
+def _add_min(hhmm: str, minutes: int) -> str:
+    return (datetime.strptime(hhmm, "%H:%M") + timedelta(minutes=minutes)).strftime("%H:%M")
+
+
 def _analyze(rows: list[dict], opt: dict | None) -> dict:
     cats: dict[str, dict] = {}
     slot_use: Counter = Counter()
     team_time: Counter = Counter()
+    team_week: Counter = Counter()
     problems: list[str] = []
-    fields_needed: set[str] = set()
+    fields_needed: dict[str, str] = {}
+    day_span: dict[str, list[str]] = {}
     for i, r in enumerate(rows, start=2):
         cat, gir, turno = r["categoria"], r["girone"], r["turno"]
         if not (cat and gir and turno and r["squadra_casa"] and r["squadra_ospite"]):
             problems.append(f"Riga {i}: dati incompleti")
             continue
-        try:
-            rnd = int(float(turno))
-        except ValueError:
+        rnd = _int(turno)
+        if rnd is None:
             problems.append(f"Riga {i}: turno «{turno}» non numerico")
             continue
-        c = cats.setdefault(cat, {"category": cat, "groups": defaultdict(set), "rounds": set(), "matches": 0, "placed": 0, "unplaced": 0, "dates": set(), "formato": Counter(), "items": []})
+        c = cats.setdefault(cat, {"category": cat, "groups": defaultdict(set), "rounds": set(), "matches": 0, "placed": 0, "unplaced": 0, "dates": set(), "formato": Counter(), "minutes": Counter(), "buffer": Counter(), "items": [], "group_matches": Counter(), "group_rounds": defaultdict(set)})
         c["groups"][gir].update([r["squadra_casa"], r["squadra_ospite"]])
         c["rounds"].add(rnd)
+        c["group_rounds"][gir].add(rnd)
+        c["group_matches"][gir] += 1
         c["matches"] += 1
         if r.get("formato"):
             c["formato"][r["formato"]] += 1
+        mins, buf = _int(r.get("minuti_gioco", "")), _int(r.get("cambio_minuti", ""))
+        if mins:
+            c["minutes"][mins] += 1
+        if buf is not None:
+            c["buffer"][buf] += 1
         item = {"girone": gir, "round": rnd, "home": r["squadra_casa"], "away": r["squadra_ospite"], "kickoff_at": None, "field": None, "row": i}
         if opt:
             dcol, tcol, fcol = opt["cols"]
@@ -98,31 +125,88 @@ def _analyze(rows: list[dict], opt: dict | None) -> dict:
                 if not d or not t:
                     problems.append(f"Riga {i}: data/ora non valide «{r[dcol]} {r[tcol]}»")
                 else:
-                    item["kickoff_at"], item["field"] = f"{d}T{t}", (r.get(fcol) or "").strip().upper() or None
+                    raw_field = (r.get(fcol) or "").strip()
+                    item["kickoff_at"], item["field"] = f"{d}T{t}", _field_key(raw_field) or None
                     c["placed"] += 1
                     c["dates"].add(d)
                     if item["field"]:
-                        fields_needed.add(item["field"])
+                        fields_needed.setdefault(item["field"], raw_field)
                     k = (item["kickoff_at"], item["field"])
                     slot_use[k] += 1
+                    end = _time(r.get("fine_slot", "")) or (_add_min(t, mins + (buf or 0)) if mins else None)
+                    span = day_span.setdefault(d, [t, end or t])
+                    span[0], span[1] = min(span[0], t), max(span[1], end or t)
+                    wk = datetime.strptime(d, "%Y-%m-%d").isocalendar()[:2]
                     for tm in (item["home"], item["away"]):
                         team_time[(cat, tm, item["kickoff_at"])] += 1
+                        team_week[(cat, tm, wk)] += 1
             else:
                 c["unplaced"] += 1
         c["items"].append(item)
     dup_slots = [k for k, v in slot_use.items() if v > 1 and k[1]]
     dup_teams = [k for k, v in team_time.items() if v > 1]
+    dup_week = [k for k, v in team_week.items() if v > 1]
     if dup_slots:
         problems.append(f"{len(dup_slots)} slot campo/orario usati da più gare (es. {dup_slots[0][0].replace('T', ' ')} {dup_slots[0][1]})")
     if dup_teams:
         problems.append(f"{len(dup_teams)} squadre con due gare allo stesso orario (es. {dup_teams[0][1]} il {dup_teams[0][2].replace('T', ' ')})")
+    if dup_week:
+        problems.append(f"{len(dup_week)} squadre con più di una gara nello stesso weekend (es. {dup_week[0][1]}, settimana {dup_week[0][2][1]})")
     out = []
     for c in sorted(cats.values(), key=lambda x: x["category"]):
         sizes = {g: len(t) for g, t in c["groups"].items()}
+        for g, n in sizes.items():
+            exp_rounds, exp_matches = n - 1, n * (n - 1) // 2
+            got_rounds, got_matches = len(c["group_rounds"][g]), c["group_matches"][g]
+            if (got_rounds, got_matches) != (exp_rounds, exp_matches):
+                problems.append(f"{c['category']} {g}: {n} squadre → attesi {exp_rounds} turni e {exp_matches} gare di sola andata, trovati {got_rounds} turni e {got_matches} gare")
         ds = sorted(c["dates"])
+        mins = c["minutes"].most_common(1)[0][0] if c["minutes"] else None
+        buf = c["buffer"].most_common(1)[0][0] if c["buffer"] else None
         out.append({"category": c["category"], "groups": sizes, "teams": sum(sizes.values()), "rounds": len(c["rounds"]), "matches": c["matches"], "placed": c["placed"], "unplaced": c["unplaced"],
-                    "from": ds[0] if ds else None, "to": ds[-1] if ds else None, "formato": dict(c["formato"]), "_items": c["items"], "_groups": c["groups"]})
-    return {"categories": out, "problems": problems, "fields": sorted(fields_needed), "total": len(rows)}
+                    "from": ds[0] if ds else None, "to": ds[-1] if ds else None, "formato": dict(c["formato"]), "match_minutes": mins, "buffer_minutes": buf, "_items": c["items"], "_groups": c["groups"]})
+    sessions = [{"date": d, "start_time": span[0], "end_time": span[1]} for d, span in sorted(day_span.items())]
+    return {"categories": out, "problems": problems, "fields": dict(sorted(fields_needed.items(), key=lambda kv: (len(kv[0]), kv[0]))), "total": len(rows), "sessions": sessions, "week_overlaps": bool(dup_week)}
+
+
+def _settings_patch(a: dict, s) -> dict:
+    """Impostazioni torneo derivate dal file: campi, giorni, orari, sessioni, squadre per girone, durate per categoria."""
+    sess = a["sessions"]
+    if not sess:
+        return {}
+    cats = a["categories"]
+    sizes = [n for c in cats for n in c["groups"].values()]
+    first = cats[0]
+    series = sorted(first["groups"].keys())
+    durations = {c["category"]: {"match_minutes": c["match_minutes"], "buffer_minutes": c["buffer_minutes"] if c["buffer_minutes"] is not None else s.buffer_min} for c in cats if c["match_minutes"]}
+    all_mins = [d["match_minutes"] for d in durations.values()] or [s.match_duration_min]
+    all_buf = [d["buffer_minutes"] for d in durations.values()] or [s.buffer_min]
+    day_start, day_end = min(x["start_time"] for x in sess), max(x["end_time"] for x in sess)
+    keep = [x for x in (s.calendar_sessions or []) if x.get("date") not in {x["date"] for x in sess}]
+    patch = {
+        "fields_count": max(len(a["fields"]), 1),
+        "match_days": [WEEKDAYS[i] for i in sorted({datetime.strptime(x["date"], "%Y-%m-%d").weekday() for x in sess})],
+        "day_start": day_start, "day_end": day_end,
+        "calendar_sessions": sorted(keep + sess, key=lambda x: (x["date"], x["start_time"])),
+        "teams_per_series": max(sizes), "series": series, "groups_count": len(series), "teams_total": 0,
+        "match_duration_min": min(all_mins), "buffer_min": min(all_buf),
+        "duration_by_category": {**(s.duration_by_category or {}), **durations},
+        "max_matches_per_team_per_weekend": s.max_matches_per_team_per_weekend if a["week_overlaps"] else 1,
+    }
+    patch["slots"] = svc.compute_slots(day_start, day_end, patch["match_duration_min"], patch["buffer_min"])
+    return patch
+
+
+async def _field_map(tournament_id: str) -> dict:
+    out = {}
+    for f in await scoped("fields", tournament_id).list({"active": True}):
+        out.setdefault(_field_key(f.code), f)
+        out.setdefault(_field_key(f.name), f)
+    return out
+
+
+def _public_settings(patch: dict) -> dict:
+    return {k: patch[k] for k in ("fields_count", "match_days", "day_start", "day_end", "teams_per_series", "series", "groups_count", "duration_by_category") if k in patch} | {"sessions": len(patch.get("calendar_sessions") or [])}
 
 
 @router.post("/import-csv/preview")
@@ -137,15 +221,18 @@ async def import_preview(tournament_id: str, file: UploadFile = File(...), optio
     for c in a["categories"]:
         ms = await matches_repo.list({"category": c["category"], "stage": "qualification", "status": {"$ne": "cancelled"}}, limit=5000)
         existing[c["category"]] = {"matches": len(ms), "played": sum(1 for m in ms if m.status in PLAYED)}
-    have_fields = {f.code.upper() for f in await scoped("fields", tournament_id).list({"active": True})}
+    have = await _field_map(tournament_id)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    patch = _settings_patch(a, s) if s else {}
     return {"options": [{"key": o["key"], "label": o["label"]} for o in opts], "option": opt["key"] if opt else None, "total": a["total"], "problems": a["problems"],
-            "fields_needed": a["fields"], "fields_to_create": [f for f in a["fields"] if f not in have_fields],
+            "fields_needed": [have[k].name if k in have else v for k, v in a["fields"].items()], "fields_to_create": [v for k, v in a["fields"].items() if k not in have],
+            "settings": _public_settings(patch),
             "categories": [{k: v for k, v in c.items() if not k.startswith("_")} | {"existing": existing[c["category"]]} for c in a["categories"]]}
 
 
 @router.post("/import-csv/apply", status_code=201)
 async def import_apply(tournament_id: str, file: UploadFile = File(...), option: str = Form(""), replace: bool = Form(False), user: CurrentUser = Depends(get_current_user)):
-    """Crea gironi, squadre segnaposto (o reali se il nome coincide), campi e gare per tutte le categorie del CSV."""
+    """Crea gironi, squadre segnaposto (o reali se il nome coincide), campi e gare per tutte le categorie del CSV; aggiorna le impostazioni del torneo."""
     t, _ = await _ctx(tournament_id, user, writable=True)
     rows, cols = _parse(await file.read())
     opts = _options(cols)
@@ -154,12 +241,15 @@ async def import_apply(tournament_id: str, file: UploadFile = File(...), option:
     if any(p.startswith("Riga") for p in a["problems"]):
         raise bad_request("Correggi prima gli errori di riga segnalati nell'anteprima")
     comps_repo, teams_repo, matches_repo, fields_repo = scoped("competitions", tournament_id), scoped("teams", tournament_id), scoped("matches", tournament_id), scoped("fields", tournament_id)
-    fields = {f.code.upper(): f for f in await fields_repo.list({"active": True})}
+    fields = await _field_map(tournament_id)
     venue = (await scoped("venues", tournament_id).list(limit=1) or [None])[0]
-    for code in a["fields"]:
-        if code not in fields:
-            num = re.sub(r"\D", "", code)
-            fields[code] = await fields_repo.insert(Field_(tournament_id=tournament_id, venue_id=venue.id if venue else None, code=code, name=f"Campo {num or code}"), user.id)
+    fields_created = []
+    for key, raw in a["fields"].items():
+        if key not in fields:
+            num = re.sub(r"\D", "", key)
+            name = raw if not re.fullmatch(r"C\d+", key) else f"Campo {num}"
+            fields[key] = await fields_repo.insert(Field_(tournament_id=tournament_id, venue_id=venue.id if venue else None, code=key, name=name), user.id)
+            fields_created.append(name)
     s = await settings_repo.find_one({"tournament_id": tournament_id})
     report = []
     for c in a["categories"]:
@@ -179,7 +269,7 @@ async def import_apply(tournament_id: str, file: UploadFile = File(...), option:
             if g:
                 g = await comps_repo.update(g.id, {"teams_count": len(names), "rounds": c["rounds"], "enabled": True}, user.id)
             else:
-                g = await comps_repo.insert(Competition(tournament_id=tournament_id, code=svc.competition_code(cat, gir), name=f"{cat} · {gir}", category=cat, series=gir, format="single_round_robin", teams_count=len(names), rounds=c["rounds"]), user.id)
+                g = await comps_repo.insert(Competition(tournament_id=tournament_id, code=svc.competition_code(cat, gir), name=f"{cat} · {gir}", category=cat, series=gir, format="single_round_robin", teams_count=len(names), rounds=c["rounds"], points=s.points if s else {"win": 3, "draw": 1, "loss": 0}, tiebreakers=s.tiebreakers if s else []), user.id)
             groups[gir] = g
         all_teams = await teams_repo.list({"category": cat}, limit=3000)
         by_name = {tm.name.strip().lower(): tm for tm in all_teams}
@@ -206,11 +296,13 @@ async def import_apply(tournament_id: str, file: UploadFile = File(...), option:
             created += 1
         await _knockout(tournament_id, cat, create=True, actor=user)
         report.append({"category": cat, "groups": len(groups), "teams_created": created_teams, "matches_created": created, "matches_skipped": skipped, "replaced": len(old)})
+    patch = {}
     if s:
         cats = list(s.categories or [])
         for c in a["categories"]:
             if c["category"] not in cats:
                 cats.append(c["category"])
-        await settings_repo.update(s.id, {"categories": cats, "formula": "groups_knockout"}, user.id)
-    await audit.record(user, "simple.import_csv", "tournament", t.id, t.id, after={"file": file.filename, "option": opt["key"] if opt else None, "report": report})
-    return {"ok": True, "report": report, "fields_created": [c for c in a["fields"]]}
+        patch = {"categories": cats, "formula": "groups_knockout", **_settings_patch(a, s)}
+        await settings_repo.update(s.id, patch, user.id)
+    await audit.record(user, "simple.import_csv", "tournament", t.id, t.id, after={"file": file.filename, "option": opt["key"] if opt else None, "report": report, "settings": _public_settings(patch)})
+    return {"ok": True, "report": report, "fields_created": fields_created, "settings": _public_settings(patch)}

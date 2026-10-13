@@ -18,22 +18,24 @@ TRANSITIONS = {
 
 TEMPLATES = {
     "serie_a_bambini": {
-        "label": "Campionato multi-categoria (Serie A / Serie B)",
-        "description": "Più categorie, due serie per categoria, girone unico di sola andata, playoff/playout, promozioni e retrocessioni.",
+        "label": "Campionato multi-categoria (formato FSL 2026/27)",
+        "description": "4 categorie × 2 gironi da 16 squadre, sola andata (15 turni, 960 gare), 4 campi, sabato e domenica, 9v9 da 35' e 7v7 da 30', playoff/playout, promozioni e retrocessioni.",
         "settings": {
             "categories": ["2014", "2015", "2016", "2017"],
-            "series": ["Serie A", "Serie B"],
-            "teams_per_series": 18,
-            "fields_count": 3,
+            "series": ["Girone 1", "Girone 2"],
+            "teams_per_series": 16,
+            "fields_count": 4,
             "match_days": ["sat", "sun"],
             "day_start": "08:30",
-            "day_end": "13:30",
+            "day_end": "14:30",
             "match_duration_min": 30,
             "buffer_min": 10,
+            "duration_by_category": {"2014": {"match_minutes": 35, "buffer_minutes": 10}, "2015": {"match_minutes": 35, "buffer_minutes": 10}, "2016": {"match_minutes": 30, "buffer_minutes": 10}, "2017": {"match_minutes": 30, "buffer_minutes": 10}},
+            "max_matches_per_team_per_weekend": 1,
             "formula": "single_round_robin",
             "playoff_rules": {
-                "Serie A": {"playoff": [1, 8], "safe": [9, 12], "playout": [13, 18]},
-                "Serie B": {"direct_promotion": [1, 2], "promotion_playoff": [3, 6]},
+                "Girone 1": {"playoff": [1, 8], "safe": [9, 12], "playout": [13, 16]},
+                "Girone 2": {"playoff": [1, 8], "safe": [9, 12], "playout": [13, 16]},
             },
             "promoted_per_category": 3,
             "relegated_per_category": 3,
@@ -132,6 +134,14 @@ def group_sizes(s: TournamentSettings) -> list[int]:
     g = max(1, s.groups_count)
     base, extra = divmod(s.teams_total, g)
     return [base + (1 if i < extra else 0) for i in range(g)]
+
+
+def duration_for(s: TournamentSettings, cat: str | None) -> tuple[int, int]:
+    """Durata gara e cambio campo (minuti) per categoria: override in `duration_by_category`, altrimenti valori generali."""
+    d = ((s.duration_by_category or {}).get(cat or "") or {}) if s else {}
+    mm = int(d.get("match_minutes") or (s.match_duration_min if s else 25))
+    bb = int(d["buffer_minutes"]) if d.get("buffer_minutes") is not None else (s.buffer_min if s else 10)
+    return mm, bb
 
 
 def apply_structure(s: TournamentSettings) -> TournamentSettings:

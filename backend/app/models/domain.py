@@ -98,6 +98,7 @@ class TournamentSettings(BaseDocument):
     break_end: Optional[str] = None
     match_duration_min: int = 30
     buffer_min: int = 10
+    duration_by_category: dict = {}
     slots: list[str] = []
     formula: Literal["single_round_robin", "double_round_robin", "groups_knockout", "weekend_event"] = "single_round_robin"
     points: dict = {"win": 3, "draw": 1, "loss": 0}

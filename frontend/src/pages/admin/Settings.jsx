@@ -74,6 +74,7 @@ export default function Settings() {
           break_end: s.break_end || null,
           match_duration_min: Number(s.match_duration_min),
           buffer_min: Number(s.buffer_min),
+          duration_by_category: s.duration_by_category || {},
           formula: s.formula,
           points: s.points,
           tiebreakers: s.tiebreakers,
@@ -203,6 +204,19 @@ export default function Settings() {
             <Field label="Cambio campo (min)"><input type="number" min="0" className="fsl-input" value={s.buffer_min} onChange={(e) => upd("buffer_min", e.target.value)} data-testid="settings-buffer-input" /></Field>
             <Field label="Max gare per squadra a weekend" hint="Regola propria di questo torneo: 1 per i campionati lunghi, più gare per gli eventi concentrati (riposo di almeno uno slot tra una gara e l'altra)"><input type="number" min="1" className="fsl-input" value={s.max_matches_per_team_per_weekend} onChange={(e) => upd("max_matches_per_team_per_weekend", e.target.value)} data-testid="settings-maxweekend-input" /></Field>
             <label className="flex items-center gap-2 text-sm mt-6"><input type="checkbox" checked={s.skip_holidays} onChange={(e) => upd("skip_holidays", e.target.checked)} data-testid="settings-skip-holidays" /> Salta automaticamente i festivi</label>
+          </div>
+          <div className="mt-4 rounded-md bg-ink-950/50 border border-white/10 p-4" data-testid="settings-duration-by-category">
+            <div className="fsl-label mb-1">Durata per categoria</div>
+            <p className="text-xs text-fsl-slate mb-3">Vuoto = durata generale. Es. 9v9 35' per 2014/2015, 7v7 30' per 2016/2017. Griglia, controllo conflitti e fase finale usano la durata della categoria.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {s.categories.map((cat) => { const d = s.duration_by_category?.[cat] || {}; const set = (k, v) => { const by = { ...(s.duration_by_category || {}) }; const next = { ...(by[cat] || {}) }; if (v === "") delete next[k]; else next[k] = Number(v); if (Object.keys(next).length) by[cat] = next; else delete by[cat]; upd("duration_by_category", by); }; return (
+                <div key={cat} className="rounded-md border border-white/10 p-3">
+                  <div className="font-display font-bold text-fsl-gold num mb-2">{cat}</div>
+                  <label className="flex items-center justify-between gap-2 text-xs text-fsl-slate">Gara (min)<input type="number" min="5" max="120" placeholder={String(s.match_duration_min)} className="fsl-input h-8 w-20 text-right num" value={d.match_minutes ?? ""} onChange={(e) => set("match_minutes", e.target.value)} data-testid={`settings-duration-${cat}`} /></label>
+                  <label className="flex items-center justify-between gap-2 text-xs text-fsl-slate mt-2">Cambio (min)<input type="number" min="0" max="60" placeholder={String(s.buffer_min)} className="fsl-input h-8 w-20 text-right num" value={d.buffer_minutes ?? ""} onChange={(e) => set("buffer_minutes", e.target.value)} data-testid={`settings-buffer-${cat}`} /></label>
+                </div>
+              ); })}
+            </div>
           </div>
           <div className="mt-4 rounded-md bg-ink-950/50 border border-white/10 p-4">
             <div className="fsl-label mb-2">Slot calcolati (salvati)</div>

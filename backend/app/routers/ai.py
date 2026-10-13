@@ -41,6 +41,16 @@ FSL è una lega di calcio giovanile (bambini e ragazzi 2012–2018) con l'organi
 - Una squadra non gioca mai due gare sovrapposte; tra due gare della stessa squadra meglio almeno uno slot di riposo.
 """
 
+FORMAT_2026_27 = """
+## Formato campionato FSL 2026/27 (definitivo)
+- 4 categorie (2014, 2015, 2016, 2017) × 2 gironi («Girone 1», «Girone 2») da **16 squadre** ciascuno = 32 squadre per categoria, 128 in totale.
+- Girone all'italiana di **sola andata**: 15 turni, 120 gare per girone, 240 per categoria, **960 gare totali** (non più 18 squadre / 1.224 gare).
+- **4 campi** in parallelo, sabato e domenica, dalle 08:30 alle 14:30 circa; 30 date dal 28/11/2026 al 25/04/2027; ogni squadra gioca **una sola gara a weekend**.
+- 2014 e 2015: 9v9, gare da 35' + 10' di cambio campo (slot 45'). 2016 e 2017: 7v7, gare da 30' + 10' (slot 40'). Le durate per categoria sono in Impostazioni → «Durata per categoria».
+- Per ogni girone: playoff 1ª–8ª, salve 9ª–12ª, playout 13ª–16ª. Il calendario ufficiale si carica con «Importa CSV» (tracciato master gare) e resta modificabile gara per gara.
+"""
+DEFAULT_BRAIN += FORMAT_2026_27
+
 CAL_SYSTEM = """Sei l'assistente calendario di Future Stars League. Aiuti il direttore a trasformare la descrizione a parole di un torneo in un PIANO concreto che il software applicherà.
 
 Strumenti che il piano può usare (tutti opzionali; ordine di esecuzione fisso: groups → breaks → calendar → finals → extra_matches, quindi le pause vengono rispettate dal calendario):
@@ -63,7 +73,8 @@ REGOLE
 
 async def _brain_text() -> str:
     doc = await db.ai_brain.find_one({"key": "fsl"})
-    return (doc or {}).get("text") or DEFAULT_BRAIN
+    text = (doc or {}).get("text") or DEFAULT_BRAIN
+    return text if "Formato campionato FSL 2026/27" in text else text.rstrip() + "\n" + FORMAT_2026_27
 
 
 @router.get("/brain")
