@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, CreditCard, FileText, Shield, Users } from "lucide-react";
+import { CalendarDays, Copy, CreditCard, FileText, KeyRound, Shield, UserRound, Users } from "lucide-react";
+import { toast } from "sonner";
 import { ReadinessCard } from "@/components/fsl/ReadinessCard";
 import { KpiTile } from "@/components/fsl/Primitives";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
@@ -71,6 +72,40 @@ export default function ClubDashboard() {
         <KpiTile icon={CalendarDays} value={data.next_match ? fmtDate(data.next_match.kickoff_at, { time: true }) : "—"} label="Prossima gara" hint={data.next_match ? `${data.next_match.home?.club?.short_name || data.next_match.home?.name || ""} – ${data.next_match.away?.club?.short_name || data.next_match.away?.name || ""}` : "Nessuna gara programmata"} testId="club-kpi-next" to={data.next_match ? `/societa/partite/${data.next_match.id}` : "/societa/calendario"} />
       </div>
       <ClubGroups />
+      <ClubManagersCard tid={membership.tournament_id} />
     </div>
+  );
+}
+
+function ClubManagersCard({ tid }) {
+  const [data, setData] = useState(null);
+  const load = () => api.get("/me/club/invite", { params: { tournament_id: tid } }).then((r) => setData(r.data)).catch((e) => toast.error(apiError(e)));
+  useEffect(() => { load(); }, [tid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const gen = () => api.post("/me/club/invite", null, { params: { tournament_id: tid } }).then(() => { toast.success("Codice invito generato"); load(); }).catch((e) => toast.error(apiError(e)));
+  if (!data) return null;
+  const inv = data.valid ? data.invite : null;
+  const link = inv ? `${window.location.origin}/registrati-societa?codice=${inv.code}` : "";
+  const copy = (t) => navigator.clipboard?.writeText(t).then(() => toast.success("Copiato"));
+  return (
+    <section className="fsl-card p-5 md:p-6" data-testid="club-managers-card">
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="flex-1 min-w-[240px]">
+          <div className="fsl-section-title">Dirigenti della società</div>
+          <p className="text-xs text-fsl-slate mt-1">Chi accede all'Area Società con pieni poteri (rose, convocazioni, documenti, pagamenti). Invita un altro dirigente con un codice: si registra su /registrati-societa e trova subito tutte le squadre della società.</p>
+          <ul className="mt-3 space-y-1 text-sm" data-testid="club-managers-list">
+            {data.managers.map((m, i) => <li key={m.id} className="flex items-center gap-2"><UserRound className="h-4 w-4 text-fsl-gold" /> <span className="font-semibold">{m.full_name || m.email}</span><span className="text-xs text-fsl-slate">{m.email}{i === 0 ? " · responsabile" : ""}</span></li>)}
+          </ul>
+        </div>
+        <div className="w-full sm:w-auto sm:min-w-[280px] space-y-2">
+          {inv ? (
+            <>
+              <code className="block text-center text-2xl font-mono tracking-widest rounded-lg bg-navy-700/60 border border-fsl-gold/40 px-4 py-3 select-all" data-testid="club-invite-code">{inv.code}</code>
+              <p className="text-[11px] text-fsl-slate text-center">Valido fino al {fmtDate(inv.expires_at)} · una sola registrazione</p>
+              <div className="flex gap-2"><button className="btn-primary flex-1 h-9" onClick={() => copy(link)} data-testid="club-invite-copy"><Copy className="h-4 w-4" /> Copia link</button><button className="btn-ghost h-9" onClick={gen} data-testid="club-invite-regen">Rigenera</button></div>
+            </>
+          ) : <button className="btn-gold w-full" onClick={gen} data-testid="club-invite-generate"><KeyRound className="h-4 w-4" /> Invita un dirigente</button>}
+        </div>
+      </div>
+    </section>
   );
 }

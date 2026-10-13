@@ -67,6 +67,48 @@ def _rounds(rows: list[dict]) -> list[dict]:
     return [{**o, "dates": sorted(o["dates"])} for _, o in sorted(out.items())]
 
 
+async def _my_org_key(tournament_id: str, user: CurrentUser) -> str:
+    from ..services import org_clubs as org_clubs_svc
+
+    if user.role_in(tournament_id) != "club_manager":
+        raise forbidden("Area riservata al Responsabile Società")
+    club = await scoped("clubs", tournament_id).get(user.club_in(tournament_id))
+    if not club:
+        raise not_found("Società")
+    return (await org_clubs_svc.ensure_for_club(club, user.id)).org_key
+
+
+@router.get("/club/invite")
+async def my_club_invite(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Codice invito per un altro dirigente della società + elenco dei dirigenti già registrati."""
+    from ..models.base import utcnow
+    from ..services import org_clubs as org_clubs_svc
+    from .org_clubs import invites
+
+    key = await _my_org_key(tournament_id, user)
+    inv = next(iter(await invites.list({"org_key": key, "tournament_id": None}, sort=[("created_at", -1)], limit=1)), None)
+    valid = bool(inv and not inv.used_by and inv.expires_at.replace(tzinfo=None) > utcnow().replace(tzinfo=None))
+    row = next((r for r in await org_clubs_svc.registry() if r["org_key"] == key), None)
+    return {"invite": inv.public() if inv else None, "valid": valid, "managers": row["managers"] if row else []}
+
+
+@router.post("/club/invite")
+async def my_club_create_invite(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    from datetime import timedelta
+
+    from ..models.base import utcnow
+    from ..models.domain import ClubInvite
+    from ..services import audit
+    from .org_clubs import _code, invites
+
+    key = await _my_org_key(tournament_id, user)
+    for old in await invites.list({"org_key": key, "used_by": None}):
+        await invites.update(old.id, {"expires_at": utcnow()}, user.id)
+    inv = await invites.insert(ClubInvite(org_key=key, code=_code(), expires_at=utcnow() + timedelta(days=30)), user.id)
+    await audit.record(user, "club.invite_manager", "org_club", key, tournament_id, after={"code": inv.code})
+    return inv.public()
+
+
 @router.get("/club/program")
 async def my_club_program(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
     """Giornate con gare della società (per il selettore di stampa)."""

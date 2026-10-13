@@ -98,8 +98,6 @@ async def create_invite(key: str, user: CurrentUser = Depends(get_current_user))
     oc = await svc.get(key)
     if not oc:
         raise not_found("Società")
-    if oc.manager_user_id:
-        raise conflict("La società ha già un responsabile registrato")
     for old in await invites.list({"org_key": key, "used_by": None}):
         await invites.update(old.id, {"expires_at": utcnow()}, user.id)
     inv = await invites.insert(ClubInvite(org_key=key, code=_code(), expires_at=utcnow() + timedelta(days=30)), user.id)

@@ -38,9 +38,8 @@ async def get(key: str) -> Optional[OrgClub]:
 async def ensure_for_club(club: Club, actor_id: Optional[str] = None) -> OrgClub:
     key = key_of(club)
     oc = await get(key)
-    if oc:
-        return oc
-    oc = await org_clubs.insert(OrgClub(org_key=key, **_profile_patch(club)), actor_id)
+    if not oc:
+        oc = await org_clubs.insert(OrgClub(org_key=key, **_profile_patch(club)), actor_id)
     if not club.org_club_id:
         await db.clubs.update_one({"_id": ObjectId(club.id)}, {"$set": {"org_club_id": key}})
     return oc
@@ -132,6 +131,17 @@ async def registry() -> list[dict]:
         by_key.setdefault(key, []).append({"club_id": str(d["_id"]), "club_slug": d.get("slug"), "tournament_id": d["tournament_id"], "tournament_name": t.name if t else "", "tournament_slug": t.slug if t else "", "tournament_status": t.status if t else "", "teams": teams})
     out = []
     users_cache: dict[str, Optional[dict]] = {}
+    club_to_key = {c["club_id"]: k for k, cs in by_key.items() for c in cs}
+    mgr_by_key: dict[str, list] = {}
+    if club_to_key:
+        ms = [m async for m in db.tournament_memberships.find({"club_id": {"$in": list(club_to_key)}, "role": "club_manager"}, {"user_id": 1, "club_id": 1})]
+        uids = {m["user_id"] for m in ms}
+        umap = {str(u["_id"]): u async for u in db.users.find({"_id": {"$in": [ObjectId(x) for x in uids if ObjectId.is_valid(x)]}}, {"email": 1, "full_name": 1, "status": 1})}
+        for m in ms:
+            u = umap.get(m["user_id"])
+            lst = mgr_by_key.setdefault(club_to_key[m["club_id"]], [])
+            if u and all(x["id"] != m["user_id"] for x in lst):
+                lst.append({"id": m["user_id"], "email": u["email"], "full_name": u.get("full_name"), "status": u.get("status")})
     async for oc in db.org_clubs.find({"deleted_at": None}):
         key = oc["org_key"]
         manager = None
@@ -144,7 +154,7 @@ async def registry() -> list[dict]:
         pending_groups = await db.org_groups.count_documents({"org_key": key, "status": "pending"})
         out.append({
             "org_key": key, "id": str(oc["_id"]), "name": oc["name"], "city": oc.get("city", ""), "colors": oc.get("colors"), "crest_url": None if oc.get("crest_is_placeholder", True) else oc.get("crest_url"),
-            "manager": manager, "email": oc.get("email", ""), "contact_name": oc.get("contact_name", ""),
+            "manager": manager, "managers": ([manager] if manager else []) + [m for m in mgr_by_key.get(key, []) if not manager or m["id"] != manager["id"]], "email": oc.get("email", ""), "contact_name": oc.get("contact_name", ""),
             "tournaments": sorted(by_key.pop(key, []), key=lambda x: x["tournament_name"]),
             "pending_groups": pending_groups, "approval_status": oc.get("approval_status", "approved"), "has_draft": bool(oc.get("profile_draft")),
             "invite": {"code": inv["code"], "expires_at": inv["expires_at"], "valid": inv["expires_at"].replace(tzinfo=None) > datetime.now(timezone.utc).replace(tzinfo=None)} if inv else None,
