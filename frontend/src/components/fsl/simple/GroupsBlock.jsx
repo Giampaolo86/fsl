@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRightLeft, Check, Pencil, Shuffle, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
+import { PlaceholderPicker } from "./PlaceholderPicker";
 
-function TeamRow({ tid, team, groups, clubs, onDone, canWrite }) {
+function TeamRow({ tid, team, groups, clubs, onDone, canWrite, registry, unassigned }) {
   const [edit, setEdit] = useState(false);
   const [name, setName] = useState(team.name);
   const [clubId, setClubId] = useState("");
@@ -26,6 +27,9 @@ function TeamRow({ tid, team, groups, clubs, onDone, canWrite }) {
       toast.success(data.regenerated ? "Squadra spostata · calendario rigenerato" : "Squadra spostata"); onDone();
     } catch (e) { toast.error(apiError(e)); }
   };
+  if (edit && team.placeholder && team.competition_id) {
+    return <PlaceholderPicker tid={tid} team={team} registry={registry} unassigned={unassigned} onDone={() => { setEdit(false); onDone(); }} onCancel={() => setEdit(false)} />;
+  }
   if (edit) {
     return (
       <li className="py-1.5 flex flex-col gap-1.5" data-testid={`team-edit-${team.id}`}>
@@ -59,6 +63,9 @@ export function GroupsBlock({ tid, board, reload, canWrite }) {
   const [n, setN] = useState(board.groups.length || 2);
   const [size, setSize] = useState(board.groups[0]?.size || 4);
   const [busy, setBusy] = useState(false);
+  const [registry, setRegistry] = useState([]);
+  const placeholders = board.groups.reduce((acc, g) => acc + g.teams.filter((tm) => tm.placeholder).length, 0);
+  useEffect(() => { if (canWrite && placeholders > 0) api.get("/org-clubs").then((r) => setRegistry(r.data.items || [])).catch(() => {}); }, [canWrite, placeholders]);
   const run = async (fn, ok) => { setBusy(true); try { await fn(); toast.success(ok); reload(); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); } };
   const create = () => {
     const msg = board.matches.length ? "Il calendario esistente dei gironi verrà eliminato (le squadre e i nomi restano)." : "";
@@ -78,7 +85,7 @@ export function GroupsBlock({ tid, board, reload, canWrite }) {
   return (
     <section className="fsl-card p-5" data-testid="block-groups">
       <div className="flex flex-wrap items-end gap-3 mb-4">
-        <div><div className="fsl-kicker">A</div><h2 className="font-display font-extrabold uppercase text-2xl leading-none">Gironi</h2></div>
+        <div><div className="fsl-kicker">A</div><h2 className="font-display font-extrabold uppercase text-2xl leading-none">Gironi</h2>{placeholders > 0 && <p className="text-[11px] text-fsl-warning mt-1" data-testid="groups-placeholders-count"><span className="num font-semibold">{placeholders}</span> segnaposto da sostituire: clicca su un nome in corsivo e scegli la società reale dall'anagrafe FSL</p>}</div>
         {canWrite && (
           <div className="flex flex-wrap items-end gap-2 ml-auto">
             <label className="text-xs text-fsl-slate">Gironi<input type="number" min="1" max="26" className="fsl-input h-10 w-20 mt-1" value={n} onChange={(e) => setN(e.target.value)} data-testid="groups-count-input" /></label>
@@ -95,7 +102,7 @@ export function GroupsBlock({ tid, board, reload, canWrite }) {
           {board.groups.map((g) => (
             <div key={g.id} className="rounded-lg border border-white/10 bg-ink-950/40 p-3" data-testid={`group-card-${g.name.replace(/\s+/g, "-")}`}>
               <div className="flex items-center justify-between mb-1 gap-2"><div className="font-display font-extrabold uppercase text-fsl-gold">{g.name}</div><span className="text-[11px] text-fsl-slate num ml-auto">{g.teams.length} squadre</span>{canWrite && <button type="button" onClick={() => removeGroup(g)} className="text-fsl-slate/50 hover:text-fsl-danger" aria-label={`Elimina ${g.name}`} data-testid={`group-delete-${g.id}`}><Trash2 className="h-3.5 w-3.5" /></button>}</div>
-              <ul className="divide-y divide-white/[0.06]">{g.teams.map((tm) => <TeamRow key={tm.id} tid={tid} team={tm} groups={board.groups} clubs={board.clubs} onDone={reload} canWrite={canWrite} />)}</ul>
+              <ul className="divide-y divide-white/[0.06]">{g.teams.map((tm) => <TeamRow key={tm.id} tid={tid} team={tm} groups={board.groups} clubs={board.clubs} onDone={reload} canWrite={canWrite} registry={registry} unassigned={board.unassigned} />)}</ul>
             </div>
           ))}
         </div>

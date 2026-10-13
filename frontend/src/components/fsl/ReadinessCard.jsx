@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Check, ChevronRight, Info, Loader2, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
+import { fmtDate } from "@/lib/format";
 
 function Item({ it, onToggle, busy }) {
   const neutral = it.done === null;
@@ -47,6 +48,34 @@ export function ReadinessCard({ tid, cid }) {
         </div>
       </div>
       <ul className="mt-4">{data.items.map((it) => <Item key={it.key} it={it} onToggle={toggle} busy={busy === it.key} />)}</ul>
+      {data.rosters?.length > 0 && <RosterChecklist rosters={data.rosters} deadline={data.deadline} />}
     </section>
+  );
+}
+
+function RosterChecklist({ rosters, deadline }) {
+  const missing = rosters.filter((r) => !r.ok);
+  const days = deadline ? Math.ceil((new Date(deadline) - Date.now()) / 86400000) : null;
+  return (
+    <div className="mt-4 rounded-lg border border-white/10 bg-ink-950/40 p-4" data-testid="roster-checklist">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-display font-bold uppercase text-base">Rose da caricare</h3>
+        <span className={`text-xs num ${missing.length ? "text-fsl-warning" : "text-fsl-success"}`} data-testid="roster-checklist-summary">{missing.length ? `${missing.length} di ${rosters.length} rose mancanti o incomplete` : "Tutte le rose sono complete"}</span>
+        {deadline && <span className="ml-auto text-xs text-fsl-slate num" data-testid="roster-checklist-deadline">Prima gara {fmtDate(deadline)}{days !== null && days >= 0 ? ` · tra ${days} giorni` : ""}</span>}
+      </div>
+      <ul className="mt-3 grid sm:grid-cols-2 gap-2">
+        {rosters.map((r) => (
+          <li key={r.team_id} className={`flex items-center gap-3 rounded-md border px-3 py-2 ${r.ok ? "border-fsl-success/30" : r.players ? "border-fsl-warning/40" : "border-fsl-danger/40"}`} data-testid={`roster-row-${r.category}`}>
+            <span className="font-display font-black text-fsl-gold text-lg num w-12">{r.category}</span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold truncate">{r.name}</span>
+              <span className="block text-[11px] text-fsl-slate num">{r.players} giocatori{!r.ok && ` · minimo ${r.min}`}{r.first_kickoff && ` · esordio ${fmtDate(r.first_kickoff)}`}</span>
+            </span>
+            {r.ok ? <span className="text-xs text-fsl-success inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> OK</span>
+              : <Link to="/societa/rose" className="btn-gold h-8 px-3 text-xs" data-testid={`roster-upload-${r.category}`}>{r.players ? "Completa" : "Carica rosa"}</Link>}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

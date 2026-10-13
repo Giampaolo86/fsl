@@ -53,7 +53,14 @@ async def club_readiness(tournament_id: str, club, homepage_missing: list[str]) 
         items.append({"key": key, "label": label, "done": bool(done_map.get(key)), "detail": detail, "to": to, "auto": False, "info": False, "done_at": done_map.get(key)})
     scored = [i for i in items if not i["info"] and i["done"] is not None]
     done = sum(1 for i in scored if i["done"])
-    return {"items": items, "done": done, "total": len(scored), "score": round(100 * done / len(scored)) if scored else 0}
+    per_team_first: dict[str, str] = {}
+    if team_ids:
+        for m in await scoped("matches", tournament_id).list({"$or": [{"home_team_id": {"$in": team_ids}}, {"away_team_id": {"$in": team_ids}}], "status": {"$nin": ["cancelled"]}}, sort=[("kickoff_at", 1)], limit=5000):
+            for tid_ in (m.home_team_id, m.away_team_id):
+                if tid_ in per_team and tid_ not in per_team_first:
+                    per_team_first[tid_] = m.kickoff_at
+    rosters = sorted([{"team_id": t.id, "name": t.name, "category": t.category, "series": t.series, "players": per_team.get(t.id, 0), "min": MIN_PLAYERS_PER_TEAM, "ok": per_team.get(t.id, 0) >= MIN_PLAYERS_PER_TEAM, "first_kickoff": per_team_first.get(t.id)} for t in teams], key=lambda r: (r["category"], r["name"]))
+    return {"items": items, "done": done, "total": len(scored), "score": round(100 * done / len(scored)) if scored else 0, "rosters": rosters, "deadline": first[0].kickoff_at if first else None}
 
 
 async def toggle_manual(tournament_id: str, club, key: str, done: bool) -> dict:

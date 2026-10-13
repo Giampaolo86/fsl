@@ -215,6 +215,51 @@ class MoveIn(BaseModel):
     competition_id: str
 
 
+class AssignIn(BaseModel):
+    org_key: str = ""
+    team_id: str = ""
+
+
+@router.post("/teams/{team_id}/assign")
+async def assign_placeholder(tournament_id: str, team_id: str, body: AssignIn, user: CurrentUser = Depends(get_current_user)):
+    """Una società reale prende il posto di un segnaposto nel girone: dall'anagrafe FSL (iscrizione automatica nella categoria) o una squadra «fuori girone».
+    Le gare del segnaposto passano alla squadra reale; il segnaposto sparisce."""
+    t, _ = await _ctx(tournament_id, user, writable=True)
+    teams_repo, comps_repo, matches_repo = scoped("teams", tournament_id), scoped("competitions", tournament_id), scoped("matches", tournament_id)
+    ph = await teams_repo.get(team_id)
+    if not ph or not ph.placeholder or not ph.competition_id:
+        raise not_found("Segnaposto")
+    g = await comps_repo.get(ph.competition_id)
+    if not g or g.kind == "knockout":
+        raise bad_request("Si sostituiscono solo i segnaposto dei gironi")
+    if body.org_key:
+        from .org_clubs import EnrollIn, enroll as org_enroll
+
+        res = await org_enroll(body.org_key, EnrollIn(tournament_id=tournament_id, categories=[ph.category]), user)
+        club_id = res["club"]["id"]
+        real = await teams_repo.find_one({"club_id": club_id, "category": ph.category, "placeholder": False, "status": {"$ne": "pending"}})
+        if not real:
+            raise conflict("Iscrizione riuscita ma nessuna squadra trovata per la categoria")
+    else:
+        real = await teams_repo.get(body.team_id) if body.team_id else None
+        if not real or real.placeholder:
+            raise not_found("Squadra")
+    if real.id == ph.id or real.category != ph.category:
+        raise bad_request("La squadra deve essere della stessa categoria del segnaposto")
+    if real.competition_id and real.competition_id != ph.competition_id:
+        other = await comps_repo.get(real.competition_id)
+        if other and other.kind != "knockout":
+            raise conflict(f"{real.name} è già nel {other.name}: spostala da lì oppure scegli un'altra società")
+    if real.competition_id == ph.competition_id:
+        raise conflict(f"{real.name} è già in questo girone")
+    for side in ("home_team_id", "away_team_id"):
+        await matches_repo.col.update_many({"tournament_id": tournament_id, side: ph.id}, {"$set": {side: real.id}})
+    await teams_repo.update(real.id, {"competition_id": ph.competition_id, "series": ph.series, "placeholder": False, "status": "active"}, user.id)
+    await teams_repo.soft_delete(ph.id, user.id)
+    await audit.record(user, "simple.assign_placeholder", "team", real.id, t.id, before={"placeholder": ph.name}, after={"team": real.name, "group": g.name, "org_key": body.org_key or None})
+    return {"team": (await teams_repo.get(real.id)).public(), "replaced": ph.name, **await _board(tournament_id, ph.category)}
+
+
 @router.post("/teams/{team_id}/move")
 async def move_team(tournament_id: str, team_id: str, body: MoveIn, user: CurrentUser = Depends(get_current_user)):
     """Sposta una squadra in un altro girone; se il calendario esiste viene rigenerato (solo se nessuna gara è giocata)."""
