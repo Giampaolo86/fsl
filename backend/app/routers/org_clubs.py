@@ -109,15 +109,29 @@ async def create_invite(key: str, user: CurrentUser = Depends(get_current_user))
 
 @router.post("/{key}/enroll", status_code=201)
 async def enroll(key: str, body: EnrollIn, user: CurrentUser = Depends(get_current_user)):
+    """Iscrive una società FSL già registrata a un torneo: nessun nuovo invito, il responsabile entra subito; una squadra (e una rosa) per ogni categoria scelta.
+    Se la società ha già dichiarato un gruppo per quella categoria, viene usato quello (con l'eventuale rosa già caricata)."""
+    from .club_extras import notify
     from .club_groups import InviteIn, invite_org_group, org_groups
 
     t, _ = await require_tournament(body.tournament_id, user, roles=ADMINS, writable=True)
-    club, teams, created = await svc.enroll(key, t.id, user.id, body.categories)
+    pending = await org_groups.list({"org_key": key, "status": "pending"}, limit=100)
+    group_ids = list(body.group_ids)
+    cats = []
+    for cat in body.categories:
+        g = next((g for g in pending if g.category == cat and g.id not in group_ids and (not g.requested_tournament_id or g.requested_tournament_id == t.id)), None)
+        if g:
+            group_ids.append(g.id)
+        else:
+            cats.append(cat)
+    club, teams, created = await svc.enroll(key, t.id, user.id, cats)
     invited = []
-    for gid in body.group_ids:
+    for gid in group_ids:
         g = await org_groups.get(gid)
         if g and g.status == "pending" and g.org_key == key:
             invited.append((await invite_org_group(gid, InviteIn(tournament_id=t.id, note=body.note), user))["team"])
+    if teams:
+        await notify(t.id, club.id, "group", f"{club.name} partecipa a {t.name}", f"Squadre iscritte: {', '.join(x.name for x in teams)}. Carica le rose dalla tua Area Società (Rose → modulo Excel o foto).", "/societa/rose", f"enroll:{t.id}:{club.id}")
     await audit.record(user, "org_club.enroll", "club", club.id, t.id, after={"org_key": key, "created": created, "teams": [x.name for x in teams], "groups": len(invited)})
     return {"ok": True, "club": club.public(), "created": created, "teams": [x.public() for x in teams] + invited, "tournament": {"id": t.id, "name": t.name}}
 

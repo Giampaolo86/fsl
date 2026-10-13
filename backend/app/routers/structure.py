@@ -89,10 +89,25 @@ async def clubs(tournament_id: str, user: CurrentUser = Depends(get_current_user
         f = {"_id": __import__("bson").ObjectId(user.club_in(tournament_id))}
     items = await repo.list(f, sort=[("name", 1)])
     teams = scoped("teams", tournament_id)
+    users_cache: dict = {}
     out = []
     for c in items:
         d = c.public()
-        d["teams_count"] = await teams.count({"club_id": c.id})
+        tms = await teams.list({"club_id": c.id}, limit=200)
+        d["teams_count"] = len(tms)
+        d["categories"] = sorted({tm.category for tm in tms if tm.category})
+        d["org_key"] = c.org_club_id
+        d["manager"] = None
+        oc = await db.org_clubs.find_one({"org_key": c.org_club_id}, {"manager_user_id": 1}) if c.org_club_id else None
+        mid = (oc or {}).get("manager_user_id")
+        if not mid:
+            m = await db.tournament_memberships.find_one({"tournament_id": tournament_id, "club_id": c.id, "role": "club_manager"}, {"user_id": 1})
+            mid = (m or {}).get("user_id")
+        if mid and role in STRUCTURE_ROLES:
+            if mid not in users_cache:
+                users_cache[mid] = await db.users.find_one({"_id": __import__("bson").ObjectId(mid)}, {"email": 1, "full_name": 1})
+            u = users_cache[mid]
+            d["manager"] = {"id": mid, "email": u["email"], "full_name": u.get("full_name")} if u else None
         if role not in STRUCTURE_ROLES and role != "club_manager":
             d["contacts"] = [ct for ct in d["contacts"] if ct.get("is_public")]
         out.append(d)

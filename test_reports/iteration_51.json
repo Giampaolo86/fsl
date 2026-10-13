@@ -1,0 +1,29 @@
+{
+  "summary": "Retest mirato dopo i fix dell'iterazione 50 sul torneo 'La Serie A dei Bambini' (tid 6a9b5b045d9e0985643d0a9f). TUTTI VERDI. Backend: pytest 12/12 OK; PATCH {groups_count:2,teams_total:32} preserva series=['Girone 1','Girone 2']; competitions = Girone 1, Girone 2, Fase finale (nessun 'Girone A/B'); zones playoff[1,8]/safe[9,12]/playout[13,16] su entrambi i gironi per 4 categorie; board 2015 → 2 gironi da 16, 240 gare, match_minutes 35. Frontend: login QA MFA, /admin/t/{tid}/impostazioni carica senza errori, pianificatore gironi mostra '32 squadre · 2 gironi da 16 · 15 gare a squadra nei gironi · 2 qualificate per girone → semifinali + finale · 240 gare nei gironi + 3 di fase finale = 243 gare per categoria', settings-save-button ABILITATO. Flusso: duration-2014 35→36 → Salva → toast 'Impostazioni salvate' → reload → 36 ✓; poi 36→35 → Salva → toast → reload → 35 ✓. Stato finale duration_by_category contiene tutte le 4 categorie (2014/2015=35+10, 2016/2017=30+10), duration 2014=35 come richiesto. QA account rimosso.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Impostazioni → Pianificatore gironi (settings-groups-plan)", "issues": ["Il riepilogo testuale termina con 'gironi A: 16 · B: 16' mentre i gironi effettivi (DB + competitions + board) sono 'Girone 1' e 'Girone 2'. Discrepanza puramente cosmetica nella UI del planner (le serie salvate restano 1/2); vale la pena allineare l'etichetta al nome reale per non confondere lo staff."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fsl_import_960.py",
+    "/app/test_reports/pytest/fsl_960_iter51.xml"
+  ],
+  "action_items": [
+    "(Opzionale) Nel componente GroupsPlanner allineare la stringa riepilogativa ('gironi A: 16 · B: 16') ai nomi effettivi delle serie ('Girone 1','Girone 2') quando la formula è groups_knockout e settings.series è già definito."
+  ],
+  "critical_code_review_comments": [
+    "Fix di apply_structure (preservazione nomi serie) e _settings_patch (teams_total/groups_count) verificati: nessuna regressione.",
+    "sync_competitions con zones da playoff_rules funziona: 8 competizioni di girone (4 categorie × 2 gironi) con zones corrette, più 4 competizioni 'Fase finale'."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (12/12 pytest + 4/4 ad-hoc)", "frontend": "100% (flusso Salva impostazioni OK end-to-end)"},
+  "test_credentials": "QA Super Admin creato con scripts/qa_admin.py create ed eliminato con delete a fine test (credenziali solo in backend/.env).",
+  "seed_data_creation": "Nessuna. Stato del torneo ripristinato come richiesto (duration 2014 = 35).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Torneo 'La Serie A dei Bambini' (tid 6a9b5b045d9e0985643d0a9f) in stato valido: series=['Girone 1','Girone 2'], teams_total=32, groups_count=2, formula=groups_knockout, duration_by_category completo per 2014/2015/2016/2017, playoff_rules con zones, 12 competitions (8 gironi + 4 fase finale). Pytest suite /app/backend/tests/test_fsl_import_960.py pronta per regressione."
+}

@@ -1,87 +1,44 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, KeyRound, Pencil, Plus, Shield, Trash2, Users } from "lucide-react";
-import { InviteDialog } from "@/components/fsl/ClubOnboarding";
-import { ClubRegistryPicker } from "@/components/fsl/ClubRegistryPicker";
+import { ExternalLink, KeyRound, Pencil, Plus, Shield, Trash2, UserRound, Users } from "lucide-react";
+import { InviteDialog } from "@/components/fsl/OrgRegistry";
+import { AddClubDialog, CategoriesDialog } from "@/components/fsl/TournamentClubAdd";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/fsl/Primitives";
 import { ProfileReviews } from "@/components/fsl/ProfileReviews";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { EmptyState, ErrorState, LoadingState } from "@/components/fsl/States";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useScoped, useTournamentDetail } from "@/hooks/useTournamentData";
-import { useAuth } from "@/context/AuthContext";
 import { api, apiError } from "@/lib/api";
 
 export default function Clubs() {
   const { data: t } = useTournamentDetail();
   const clubs = useScoped("clubs");
   const comps = useScoped("competitions");
-  const { user } = useAuth();
   const [open, setOpen] = useState(null);
-  const [form, setForm] = useState({ name: "", city: "", motto: "", primary: "#0B57D9", secondary: "#F4AE2B" });
-  const [source, setSource] = useState(null);
-  const [teamForm, setTeamForm] = useState({ competition_id: "" });
-  const [busy, setBusy] = useState(false);
 
   if (clubs.loading || !t) return <LoadingState />;
   if (clubs.error) return <ErrorState message={apiError(clubs.error)} onRetry={clubs.reload} />;
   const canWrite = ["super_admin", "director", "secretary"].includes(t.my_role) && !t.read_only;
-
-  const createClub = async () => {
-    setBusy(true);
-    try {
-      await api.post(`/tournaments/${t.id}/clubs`, { name: form.name, city: form.city, motto: form.motto, colors: source ? null : { primary: form.primary, secondary: form.secondary }, source_club_id: source?.id || null });
-      toast.success(source ? "Società collegata all'anagrafica FSL e aggiunta al torneo" : "Società creata");
-      setOpen(null);
-      setSource(null);
-      setForm({ name: "", city: "", motto: "", primary: "#0B57D9", secondary: "#F4AE2B" });
-      clubs.reload();
-    } catch (e) {
-      toast.error(apiError(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const done = () => { setOpen(null); clubs.reload(); comps.reload(); };
 
   const deleteClub = async (c) => {
-    if (!window.confirm(`Eliminare la società «${c.name}» da questo torneo? Possibile solo senza squadre iscritte.`)) return;
-    try { await api.delete(`/tournaments/${t.id}/clubs/${c.id}`); toast.success("Società eliminata"); clubs.reload(); } catch (e) { toast.error(apiError(e)); }
-  };
-
-  const addTeam = async () => {
-    setBusy(true);
-    try {
-      await api.post(`/tournaments/${t.id}/teams`, { club_id: open.id, competition_id: teamForm.competition_id });
-      toast.success("Squadra iscritta");
-      setOpen(null);
-      clubs.reload();
-      comps.reload();
-    } catch (e) {
-      toast.error(apiError(e));
-    } finally {
-      setBusy(false);
-    }
+    if (!window.confirm(`Togliere «${c.name}» da questo torneo? Possibile solo senza squadre iscritte. La società resta nell'anagrafe FSL.`)) return;
+    try { await api.delete(`/tournaments/${t.id}/clubs/${c.id}`); toast.success("Società tolta dal torneo"); clubs.reload(); } catch (e) { toast.error(apiError(e)); }
   };
 
   return (
     <div>
       <PageHeader
-        kicker="Società, squadre e inviti"
+        kicker="Società partecipanti"
         title="Società"
-        subtitle={`${clubs.data.length} società nel torneo. Clicca sul nome per aprire la homepage pubblica della società. Gli stemmi mostrati sono segnaposto finché la società non carica il proprio materiale ufficiale.`}
-        actions={
-          canWrite && (
-            <button className="btn-primary" onClick={() => setOpen("new")} data-testid="clubs-create-button">
-              <Plus className="h-4 w-4" aria-hidden="true" /> Nuova società
-            </button>
-          )
-        }
+        subtitle={`${clubs.data.length} società nel torneo. Le società si registrano a FSL una sola volta: qui scegli chi partecipa e in quali categorie (una squadra e una rosa per categoria). Il responsabile vede il torneo nella sua Area Società senza nuovi inviti.`}
+        actions={canWrite && <button className="btn-primary" onClick={() => setOpen({ add: true })} data-testid="clubs-create-button"><Plus className="h-4 w-4" aria-hidden="true" /> Aggiungi società</button>}
       />
       <ProfileReviews tid={t.id} onDone={clubs.reload} />
       {!t.published && <p className="mb-4 text-xs text-fsl-warning" data-testid="clubs-unpublished-note">Il torneo non è ancora pubblicato: le homepage delle società sono visibili in anteprima solo allo staff loggato.</p>}
       {clubs.data.length === 0 ? (
-        <EmptyState icon={Shield} title="Nessuna società" description="Aggiungi le società invitate dall'organizzazione per iniziare a comporre le serie." action={canWrite && <button className="btn-gold" onClick={() => setOpen("new")}>Nuova società</button>} />
+        <EmptyState icon={Shield} title="Nessuna società" description="Aggiungi le società partecipanti dall'anagrafe FSL e scegli le categorie: le squadre si creano da sole." action={canWrite && <button className="btn-gold" onClick={() => setOpen({ add: true })}>Aggiungi società</button>} />
       ) : (
         <div className="fsl-card overflow-x-auto">
           <table className="w-full table-dark" data-testid="clubs-table">
@@ -89,8 +46,8 @@ export default function Clubs() {
               <tr>
                 <th>Società</th>
                 <th>Città</th>
-                <th>Motto</th>
-                <th className="text-right">Squadre</th>
+                <th>Responsabile</th>
+                <th>Categorie</th>
                 <th>Stemma</th>
                 <th className="text-right">Homepage</th>
                 {canWrite && <th className="text-right">Azioni</th>}
@@ -106,29 +63,29 @@ export default function Clubs() {
                     </Link>
                   </td>
                   <td className="text-fsl-slate">{c.city || "—"}</td>
-                  <td className="text-fsl-slate text-xs">{c.motto || "—"}</td>
-                  <td className="num text-right">{c.teams_count}</td>
+                  <td className="text-xs" data-testid={`club-manager-${c.slug}`}>
+                    {c.manager ? <span className="inline-flex items-center gap-1.5"><UserRound className="h-3.5 w-3.5 text-fsl-gold" /> {c.manager.full_name || c.manager.email}</span>
+                      : canWrite ? <button className="btn-ghost h-8 text-xs text-fsl-warning" onClick={() => setOpen({ invite: c })} title="Nessun account: genera una volta sola il codice FSL con cui il responsabile si registra" data-testid={`club-invite-${c.slug}`}><KeyRound className="h-3.5 w-3.5" /> Nessun account · Codice FSL</button>
+                      : <span className="text-fsl-slate">—</span>}
+                  </td>
+                  <td className="text-xs" data-testid={`club-categories-${c.slug}`}>
+                    <div className="flex flex-wrap gap-1 items-center">
+                      {(c.categories || []).map((cat) => <span key={cat} className="num rounded-full border border-fsl-gold/40 px-2 py-0.5 text-fsl-gold font-semibold">{cat}</span>)}
+                      {(c.categories || []).length === 0 && <span className="text-fsl-warning">Nessuna squadra</span>}
+                    </div>
+                  </td>
                   <td className="text-xs">{c.crest_is_placeholder ? <span className="text-fsl-warning">Segnaposto</span> : <span className="text-fsl-success">Ufficiale</span>}</td>
                   <td className="text-right">
                     <div className="inline-flex gap-1">
-                      {canWrite && <button className="btn-ghost h-9" onClick={() => setOpen({ invite: c })} data-testid={`club-invite-${c.slug}`}><KeyRound className="h-4 w-4" aria-hidden="true" /> Invito</button>}
                       {canWrite && <Link to={`/admin/t/${t.id}/societa/${c.id}`} className="btn-ghost h-9" data-testid={`club-edit-${c.slug}`}><Pencil className="h-4 w-4" aria-hidden="true" /> Modifica</Link>}
-                      <Link to={`/tornei/${t.slug}/squadre/${c.slug}`} target="_blank" rel="noreferrer" className="btn-ghost h-9" data-testid={`club-homepage-${c.slug}`}>
-                        <ExternalLink className="h-4 w-4" aria-hidden="true" /> Apri
-                      </Link>
-                      <Link to={`/club/${c.org_club_id || c.slug}`} target="_blank" rel="noreferrer" className="btn-ghost h-9" title="Scheda società: tutti i tornei, i gruppi e le rose" data-testid={`club-entity-${c.slug}`}>
-                        <Shield className="h-4 w-4" aria-hidden="true" /> Scheda
-                      </Link>
+                      <Link to={`/tornei/${t.slug}/squadre/${c.slug}`} target="_blank" rel="noreferrer" className="btn-ghost h-9" data-testid={`club-homepage-${c.slug}`}><ExternalLink className="h-4 w-4" aria-hidden="true" /> Apri</Link>
+                      <Link to={`/club/${c.org_club_id || c.slug}`} target="_blank" rel="noreferrer" className="btn-ghost h-9" title="Scheda società: tutti i tornei, i gruppi e le rose" data-testid={`club-entity-${c.slug}`}><Shield className="h-4 w-4" aria-hidden="true" /> Scheda</Link>
                     </div>
                   </td>
                   {canWrite && (
                     <td className="text-right">
-                      <button className="btn-ghost h-9" onClick={() => { setOpen(c); setTeamForm({ competition_id: comps.data?.[0]?.id || "" }); }} data-testid={`club-add-team-${c.slug}`}>
-                        <Users className="h-4 w-4" aria-hidden="true" /> Iscrivi squadra
-                      </button>
-                      <button className="btn-ghost h-9 text-fsl-danger" title="Elimina società (solo senza squadre)" onClick={() => deleteClub(c)} data-testid={`club-delete-${c.slug}`}>
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </button>
+                      <button className="btn-ghost h-9" onClick={() => setOpen({ categories: c })} data-testid={`club-add-team-${c.slug}`}><Users className="h-4 w-4" aria-hidden="true" /> Categorie</button>
+                      <button className="btn-ghost h-9 text-fsl-danger" title="Togli dal torneo (solo senza squadre)" onClick={() => deleteClub(c)} data-testid={`club-delete-${c.slug}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
                     </td>
                   )}
                 </tr>
@@ -137,46 +94,9 @@ export default function Clubs() {
           </table>
         </div>
       )}
-
-      {open?.invite && <InviteDialog tid={t.id} club={open.invite} onClose={() => setOpen(null)} />}
-      <Dialog open={open === "new"} onOpenChange={(o) => !o && setOpen(null)}>
-        <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl" data-testid="club-create-dialog" aria-describedby={undefined}>
-          <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Nuova società</DialogTitle></DialogHeader>
-          <div className="grid gap-3">
-            <label><span className="fsl-label">Nome *</span><input className="fsl-input mt-1" value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); if (source) setSource(null); }} placeholder="Inizia a scrivere: se la società esiste già in FSL te la proponiamo" data-testid="club-name-input" /></label>
-            <ClubRegistryPicker tid={t.id} query={form.name} selected={source} onSelect={(it) => { setSource(it); if (it) setForm((f) => ({ ...f, name: it.name, city: it.city || f.city, motto: it.motto || f.motto, primary: it.colors?.primary || f.primary, secondary: it.colors?.secondary || f.secondary })); }} />
-            <label><span className="fsl-label">Città</span><input className="fsl-input mt-1" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} data-testid="club-city-input" /></label>
-            <label><span className="fsl-label">Motto</span><input className="fsl-input mt-1" value={form.motto} onChange={(e) => setForm({ ...form, motto: e.target.value })} data-testid="club-motto-input" /></label>
-            <div className="grid grid-cols-2 gap-3">
-              <label><span className="fsl-label">Colore primario</span><input type="color" className="fsl-input mt-1 p-1" value={form.primary} onChange={(e) => setForm({ ...form, primary: e.target.value })} /></label>
-              <label><span className="fsl-label">Colore secondario</span><input type="color" className="fsl-input mt-1 p-1" value={form.secondary} onChange={(e) => setForm({ ...form, secondary: e.target.value })} /></label>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-fsl-slate"><ClubCrest club={source ? source : { name: form.name || "Nuova", colors: { primary: form.primary, secondary: form.secondary } }} size={40} /> {source ? "Stemma importato dall'anagrafica FSL" : "Anteprima stemma segnaposto"}</div>
-          </div>
-          <DialogFooter>
-            <button className="btn-ghost" onClick={() => setOpen(null)}>Annulla</button>
-            <button className="btn-primary" disabled={busy || form.name.trim().length < 2} onClick={createClub} data-testid="club-create-submit">{source ? "Aggiungi al torneo" : "Crea società"}</button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!open && open !== "new" && !open.invite} onOpenChange={(o) => !o && setOpen(null)}>
-        <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl" data-testid="team-create-dialog" aria-describedby={undefined}>
-          <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Iscrivi {open?.name}</DialogTitle></DialogHeader>
-          <label>
-            <span className="fsl-label">Competizione</span>
-            <select className="fsl-input mt-1" value={teamForm.competition_id} onChange={(e) => setTeamForm({ competition_id: e.target.value })} data-testid="team-competition-select">
-              {(comps.data || []).filter((c) => c.kind !== "knockout").map((c) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.teams_registered}/{c.teams_count})</option>
-              ))}
-            </select>
-          </label>
-          <DialogFooter>
-            <button className="btn-ghost" onClick={() => setOpen(null)}>Annulla</button>
-            <button className="btn-primary" disabled={busy || !teamForm.competition_id} onClick={addTeam} data-testid="team-create-submit">Iscrivi</button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {open?.add && <AddClubDialog t={t} present={clubs.data} onClose={() => setOpen(null)} onDone={done} />}
+      {open?.categories && <CategoriesDialog t={t} club={open.categories} onClose={() => setOpen(null)} onDone={done} />}
+      {open?.invite && <InviteDialog club={{ org_key: open.invite.org_key || open.invite.org_club_id, name: open.invite.name }} onClose={() => setOpen(null)} />}
     </div>
   );
 }

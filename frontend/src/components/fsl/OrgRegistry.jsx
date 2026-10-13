@@ -10,7 +10,7 @@ import { fmtDate } from "@/lib/format";
 
 const Field = ({ label, children }) => <label className="block"><span className="fsl-label">{label}</span><div className="mt-1">{children}</div></label>;
 
-function InviteDialog({ club, onClose }) {
+export function InviteDialog({ club, onClose }) {
   const [data, setData] = useState(null);
   const load = useCallback(() => api.get(`/org-clubs/${club.org_key}/invite`).then((r) => setData(r.data)).catch((e) => toast.error(apiError(e))), [club.org_key]);
   useEffect(() => { load(); }, [load]);
