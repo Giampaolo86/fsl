@@ -23,8 +23,49 @@ UNPLACED = {"", "NON COLLOCATA", "DA COLLOCARE"}
 WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 
+ALIASES = {"min._gioco": "minuti_gioco", "min_gioco": "minuti_gioco", "minuti": "minuti_gioco", "durata": "minuti_gioco", "cambio": "cambio_minuti", "cambio_campo": "cambio_minuti", "fine_gioco": "fine_gara", "casa": "squadra_casa", "ospite": "squadra_ospite", "ora": "inizio", "orario": "inizio", "giornata": "turno", "id_gara": "id"}
+
+
 def _norm(h: str) -> str:
-    return re.sub(r"\s+", "_", h.strip().lstrip("\ufeff").lower())
+    k = re.sub(r"\s+", "_", str(h or "").strip().lstrip("\ufeff").lower())
+    return ALIASES.get(k, k)
+
+
+def _cell(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d") if (v.hour, v.minute) == (0, 0) else v.strftime("%H:%M")
+    if hasattr(v, "strftime"):
+        return v.strftime("%H:%M") if hasattr(v, "hour") else v.strftime("%Y-%m-%d")
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v).strip()
+
+
+def _parse_xlsx(data: bytes) -> list[dict]:
+    """Excel «master gare»: cerca in ogni foglio la riga d'intestazione (categoria + squadra_casa) e prende il foglio con più gare."""
+    import openpyxl
+
+    wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    best: list[dict] = []
+    for ws in wb.worksheets:
+        header = None
+        rows = []
+        for r in ws.iter_rows(values_only=True):
+            if header is None:
+                keys = [_norm(c) for c in r]
+                if {"categoria", "squadra_casa", "squadra_ospite"} <= set(keys):
+                    header = keys
+                continue
+            if all(c is None or str(c).strip() == "" for c in r):
+                continue
+            rows.append({k: _cell(v) for k, v in zip(header, r) if k})
+        if header and len(rows) > len(best):
+            best = rows
+    if not best:
+        raise bad_request("Nessun foglio con le colonne Categoria / Girone / Turno / Squadra casa / Squadra ospite")
+    return best
 
 
 def _field_key(code: str) -> str:
@@ -34,14 +75,19 @@ def _field_key(code: str) -> str:
     return f"C{int(m.group(1))}" if m else c
 
 
-def _parse(data: bytes) -> tuple[list[dict], list[str]]:
-    text = data.decode("utf-8-sig", errors="replace")
-    sample = text[:4000]
-    delim = ";" if sample.count(";") >= sample.count(",") else ","
-    rows = list(csv.DictReader(io.StringIO(text), delimiter=delim))
+def _parse(data: bytes, filename: str = "") -> tuple[list[dict], list[str]]:
+    if (filename or "").lower().endswith((".xlsx", ".xlsm")) or data[:2] == b"PK":
+        rows = _parse_xlsx(data)
+    else:
+        text = data.decode("utf-8-sig", errors="replace")
+        sample = text[:4000]
+        delim = ";" if sample.count(";") >= sample.count(",") else ","
+        rows = list(csv.DictReader(io.StringIO(text), delimiter=delim))
+        if not rows:
+            raise bad_request("Il file è vuoto")
+        rows = [{_norm(k): (v or "").strip() for k, v in r.items() if k is not None} for r in rows]
     if not rows:
         raise bad_request("Il file è vuoto")
-    rows = [{_norm(k): (v or "").strip() for k, v in r.items() if k is not None} for r in rows]
     cols = list(rows[0].keys())
     missing = [c for c in REQUIRED if c not in cols]
     if missing:
@@ -212,7 +258,7 @@ def _public_settings(patch: dict) -> dict:
 @router.post("/import-csv/preview")
 async def import_preview(tournament_id: str, file: UploadFile = File(...), option: str = Form(""), user: CurrentUser = Depends(get_current_user)):
     await _ctx(tournament_id, user, writable=True)
-    rows, cols = _parse(await file.read())
+    rows, cols = _parse(await file.read(), file.filename or "")
     opts = _options(cols)
     opt = next((o for o in opts if o["key"] == option), opts[0] if opts else None)
     a = _analyze(rows, opt)
@@ -234,7 +280,7 @@ async def import_preview(tournament_id: str, file: UploadFile = File(...), optio
 async def import_apply(tournament_id: str, file: UploadFile = File(...), option: str = Form(""), replace: bool = Form(False), user: CurrentUser = Depends(get_current_user)):
     """Crea gironi, squadre segnaposto (o reali se il nome coincide), campi e gare per tutte le categorie del CSV; aggiorna le impostazioni del torneo."""
     t, _ = await _ctx(tournament_id, user, writable=True)
-    rows, cols = _parse(await file.read())
+    rows, cols = _parse(await file.read(), file.filename or "")
     opts = _options(cols)
     opt = next((o for o in opts if o["key"] == option), opts[0] if opts else None)
     a = _analyze(rows, opt)

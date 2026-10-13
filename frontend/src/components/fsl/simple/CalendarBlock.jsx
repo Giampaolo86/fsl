@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileDown, FileUp, GripVertical, LayoutGrid, List, Pencil, Plus, Star, Trash2, X } from "lucide-react";
+import { CalendarRange, FileDown, FileUp, GripVertical, LayoutGrid, List, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -159,6 +159,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
               <div className="inline-flex rounded-md border border-white/15 overflow-hidden" role="tablist" data-testid="cal-view-toggle">
                 <button type="button" role="tab" aria-selected={view === "grid"} onClick={() => setView("grid")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "grid" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-grid"><LayoutGrid className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Griglia ora × campo</span><span className="sm:hidden">Griglia</span></button>
                 <button type="button" role="tab" aria-selected={view === "list"} onClick={() => setView("list")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "list" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-list"><List className="h-3.5 w-3.5" /> Per girone</button>
+                <button type="button" role="tab" aria-selected={view === "rounds"} onClick={() => setView("rounds")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "rounds" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-rounds"><CalendarRange className="h-3.5 w-3.5" /> Per giornata</button>
               </div>
               {canWrite && <button className="btn-ghost h-9" onClick={() => onCreate({ stage: "qualification" })} data-testid="cal-add-match"><Plus className="h-4 w-4" /> Partita</button>}
               {canWrite && board.matches?.length > 0 && <button className="btn-ghost h-9 text-fsl-danger" disabled={clearing} onClick={clearCalendar} title="Elimina tutte le gare del calendario di questa categoria (gironi e squadre restano). Possibile solo se nessuna gara è stata giocata." data-testid="cal-clear-button"><Trash2 className="h-4 w-4" /> {clearing ? "Cancello…" : "Cancella calendario"}</button>}
@@ -167,10 +168,30 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
             </div>
           </div>
           {view === "grid" && <TimeGrid board={board} canWrite={canWrite} onMove={onMove} onEdit={onEdit} onBreaks={onBreaks} onSlots={onSlots} onQuickTeam={onQuickTeam} />}
+          {view === "rounds" && <RoundsView board={board} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} />}
           {view === "list" && board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
         </div>
       )}
       {csvOpen && <CsvImportDialog tid={tid} onClose={() => setCsvOpen(false)} onDone={() => { setCsvOpen(false); reload(); }} />}
     </section>
+  );
+}
+
+function RoundsView({ board, onEdit, onSwap, canWrite }) {
+  const rounds = [...new Set(board.matches.map((m) => m.match_day || 0))].sort((a, b) => a - b);
+  return (
+    <div className="space-y-6" data-testid="cal-rounds">
+      <p className="text-xs text-fsl-slate">Tutto il calendario della categoria, giornata per giornata: {rounds.length} giornate · {board.matches.length} partite.</p>
+      {rounds.map((r) => {
+        const rows = board.matches.filter((m) => (m.match_day || 0) === r).sort((a, b) => a.kickoff_at.localeCompare(b.kickoff_at) || (a.field_name || "").localeCompare(b.field_name || ""));
+        const days = [...new Set(rows.map((m) => m.kickoff_at.slice(0, 10)))].sort();
+        return (
+          <div key={r} data-testid={`cal-round-${r}`}>
+            <h3 className="fsl-section-title mb-2">{r ? `Giornata ${r}` : "Senza giornata"} <span className="text-fsl-slate text-sm font-sans normal-case">· {days.map((d) => fmtDate(d)).join(" – ")} · {rows.length} partite</span></h3>
+            <MatchTable rows={rows} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup testId={`cal-round-table-${r}`} />
+          </div>
+        );
+      })}
+    </div>
   );
 }

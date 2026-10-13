@@ -76,7 +76,8 @@ export function TimeGrid({ board, canWrite, onMove, onEdit, onBreaks, onSlots, o
   const all = useMemo(() => [...board.matches, ...board.finals], [board]);
   const conflicts = useMemo(() => findConflicts(all, c.match_minutes || 25), [all, c.match_minutes]);
   const teamById = useMemo(() => Object.fromEntries(board.teams.map((t) => [t.id, t])), [board.teams]);
-  const fields = board.fields.slice(0, Math.max(c.fields_count || 1, 1));
+  const usedFields = useMemo(() => new Set(all.map((m) => m.field_id)), [all]);
+  const fields = board.fields.filter((f, i) => i < Math.max(c.fields_count || 1, 1) || usedFields.has(f.id));
   const days = useMemo(() => [...new Set([...(c.sessions || []).map((s) => s.date), ...all.map((m) => m.kickoff_at.slice(0, 10))])].sort(), [c.sessions, all]);
   const byKey = useMemo(() => Object.fromEntries(all.map((m) => [`${m.kickoff_at}|${m.field_id}`, m])), [all]);
 
