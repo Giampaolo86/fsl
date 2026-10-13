@@ -96,6 +96,7 @@ async def clubs(tournament_id: str, user: CurrentUser = Depends(get_current_user
         tms = await teams.list({"club_id": c.id}, limit=200)
         d["teams_count"] = len(tms)
         d["categories"] = sorted({tm.category for tm in tms if tm.category})
+        d["teams"] = [{"id": tm.id, "name": tm.name, "category": tm.category, "competition_id": tm.competition_id, "status": tm.status} for tm in tms]
         d["org_key"] = c.org_club_id
         d["manager"] = None
         oc = await db.org_clubs.find_one({"org_key": c.org_club_id}, {"manager_user_id": 1}) if c.org_club_id else None

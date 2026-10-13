@@ -657,20 +657,40 @@ async def _delete_team_matches(tid: str, team_id: str, user) -> None:
 
 
 @router.delete("/teams/{team_id}")
-async def delete_team(tournament_id: str, team_id: str, user: CurrentUser = Depends(get_current_user)):
-    """Elimina un segnaposto (o toglie dal girone una squadra reale) e le sue gare non giocate."""
+async def delete_team(tournament_id: str, team_id: str, hard: bool = False, user: CurrentUser = Depends(get_current_user)):
+    """Segnaposto: eliminato con le sue gare non giocate. Squadra reale in un girone: esce dal girone e al suo posto resta un segnaposto con le stesse gare.
+    `hard=true`: la squadra reale viene eliminata del tutto (con la rosa), possibile solo senza gare giocate."""
     t, _ = await _ctx(tournament_id, user, writable=True)
-    teams_repo = scoped("teams", tournament_id)
+    teams_repo, matches_repo = scoped("teams", tournament_id), scoped("matches", tournament_id)
     tm = await teams_repo.get(team_id)
     if not tm:
         raise not_found("Squadra")
-    await _delete_team_matches(tournament_id, tm.id, user)
-    if tm.club_id:
-        await teams_repo.update(tm.id, {"competition_id": None, "series": ""}, user.id)
-    else:
+    if not tm.club_id and tm.placeholder:
+        await _delete_team_matches(tournament_id, tm.id, user)
         await teams_repo.soft_delete(tm.id, user.id)
-    await audit.record(user, "simple.team_delete", "team", tm.id, t.id, before={"name": tm.name})
-    return await _board(tournament_id, tm.category)
+        await audit.record(user, "simple.team_delete", "team", tm.id, t.id, before={"name": tm.name})
+        return await _board(tournament_id, tm.category)
+    ms = await matches_repo.list({"$or": [{"home_team_id": tm.id}, {"away_team_id": tm.id}], "status": {"$ne": "cancelled"}}, limit=2000)
+    if any(m.status in PLAYED for m in ms):
+        raise conflict("La squadra ha gare già giocate: non può essere tolta né eliminata")
+    placeholder_name = None
+    if tm.competition_id and ms:
+        n = await teams_repo.count({"competition_id": tm.competition_id, "placeholder": True}) + 1
+        ph = await teams_repo.insert(Team(tournament_id=tournament_id, club_id=None, competition_id=tm.competition_id, name=f"Da definire {n}", category=tm.category, series=tm.series, placeholder=True), user.id)
+        for side in ("home_team_id", "away_team_id"):
+            await matches_repo.col.update_many({"tournament_id": tournament_id, side: tm.id}, {"$set": {side: ph.id}})
+        placeholder_name = ph.name
+    players_removed = 0
+    if hard:
+        players_repo = scoped("players", tournament_id)
+        for p in await players_repo.list({"team_id": tm.id}, limit=500):
+            await players_repo.soft_delete(p.id, user.id)
+            players_removed += 1
+        await teams_repo.soft_delete(tm.id, user.id)
+    else:
+        await teams_repo.update(tm.id, {"competition_id": None, "series": ""}, user.id)
+    await audit.record(user, "simple.team_delete" if hard else "simple.team_unassign", "team", tm.id, t.id, before={"name": tm.name, "competition_id": tm.competition_id}, after={"placeholder": placeholder_name, "players_removed": players_removed})
+    return {**await _board(tournament_id, tm.category), "placeholder": placeholder_name, "players_removed": players_removed}
 
 
 @router.delete("/groups/{competition_id}")

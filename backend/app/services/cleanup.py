@@ -108,7 +108,20 @@ async def delete_team(tournament_id: str, team_id: str) -> dict:
     played = await db.matches.count_documents({**q, "status": {"$in": ["official", "rectified", "in_progress", "finished", "report_submitted", "under_review"]}, "deleted_at": None})
     if played:
         raise conflict(f"La squadra ha {played} gare giocate o in corso: non può essere eliminata")
-    removed = {"matches": (await db.matches.delete_many(q)).deleted_count, "players": (await db.players.delete_many({"tournament_id": tournament_id, "team_id": team_id})).deleted_count}
+    removed = {"matches": 0, "players": (await db.players.delete_many({"tournament_id": tournament_id, "team_id": team_id})).deleted_count}
+    tm = await db.teams.find_one({"_id": ObjectId(team_id), "tournament_id": tournament_id})
+    comp = await db.competitions.find_one({"_id": ObjectId(tm["competition_id"])}) if tm and tm.get("competition_id") else None
+    if comp and comp.get("kind") != "knockout" and await db.matches.count_documents({**q, "deleted_at": None}):
+        from datetime import datetime, timezone
+
+        n = await db.teams.count_documents({"competition_id": tm["competition_id"], "placeholder": True, "deleted_at": None}) + 1
+        now = datetime.now(timezone.utc)
+        ph = await db.teams.insert_one({"tournament_id": tournament_id, "club_id": None, "competition_id": tm["competition_id"], "name": f"Da definire {n}", "category": tm["category"], "series": tm.get("series", ""), "placeholder": True, "qualifier": None, "status": "active", "birth_year": None, "level": "", "description": "", "proposed_by": None, "created_at": now, "updated_at": now, "deleted_at": None})
+        for side in ("home_team_id", "away_team_id"):
+            await db.matches.update_many({"tournament_id": tournament_id, side: team_id}, {"$set": {side: str(ph.inserted_id)}})
+        removed["placeholder"] = f"Da definire {n}"
+    else:
+        removed["matches"] = (await db.matches.delete_many(q)).deleted_count
     removed["badges"] = (await db.player_badges.delete_many({"tournament_id": tournament_id, "team_id": team_id})).deleted_count
     removed["teams"] = (await db.teams.delete_one({"_id": ObjectId(team_id), "tournament_id": tournament_id})).deleted_count
     return removed

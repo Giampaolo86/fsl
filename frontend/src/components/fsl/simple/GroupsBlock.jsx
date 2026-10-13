@@ -17,8 +17,17 @@ function TeamRow({ tid, team, groups, clubs, onDone, canWrite, registry, unassig
     } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
   };
   const remove = async () => {
-    if (!window.confirm(`Eliminare «${team.name || "squadra senza nome"}»${team.club_id ? " dal girone" : ""}? Le sue gare non giocate verranno rimosse.`)) return;
-    try { await api.delete(`/tournaments/${tid}/simple/teams/${team.id}`); toast.success("Squadra rimossa"); onDone(); } catch (e) { toast.error(apiError(e)); }
+    const real = !team.placeholder;
+    const hard = real && !team.competition_id;
+    const msg = !real ? `Eliminare il segnaposto «${team.name}»? Le sue gare non giocate verranno rimosse.`
+      : hard ? `Eliminare definitivamente «${team.name}» e la sua rosa? Operazione irreversibile.`
+      : `Togliere «${team.name}» dal girone? Al suo posto resta un segnaposto con le stesse gare; la squadra va «fuori girone», da dove potrai eliminarla.`;
+    if (!window.confirm(msg)) return;
+    try {
+      const { data } = await api.delete(`/tournaments/${tid}/simple/teams/${team.id}`, { params: hard ? { hard: true } : {} });
+      toast.success(hard ? `Squadra eliminata${data.players_removed ? ` · ${data.players_removed} giocatori rimossi` : ""}` : data.placeholder ? `Squadra fuori girone · al suo posto «${data.placeholder}»` : "Squadra rimossa");
+      onDone();
+    } catch (e) { toast.error(apiError(e)); }
   };
   const move = async (gid) => {
     if (!gid) return;
@@ -48,7 +57,7 @@ function TeamRow({ tid, team, groups, clubs, onDone, canWrite, registry, unassig
       <button type="button" className={`flex-1 text-left text-sm truncate hover:text-fsl-gold ${team.placeholder ? "text-fsl-slate italic" : "font-semibold"}`} onClick={() => canWrite && setEdit(true)} title="Clicca per rinominare o sostituire con la squadra reale" data-testid={`team-name-${team.id}`}>
         {team.name || <span className="text-fsl-danger">(senza nome)</span>} {canWrite && <Pencil className="inline h-3 w-3 opacity-0 group-hover:opacity-70" aria-hidden="true" />}
       </button>
-      {canWrite && <button type="button" onClick={remove} className="text-fsl-slate/50 hover:text-fsl-danger" aria-label="Elimina squadra" data-testid={`team-delete-${team.id}`}><Trash2 className="h-3.5 w-3.5" /></button>}
+      {canWrite && <button type="button" onClick={remove} className="text-fsl-slate/50 hover:text-fsl-danger" aria-label={team.placeholder ? "Elimina segnaposto" : team.competition_id ? "Togli dal girone" : "Elimina squadra"} title={team.placeholder ? "Elimina segnaposto" : team.competition_id ? "Togli dal girone (resta un segnaposto)" : "Elimina definitivamente"} data-testid={`team-delete-${team.id}`}><Trash2 className="h-3.5 w-3.5" /></button>}
       {canWrite && groups.length > 1 && (
         <select className="fsl-input h-7 w-24 text-[11px] py-0 px-1 opacity-60 group-hover:opacity-100" value="" onChange={(e) => move(e.target.value)} aria-label="Sposta in" data-testid={`team-move-${team.id}`}>
           <option value="">Sposta…</option>

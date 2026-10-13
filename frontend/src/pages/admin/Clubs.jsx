@@ -20,11 +20,13 @@ export default function Clubs() {
   if (clubs.loading || !t) return <LoadingState />;
   if (clubs.error) return <ErrorState message={apiError(clubs.error)} onRetry={clubs.reload} />;
   const canWrite = ["super_admin", "director", "secretary"].includes(t.my_role) && !t.read_only;
-  const done = () => { setOpen(null); clubs.reload(); comps.reload(); };
+  const done = (_data, opts) => { if (!opts?.keepOpen) setOpen(null); clubs.reload(); comps.reload(); };
 
   const deleteClub = async (c) => {
-    if (!window.confirm(`Togliere «${c.name}» da questo torneo? Possibile solo senza squadre iscritte. La società resta nell'anagrafe FSL.`)) return;
-    try { await api.delete(`/tournaments/${t.id}/clubs/${c.id}`); toast.success("Società tolta dal torneo"); clubs.reload(); } catch (e) { toast.error(apiError(e)); }
+    const n = (c.teams || []).length;
+    const msg = n ? `Togliere «${c.name}» da questo torneo? Le sue ${n} squadre e le relative rose verranno eliminate; nei gironi resta un segnaposto con le stesse gare (le gare già giocate bloccano l'operazione). La società resta nell'anagrafe FSL.` : `Togliere «${c.name}» da questo torneo? La società resta nell'anagrafe FSL.`;
+    if (!window.confirm(msg)) return;
+    try { const { data } = await api.delete(`/tournaments/${t.id}/clubs/${c.id}`, { params: n ? { force: true } : {} }); toast.success(`«${data.deleted}» tolta dal torneo${data.teams ? ` · ${data.teams} squadre eliminate` : ""}`); clubs.reload(); comps.reload(); } catch (e) { toast.error(apiError(e)); }
   };
 
   return (
@@ -85,7 +87,7 @@ export default function Clubs() {
                   {canWrite && (
                     <td className="text-right">
                       <button className="btn-ghost h-9" onClick={() => setOpen({ categories: c })} data-testid={`club-add-team-${c.slug}`}><Users className="h-4 w-4" aria-hidden="true" /> Categorie</button>
-                      <button className="btn-ghost h-9 text-fsl-danger" title="Togli dal torneo (solo senza squadre)" onClick={() => deleteClub(c)} data-testid={`club-delete-${c.slug}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+                      <button className="btn-ghost h-9 text-fsl-danger" title="Togli dal torneo (con le sue squadre)" onClick={() => deleteClub(c)} data-testid={`club-delete-${c.slug}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
                     </td>
                   )}
                 </tr>
