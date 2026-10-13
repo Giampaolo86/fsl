@@ -1,0 +1,28 @@
+{
+  "summary": "Iter 55 (SOLO FRONTEND) — Testato il nuovo flusso import xlsx + viste calendario del Campionato FSL (tid 6ace2360642d7fa9d9ac6496), categoria 2014, come richiesto. Login QA MFA via UI /login?area=staff; nessun errore JS in console; nessuna modifica persistente al DB. (A) IMPORTA xlsx: cliccato cal-import-csv → dialog csv-import-dialog con titolo 'IMPORTA CALENDARIO DA CSV / EXCEL'. Caricato /app/memory/FSL_calendario_128.xlsx tramite csv-import-file-input (accept include .xlsx). Preview csv-import-table mostra ESATTAMENTE 4 righe (csv-import-cat-2014/2015/2016/2017), ognuna con Squadre=32, Turni=15, Gare=240, Collocate=240, Da collocare=0, formato 9v9·35'+10' per 2014/2015 e 7v7·30'+10' per 2016/2017, intervallo 2026-11-28 → 2027-04-25, 'Esistenti' 240 (gare già presenti dal seed). Box csv-import-settings presente: '4 campi · 16 squadre per girone · Girone 1, Girone 2 · sab/dom 08:30–14:30 · 30 sessioni · durate: 2014 35'+10', 2015 35'+10', 2016 30'+10', 2017 30'+10''. Messaggio 'Nessuna collisione: ogni slot campo/orario è unico…' visibile. Checkbox csv-import-replace presente (poiché le gare sono già presenti). Chiuso con 'Annulla' SENZA importare (dialog count=0, nessuna modifica eseguita). (B) Toggle viste (cal-view-toggle): • cal-view-grid → 30 blocchi [data-testid^='grid-day-'], include grid-day-2026-11-28 e grid-day-2027-04-25; nel primo blocco gli slot 08:30, 09:15, 10:00 sono presenti e le 4 colonne Campo 1..4 sono rese come header di colonna condivisi del TimeGrid (visibili nello screenshot, non replicate dentro ogni grid-day-*). • cal-view-rounds → container cal-rounds con esattamente 15 sezioni cal-round-1 … cal-round-15; verificato cal-round-1 header 'GIORNATA 1 · 28 Nov 2026 – 29 Nov 2026 · 16 partite', cal-round-8 '… 06 Feb 2027 – 07 Feb 2027 · 16 partite', cal-round-15 '… 24 Apr 2027 – 25 Apr 2027 · 16 partite'; ogni cal-round-table-{1,8,15} contiene 16 righe tbody. • cal-view-list → 2 tabelle (una per girone) con esattamente 120 righe ciascuna (240 gare totali per 2014). Nessun errore JS a console (ignorati warning di dev-plugin). Cleanup: account qa.superadmin@fsl.demo rimosso con scripts/qa_admin.py delete; nessuna modifica a gare, torneo, settings.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/screens_iter55_import_preview.png",
+    "/app/test_reports/screens_iter55_rounds.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "CsvImportDialog.jsx — accept list ora include correttamente .xlsx + MIME openxmlformats; label dinamica 'Scegli il file CSV o Excel' coerente con il nuovo flusso. OK.",
+    "CalendarBlock.jsx — nuovo tab 'Per giornata' (cal-view-rounds) ben integrato nel toggle a 3 stati con aria-selected; cal-rounds / cal-round-{n} / cal-round-table-{n} coerenti con la convenzione data-testid del progetto. Header round legge correttamente date-range e numero partite.",
+    "TimeGrid.jsx — grid-day-{YYYY-MM-DD} è il contenitore giornaliero mentre le intestazioni di colonna 'Campo 1..4' sono rese una volta a livello superiore (non duplicate per giornata). Nessun bug, ma utile tenere a mente in test automation che la verifica di 'Campo N' va fatta su un selettore di livello pagina/schedule-grid-header, non su inner_text di grid-day-*.",
+    "calendar_import.py (_parse_xlsx / _parse) — selezione automatica del foglio 'CALENDARIO_COMPLETO'/elenco gare dallo xlsx reale funziona: preview ritorna 4 categorie con 240 gare ciascuna, 'Nessuna collisione', 30 sessioni, 4 campi, slot 08:30–14:30 sab/dom come atteso."
+  ],
+  "updated_files": [],
+  "success_rate": {"frontend": "100% (2/2 scenari — import xlsx preview e toggle viste)"},
+  "test_credentials": "QA Super Admin creato con scripts/qa_admin.py create e rimosso a fine run con delete; credenziali SOLO in backend/.env, mai scritte nel report.",
+  "seed_data_creation": "Nessuna. Il torneo 'Campionato FSL' non è stato modificato (import NON eseguito, nessun drag, nessun Importa).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Import xlsx del calendario funziona end-to-end sulla UI: upload tramite csv-import-file-input (accept include .xlsx), preview 4 righe (240 gare × categoria), box impostazioni, 'Nessuna collisione', checkbox csv-import-replace quando esistono già gare. Vista 'Per giornata' (cal-view-rounds) espone cal-rounds con N sezioni cal-round-{n} e tabella cal-round-table-{n} di 16 righe/gara; vista 'Per girone' espone 2 tabelle da 120 righe; vista 'Griglia ora × campo' espone 30 blocchi grid-day-{YYYY-MM-DD} con 4 colonne Campo 1..4 come header di colonna del TimeGrid (non replicate per ogni giornata). Il torneo Campionato FSL resta pulito (4 categorie × 240 gare, 30 date, 4 campi).",
+  "rca of the issue": "N/A — nessun bug trovato."
+}
