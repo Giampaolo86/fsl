@@ -356,3 +356,9 @@ Provider email/SMS; policy retention; Pantone su mazzetta fisica. Stripe: sandbo
 
 ## Iterazione 56 (2026-10) · «CANCELLA CALENDARIO»
 - [x] `DELETE /tournaments/{tid}/simple/calendar?category=&finals=` → elimina (soft) tutte le gare dei gironi della categoria (e, se `finals=true`, anche la fase finale); bloccato con 409 se esistono gare giocate; gironi e squadre restano. Pulsante rosso «Cancella calendario» nel blocco Calendario (doppia conferma: gironi, poi fase finale). Verificato via API (3 gare → 0, guard su gara giocata → 409).
+
+## Iterazione 57 (2026-10) · FIX CRASH AVVIO IN PRODUZIONE (deploy fallito)
+- Causa (RCA deployer): `seed_match_engine` inseriva Player con `link_code=None` mentre l'indice `players.link_code_1` era sparse+unique (gli sparse indicizzano i null espliciti) → E11000 dup key {link_code: null} → startup abortito → probe 503 → rollout mai promosso (live rimasto sulla run precedente sana).
+- [x] `services/linkcodes.py::ensure_link_codes`: migra l'indice legacy sparse → **unico PARZIALE** (`partialFilterExpression {link_code: {$type: 'string'}}`), in try/except (mai bloccante). [x] `seed.py`: `link_code=linkcodes.new_code()` per gli atleti seed.
+- [x] Testing agent iteration_49: riprodotto il bug con l'indice sparse, poi verificato startup pulito, indice migrato, null multipli ammessi e unicità dei codici reali, seed ×2 senza errori, CI 43/43. Redeploy richiesto al deployer.
+- Nota: il DB di produzione si chiama `torneo-platform-test_database` (segnalato dal deployer; confermare con l'utente se voluto).

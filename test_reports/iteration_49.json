@@ -1,0 +1,20 @@
+{
+  "summary": "Iteration 49 — Backend-only validation of the link_code sparse→partial unique index migration fix. (A) Reproduced the production E11000 bug on test_database: dropped link_code_1 and recreated it as sparse+unique; first null-link_code insert OK, second insert failed with E11000 (confirmed mechanism). Cleaned throwaways. (B) `sudo supervisorctl restart backend` → startup succeeded ('Application startup complete', no Traceback); `db.players.getIndexes()` shows link_code_1 with unique:true + partialFilterExpression:{link_code:{$type:'string'}} and NO 'sparse'; GET /api/public/tournaments → 200. (C) With the partial index, two null link_code inserts BOTH succeed; two duplicate string 'QA-DUP-1' inserts: second fails with E11000 (uniqueness preserved). All 3 throwaway docs deleted; final null link_code count = 0. (D) seed_match_engine executed twice via asyncio.run — no DuplicateKeyError (returns early because matches already exist for la-serie-a-dei-bambini). Total players = 57, null link_code count unchanged at 0. (E) ensure_link_codes called twice inside one event loop — no exception, index unchanged, 0 backfills. (F) CI regression: scripts/qa_admin.py create → pytest tests/test_security_phase2.py tests/test_owner_hierarchy.py → 43 passed in 27.22s → scripts/qa_admin.py delete.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_security_phase2.py", "/app/backend/tests/test_owner_hierarchy.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "linkcodes.py:ensure_link_codes — migration logic correctly treats legacy sparse index as needing drop+recreate (checks cur.get('sparse')) and compares partialFilterExpression. Wrapped in try/except so an index error never aborts startup. Good.",
+    "seed.py:seed_match_engine — Player insert now uses linkcodes.new_code() (line 303), so new seeded players never have null link_code. Function early-returns if matches already exist, keeping it idempotent. No crash on repeated calls.",
+    "Minor: ensure_link_codes backfill loop retries up to 5 times per player but silently drops a player if all 5 random codes collide (never happens in practice but no error log). Low priority."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (43/43 CI tests, index migration verified, seed idempotent)", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "Not needed for this test. Admin castellani.giampaolo@gmail.com used only to source actor.id for seed_match_engine.",
+  "seed_data_creation": "Three throwaway Player docs inserted (first_name='QA-NULL-LINK', _qa:true) to prove index semantics; all deleted immediately after each step. No real player docs were modified.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Fix for the production startup crash (sparse unique index → DuplicateKeyError on seeded null link_code) is verified end-to-end on preview DB. Current index on players: link_code_1 {unique:true, partialFilterExpression:{link_code:{$type:'string'}}}. Backend logs clean. CI suite (test_security_phase2 + test_owner_hierarchy) = 43/43 green.",
+  "rca of the issue": "MongoDB sparse+unique indexes DO index documents whose indexed field is explicitly set to null — only fully-missing fields are skipped. seed.py inserted Player docs with link_code=None, which the sparse unique index saw as duplicate null keys → E11000 → FastAPI startup failed. Fix: (a) replace sparse with partialFilterExpression:{link_code:{$type:'string'}} so nulls are completely ignored by the index; (b) seed with linkcodes.new_code() so no seeded doc has null link_code anyway. Both are in place and verified via reproduction + post-fix validation."
+}
