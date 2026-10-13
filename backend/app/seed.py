@@ -7,7 +7,7 @@ from .core.security import hash_password, verify_password
 from .models.base import utcnow
 from .models.domain import Club, Organization, Team, TournamentMembership, User
 from .repositories.registry import memberships, organizations, scoped, tournaments, users
-from .services import audit
+from .services import audit, linkcodes
 from .services.tournaments import competition_code, create_tournament, slugify
 
 logger = logging.getLogger("fsl.seed")
@@ -300,7 +300,7 @@ async def seed_match_engine(actor):
         team = await teams.find_one({"club_id": club.id})
         if team and await players.count({"team_id": team.id}) == 0:
             for i, (fn, ln, num, role) in enumerate(ROSTER):
-                await players.insert(Player(tournament_id=t.id, club_id=club.id, team_id=team.id, first_name=fn, last_name=ln, birth_year=2014, shirt_number=num, role=role, profile_visibility="public" if i % 3 else "private", media_consent=bool(i % 3)), actor.id)
+                await players.insert(Player(tournament_id=t.id, club_id=club.id, team_id=team.id, first_name=fn, last_name=ln, birth_year=2014, shirt_number=num, role=role, profile_visibility="public" if i % 3 else "private", media_consent=bool(i % 3), link_code=linkcodes.new_code()), actor.id)
     await engine.generate_calendar(t, actor)
     matches = scoped("matches", t.id)
     rn = await teams.find_one({"club_id": (await scoped("clubs", t.id).find_one({"slug": "roma-nord"})).id})
