@@ -33,6 +33,7 @@ export default function ClubsGlobal() {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState([]);
   const [deleting, setDeleting] = useState(false);
+  const [registryKey, setRegistryKey] = useState(0);
   const removeClub = async (c) => {
     if (!window.confirm(`Eliminare «${c.name}» da ${c.tournament_name}?${c.teams_count ? ` Verranno eliminate anche ${c.teams_count} squadre con rose e gare programmate.` : ""} Le gare già giocate bloccano l'operazione.`)) return;
     try { await api.delete(`/tournaments/${c.tournament_id}/clubs/${c.id}`, { params: { force: true } }); toast.success(`«${c.name}» eliminata`); load(); } catch (e) { toast.error(apiError(e)); }
@@ -57,8 +58,8 @@ export default function ClubsGlobal() {
   return (
     <div className="space-y-6" data-testid="clubs-global">
       <PageHeader kicker="Tutti i tornei · Società" title="Società" subtitle="Anagrafe unica delle società FSL (una società, un responsabile, un profilo per tutti i tornei) e, sotto, lo stato per torneo: homepage pubblica e checklist pre-torneo (rosa, foto, documenti, convocazioni, saldo, spunte del Responsabile). Sistema in sequenza quelle incomplete: ogni modifica dell'admin è pubblicata subito." actions={first && <button className="btn-gold" onClick={() => navigate(`/admin/t/${first.tournament_id}/societa/${first.id}?seq=1`)} data-testid="clubs-global-fix-sequence"><Wand2 className="h-4 w-4" /> Sistema in sequenza ({todo.length})</button>} />
-      <OrgRegistry onChanged={load} />
-      <OrgGroupsInbox onChanged={load} />
+      <OrgRegistry key={registryKey} onChanged={load} />
+      <OrgGroupsInbox onChanged={() => { load(); setRegistryKey((k) => k + 1); }} />
       <h2 className="fsl-section-title pt-2">Checklist per torneo</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiTile icon={Shield} value={items.length} label="Società" testId="clubs-global-kpi-total" />
