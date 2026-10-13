@@ -124,6 +124,17 @@ async def _context(tid: str, cat: str) -> str:
         f"Gare gironi già create: {len(board['matches'])} (giocate: {sum(1 for m in board['matches'] if m['played'])}); gare fase finale: {len(board['finals'])}.",
         f"Date torneo: {getattr(s, 'start_date', None) or ''}",
     ]
+    cats = [x for x in ((s.categories if s else []) or []) if x != cat]
+    if cats:
+        from collections import Counter
+
+        allm = []
+        for other in cats:
+            ob = await se._board(tid, other)
+            allm += ob["matches"]
+            lines.append(f"Categoria {other} (stesso impianto, stessi campi, stessi weekend): {len(ob['matches'])} gare gironi, {len(ob['groups'])} gironi, durata {ob['calendar']['match_minutes']}+{ob['calendar']['buffer_minutes']} min.")
+        days = Counter(m["kickoff_at"][:10] for m in allm + board["matches"])
+        lines.append("Il campionato è UNICO: ogni weekend ospita tutte le categorie sugli stessi campi (gare per data, tutte le categorie): " + ", ".join(f"{d}: {n}" for d, n in sorted(days.items())[:40]) + ". Ragiona sempre su campi e orari condivisi tra le categorie; la separazione è solo sportiva (nessuna gara tra categorie o tra gironi diversi).")
     return "\n".join(lines)
 
 

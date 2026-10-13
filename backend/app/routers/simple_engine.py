@@ -5,6 +5,7 @@ from typing import Literal
 from collections import defaultdict
 from datetime import date
 
+from collections import Counter
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -66,7 +67,7 @@ async def _board(tid: str, cat: str) -> dict:
     fields = await scoped("fields", tid).list({"active": True}, sort=[("code", 1)])
 
     def mp(m):
-        return {"id": m.id, "kickoff_at": m.kickoff_at, "field_id": m.field_id, "field_name": m.field_name, "competition_id": m.competition_id, "series": m.series, "round_name": m.round_name, "note": m.note, "is_grand_final": m.is_grand_final, "match_day": m.match_day, "stage": m.stage, "bracket_round": m.bracket_round, "home_team_id": m.home_team_id, "away_team_id": m.away_team_id, "home": names.get(m.home_team_id, "?"), "away": names.get(m.away_team_id, "?"), "status": m.status, "score": m.score, "played": m.status in PLAYED}
+        return {"id": m.id, "category": m.category, "kickoff_at": m.kickoff_at, "field_id": m.field_id, "field_name": m.field_name, "competition_id": m.competition_id, "series": m.series, "round_name": m.round_name, "note": m.note, "is_grand_final": m.is_grand_final, "match_day": m.match_day, "stage": m.stage, "bracket_round": m.bracket_round, "home_team_id": m.home_team_id, "away_team_id": m.away_team_id, "home": names.get(m.home_team_id, "?"), "away": names.get(m.away_team_id, "?"), "status": m.status, "score": m.score, "played": m.status in PLAYED}
 
     gl = [{"id": g.id, "name": g.series, "size": g.teams_count, "teams": [_team_pub(tm, clubs) for tm in teams if tm.competition_id == g.id]} for g in groups]
     group_ms = [mp(m) for m in ms if m.stage == "qualification"]
@@ -86,6 +87,27 @@ async def _board(tid: str, cat: str) -> dict:
         "calendar": {"fields_count": s.fields_count, "start_time": s.day_start, "end_time": s.day_end, "match_minutes": mm, "buffer_minutes": bb, "date": group_ms[0]["kickoff_at"][:10] if group_ms else None, "sessions": s.calendar_sessions or [], "breaks": s.calendar_breaks or [], "slots": s.calendar_slots or {}},
         "played": sum(1 for m in group_ms if m["played"]),
         "finals_played": sum(1 for m in finals_ms if m["played"]),
+    }
+
+
+@router.get("/overview")
+async def overview(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Calendario generale: tutte le categorie insieme, campo per campo e giornata per giornata (per gestire ogni weekend come un unico evento)."""
+    await _ctx(tournament_id, user)
+    s = await settings_repo.find_one({"tournament_id": tournament_id})
+    cats = (s.categories if s else []) or []
+    boards = [await _board(tournament_id, c) for c in cats]
+    matches = sorted([m for b in boards for m in b["matches"] + b["finals"]], key=lambda m: (m["kickoff_at"], m["field_name"]))
+    durations = {c: svc.duration_for(s, c) for c in cats}
+    mm = min([d[0] for d in durations.values()] or [s.match_duration_min if s else 25])
+    bb = min([d[1] for d in durations.values()] or [s.buffer_min if s else 10])
+    by_day = Counter(m["kickoff_at"][:10] for m in matches)
+    return {
+        "category": "all", "categories": cats, "groups": [], "unassigned": [], "finals": [],
+        "teams": [t for b in boards for t in b["teams"]], "clubs": boards[0]["clubs"] if boards else [], "matches": matches, "fields": boards[0]["fields"] if boards else [],
+        "calendar": {**(boards[0]["calendar"] if boards else {}), "match_minutes": mm, "buffer_minutes": bb, "fields_count": max([len({m["field_id"] for m in matches if m["field_id"]})] + [b["calendar"]["fields_count"] for b in boards])},
+        "per_category": {c: {"matches": len(b["matches"]), "played": sum(1 for m in b["matches"] if m["played"]), "finals": len(b["finals"]), "match_minutes": durations[c][0], "buffer_minutes": durations[c][1]} for c, b in zip(cats, boards)},
+        "days": [{"date": d, "matches": n, "categories": sorted({m["category"] for m in matches if m["kickoff_at"][:10] == d})} for d, n in sorted(by_day.items())],
     }
 
 

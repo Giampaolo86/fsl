@@ -1,6 +1,7 @@
 """Importa calendario da CSV (tracciato «master gare»): tutte le categorie in un colpo solo, con anteprima, controllo collisioni e aggiornamento impostazioni."""
 import csv
 import io
+import os
 import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
@@ -255,10 +256,31 @@ def _public_settings(patch: dict) -> dict:
     return {k: patch[k] for k in ("fields_count", "match_days", "day_start", "day_end", "teams_per_series", "series", "groups_count", "duration_by_category") if k in patch} | {"sessions": len(patch.get("calendar_sessions") or [])}
 
 
+BUILTIN = {"fsl_2026_27": ("fsl_campionato_2026_27.csv", "Campionato FSL 2026/27 · 128 squadre · 960 gare (calendario ufficiale)")}
+
+
+async def _read_upload(file: UploadFile | None, builtin: str) -> tuple[bytes, str]:
+    if builtin:
+        if builtin not in BUILTIN:
+            raise bad_request("Calendario predefinito sconosciuto")
+        path = os.path.join(os.path.dirname(__file__), "..", "data", BUILTIN[builtin][0])
+        with open(path, "rb") as fh:
+            return fh.read(), BUILTIN[builtin][0]
+    if not file:
+        raise bad_request("Carica un file CSV/Excel oppure scegli il calendario ufficiale FSL")
+    return await file.read(), file.filename or ""
+
+
+@router.get("/import-csv/builtin")
+async def import_builtin(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    await _ctx(tournament_id, user)
+    return [{"key": k, "label": v[1]} for k, v in BUILTIN.items()]
+
+
 @router.post("/import-csv/preview")
-async def import_preview(tournament_id: str, file: UploadFile = File(...), option: str = Form(""), user: CurrentUser = Depends(get_current_user)):
+async def import_preview(tournament_id: str, file: UploadFile | None = File(None), option: str = Form(""), builtin: str = Form(""), user: CurrentUser = Depends(get_current_user)):
     await _ctx(tournament_id, user, writable=True)
-    rows, cols = _parse(await file.read(), file.filename or "")
+    rows, cols = _parse(*await _read_upload(file, builtin))
     opts = _options(cols)
     opt = next((o for o in opts if o["key"] == option), opts[0] if opts else None)
     a = _analyze(rows, opt)
@@ -277,10 +299,11 @@ async def import_preview(tournament_id: str, file: UploadFile = File(...), optio
 
 
 @router.post("/import-csv/apply", status_code=201)
-async def import_apply(tournament_id: str, file: UploadFile = File(...), option: str = Form(""), replace: bool = Form(False), force: bool = Form(False), user: CurrentUser = Depends(get_current_user)):
+async def import_apply(tournament_id: str, file: UploadFile | None = File(None), option: str = Form(""), replace: bool = Form(False), force: bool = Form(False), builtin: str = Form(""), user: CurrentUser = Depends(get_current_user)):
     """Crea gironi, squadre segnaposto (o reali se il nome coincide), campi e gare per tutte le categorie del CSV; aggiorna le impostazioni del torneo."""
     t, _ = await _ctx(tournament_id, user, writable=True)
-    rows, cols = _parse(await file.read(), file.filename or "")
+    data, fname = await _read_upload(file, builtin)
+    rows, cols = _parse(data, fname)
     opts = _options(cols)
     opt = next((o for o in opts if o["key"] == option), opts[0] if opts else None)
     a = _analyze(rows, opt)
@@ -354,5 +377,5 @@ async def import_apply(tournament_id: str, file: UploadFile = File(...), option:
                 cats.append(c["category"])
         patch = {"categories": cats, "formula": "groups_knockout", **_settings_patch(a, s)}
         await settings_repo.update(s.id, patch, user.id)
-    await audit.record(user, "simple.import_csv", "tournament", t.id, t.id, after={"file": file.filename, "option": opt["key"] if opt else None, "report": report, "settings": _public_settings(patch)})
+    await audit.record(user, "simple.import_csv", "tournament", t.id, t.id, after={"file": fname, "option": opt["key"] if opt else None, "report": report, "settings": _public_settings(patch)})
     return {"ok": True, "report": report, "fields_created": fields_created, "settings": _public_settings(patch)}

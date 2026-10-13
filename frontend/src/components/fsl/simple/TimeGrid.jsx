@@ -96,7 +96,7 @@ export function TimeGrid({ board, canWrite, onMove, onEdit, onBreaks, onSlots, o
       m={m}
       home={{ node: <TeamBox m={m} side="home" teams={board.teams} canWrite={canWrite} onQuickTeam={onQuickTeam} conflict={conflicts.team[`${m.id}|home`]} />, ...(teamById[m.home_team_id] || {}) }}
       away={{ node: <TeamBox m={m} side="away" teams={board.teams} canWrite={canWrite} onQuickTeam={onQuickTeam} conflict={conflicts.team[`${m.id}|away`]} />, ...(teamById[m.away_team_id] || {}) }}
-      kicker={m.stage === "finals" ? m.round_name : m.series}
+      kicker={board.category === "all" ? `${m.category} · ${m.stage === "finals" ? m.round_name : m.series}` : m.stage === "finals" ? m.round_name : m.series}
       fieldConflict={conflicts.field[m.id]}
       className={`${isOver ? "ring-2 ring-fsl-gold" : ""} ${canWrite && !m.played && !mobile ? "cursor-grab active:cursor-grabbing" : ""}`}
       tileProps={{ draggable: canWrite && !m.played && !mobile, onDragStart: (e) => { e.dataTransfer.setData("text/fsl-match", m.id); e.dataTransfer.effectAllowed = "move"; } }}

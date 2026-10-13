@@ -10,16 +10,17 @@ export function CsvImportDialog({ tid, onClose, onDone }) {
   const [preview, setPreview] = useState(null);
   const [replace, setReplace] = useState(false);
   const [busy, setBusy] = useState(false);
-  const run = async (f, opt) => {
-    if (!f) return;
+  const [builtin, setBuiltin] = useState("");
+  const run = async (f, opt, bi = "") => {
+    if (!f && !bi) return;
     setBusy(true);
-    const fd = new FormData(); fd.append("file", f); fd.append("option", opt ?? "");
+    const fd = new FormData(); if (f) fd.append("file", f); fd.append("option", opt ?? ""); fd.append("builtin", bi);
     try { const { data } = await api.post(`/tournaments/${tid}/simple/import-csv/preview`, fd, { headers: { "Content-Type": "multipart/form-data" } }); setPreview(data); if (opt == null || opt === "") setOption(data.option || ""); } catch (e) { toast.error(apiError(e)); } finally { setBusy(false); }
   };
   const apply = async () => {
     setBusy(true);
     try {
-      const { data } = await withForce((force) => { const fd = new FormData(); fd.append("file", file); fd.append("option", option); fd.append("replace", replace ? "true" : "false"); fd.append("force", force ? "true" : "false"); return api.post(`/tournaments/${tid}/simple/import-csv/apply`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 300000 }); });
+      const { data } = await withForce((force) => { const fd = new FormData(); if (file) fd.append("file", file); fd.append("builtin", builtin); fd.append("option", option); fd.append("replace", replace ? "true" : "false"); fd.append("force", force ? "true" : "false"); return api.post(`/tournaments/${tid}/simple/import-csv/apply`, fd, { headers: { "Content-Type": "multipart/form-data" }, timeout: 300000 }); });
       const tot = data.report.reduce((a, r) => a + r.matches_created, 0);
       toast.success(`Importate ${tot} gare in ${data.report.length} categorie`);
       onDone(data);
@@ -33,11 +34,15 @@ export function CsvImportDialog({ tid, onClose, onDone }) {
       <DialogContent className="bg-navy-800 border-white/20 text-fsl-white rounded-xl max-w-3xl" data-testid="csv-import-dialog" aria-describedby={undefined}>
         <DialogHeader><DialogTitle className="font-display uppercase text-2xl">Importa calendario da CSV / Excel</DialogTitle></DialogHeader>
         <p className="text-xs text-fsl-slate">Tracciato «master gare» (CSV o Excel: viene letto il foglio con l'elenco gare, es. «CALENDARIO_COMPLETO»): colonne <code>Categoria; Girone; Turno; Squadra_casa; Squadra_ospite; Data; Inizio; Campo</code> (facoltative <code>Formato; Minuti_gioco; Cambio_minuti; Fine_slot</code>, oppure più opzioni di collocazione). Importa <strong>tutte le categorie</strong> in un colpo solo: crea gironi, squadre segnaposto (o usa quelle reali se il nome coincide), campi («Campo 1» = C1) e gare, e aggiorna le impostazioni del torneo (campi, giorni, orari, sessioni, squadre per girone, durate per categoria). Nulla viene scritto prima di «Importa».</p>
-        <label className={`btn-gold h-10 cursor-pointer w-fit ${busy ? "opacity-60 pointer-events-none" : ""}`} data-testid="csv-import-file-label"><FileUp className="h-4 w-4" /> {file ? file.name : "Scegli il file CSV o Excel"}<input type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => { const f = e.target.files[0]; setFile(f); setPreview(null); setOption(""); run(f, ""); e.target.value = ""; }} data-testid="csv-import-file-input" /></label>
+        <div className="rounded-md border border-fsl-gold/40 bg-fsl-gold/5 p-3 flex flex-wrap items-center gap-3" data-testid="csv-import-builtin-box">
+          <div className="flex-1 min-w-[240px] text-xs text-fsl-slate"><span className="fsl-label block text-fsl-gold">Calendario ufficiale FSL 2026/27</span>128 squadre segnaposto · 8 gironi · 15 giornate · 960 gare · 4 campi · sab+dom 08:30–14:30. Già pronto sul server: niente file da caricare. Poi sostituisci i segnaposto con le società reali.</div>
+          <button type="button" className="btn-gold h-10" disabled={busy} onClick={() => { setFile(null); setBuiltin("fsl_2026_27"); run(null, "", "fsl_2026_27"); }} data-testid="csv-import-builtin"><FileUp className="h-4 w-4" /> Usa il calendario ufficiale</button>
+        </div>
+        <label className={`btn-gold h-10 cursor-pointer w-fit ${busy ? "opacity-60 pointer-events-none" : ""}`} data-testid="csv-import-file-label"><FileUp className="h-4 w-4" /> {file ? file.name : builtin ? "Calendario ufficiale FSL 2026/27" : "…oppure scegli un tuo file CSV / Excel"}<input type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => { const f = e.target.files[0]; setFile(f); setBuiltin(""); setPreview(null); setOption(""); run(f, ""); e.target.value = ""; }} data-testid="csv-import-file-input" /></label>
         {busy && !preview && <p className="text-sm text-fsl-slate">Analizzo il file…</p>}
         {preview && (
           <div className="space-y-3" data-testid="csv-import-preview">
-            {preview.options.length > 1 && <label className="block"><span className="fsl-label">Collocazione da usare</span><select className="fsl-input mt-1" value={option} onChange={(e) => { setOption(e.target.value); run(file, e.target.value); }} data-testid="csv-import-option">{preview.options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}</select></label>}
+            {preview.options.length > 1 && <label className="block"><span className="fsl-label">Collocazione da usare</span><select className="fsl-input mt-1" value={option} onChange={(e) => { setOption(e.target.value); run(file, e.target.value, builtin); }} data-testid="csv-import-option">{preview.options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}</select></label>}
             <div className="fsl-card overflow-x-auto"><table className="w-full table-dark text-xs" data-testid="csv-import-table">
               <thead><tr><th>Categoria</th><th>Gironi</th><th>Squadre</th><th>Turni</th><th>Gare</th><th>Collocate</th><th>Da collocare</th><th>Formato</th><th>Periodo</th><th>Già presenti</th></tr></thead>
               <tbody>{preview.categories.map((c) => <tr key={c.category} data-testid={`csv-import-cat-${c.category}`}><td className="font-bold text-fsl-gold num">{c.category}</td><td>{Object.entries(c.groups).map(([g, n]) => `${g} (${n})`).join(" · ")}</td><td className="num">{c.teams}</td><td className="num">{c.rounds}</td><td className="num">{c.matches}</td><td className="num text-fsl-success">{c.placed}</td><td className={`num ${c.unplaced ? "text-fsl-warning" : ""}`}>{c.unplaced}</td><td className="num whitespace-nowrap">{[Object.keys(c.formato || {}).join("/"), c.match_minutes ? `${c.match_minutes}'${c.buffer_minutes != null ? `+${c.buffer_minutes}'` : ""}` : ""].filter(Boolean).join(" · ") || "—"}</td><td className="num">{c.from ? `${c.from} → ${c.to}` : "—"}</td><td className="num">{c.existing.matches}{c.existing.played ? ` (${c.existing.played} giocate!)` : ""}</td></tr>)}</tbody>

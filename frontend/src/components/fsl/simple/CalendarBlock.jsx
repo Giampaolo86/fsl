@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CalendarRange, FileDown, FileUp, GripVertical, LayoutGrid, List, Pencil, Plus, Star, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarRange, FileDown, Layers, FileUp, GripVertical, LayoutGrid, List, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, apiError, withForce } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -94,6 +94,8 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
   };
   const c = board.calendar;
   const [view, setView] = useState("grid");
+  const [overview, setOverview] = useState(null);
+  useEffect(() => { if (view === "all") api.get(`/tournaments/${tid}/simple/overview`).then((r) => setOverview(r.data)).catch((e) => toast.error(apiError(e))); }, [view, tid, board.matches.length]);
   const today = new Date().toISOString().slice(0, 10);
   const [sessions, setSessions] = useState(c.sessions?.length ? c.sessions : [{ date: c.date || today, start_time: c.start_time || "15:00", end_time: c.end_time || "19:00" }]);
   const [f, setF] = useState({ fields_count: c.fields_count || 2, match_minutes: c.match_minutes || 25, buffer_minutes: c.buffer_minutes ?? 10 });
@@ -163,6 +165,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
                 <button type="button" role="tab" aria-selected={view === "grid"} onClick={() => setView("grid")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "grid" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-grid"><LayoutGrid className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Griglia ora × campo</span><span className="sm:hidden">Griglia</span></button>
                 <button type="button" role="tab" aria-selected={view === "list"} onClick={() => setView("list")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "list" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-list"><List className="h-3.5 w-3.5" /> Per girone</button>
                 <button type="button" role="tab" aria-selected={view === "rounds"} onClick={() => setView("rounds")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "rounds" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} data-testid="cal-view-rounds"><CalendarRange className="h-3.5 w-3.5" /> Per giornata</button>
+                <button type="button" role="tab" aria-selected={view === "all"} onClick={() => setView("all")} className={`h-9 px-3 text-xs inline-flex items-center gap-1 ${view === "all" ? "bg-fsl-gold text-ink-950 font-semibold" : "hover:bg-white/5"}`} title="Calendario generale: tutte le categorie sugli stessi campi, weekend per weekend" data-testid="cal-view-all"><Layers className="h-3.5 w-3.5" /> Tutte le categorie</button>
               </div>
               {canWrite && <button className="btn-ghost h-9" onClick={() => onCreate({ stage: "qualification" })} data-testid="cal-add-match"><Plus className="h-4 w-4" /> Partita</button>}
               {canWrite && board.matches?.length > 0 && <button className="btn-ghost h-9 text-fsl-danger" disabled={clearing} onClick={clearCalendar} title="Elimina tutte le gare del calendario di questa categoria (gironi e squadre restano). Possibile solo se nessuna gara è stata giocata." data-testid="cal-clear-button"><Trash2 className="h-4 w-4" /> {clearing ? "Cancello…" : "Cancella calendario"}</button>}
@@ -171,6 +174,7 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
             </div>
           </div>
           {view === "grid" && <TimeGrid board={board} canWrite={canWrite} onMove={onMove} onEdit={onEdit} onBreaks={onBreaks} onSlots={onSlots} onQuickTeam={onQuickTeam} />}
+          {view === "all" && (overview ? <AllCategoriesView overview={overview} /> : <p className="text-sm text-fsl-slate">Carico il calendario generale…</p>)}
           {view === "rounds" && <RoundsView board={board} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} />}
           {view === "list" && board.groups.map((g) => <div key={g.id}><h3 className="fsl-section-title mb-2">{g.name} <span className="text-fsl-slate text-sm font-sans normal-case">· {board.matches.filter((m) => m.competition_id === g.id).length} partite</span></h3><MatchTable rows={board.matches.filter((m) => m.competition_id === g.id)} onEdit={onEdit} onSwap={onSwap} canWrite={canWrite} showGroup={false} testId={`cal-table-${g.name.replace(/\s+/g, "-")}`} /></div>)}
         </div>
@@ -195,6 +199,21 @@ function RoundsView({ board, onEdit, onSwap, canWrite }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function AllCategoriesView({ overview }) {
+  const cats = Object.entries(overview.per_category || {});
+  return (
+    <div className="space-y-4" data-testid="cal-all">
+      <div className="flex flex-wrap gap-2 text-xs" data-testid="cal-all-summary">
+        <span className="rounded-full border border-fsl-gold/40 px-3 py-1 num">{overview.matches.length} gare · {overview.days.length} date · {overview.calendar.fields_count} campi</span>
+        {cats.map(([c, v]) => <span key={c} className="rounded-full border border-white/15 px-3 py-1 num"><span className="text-fsl-gold font-bold">{c}</span> · {v.matches} gare · {v.match_minutes}'+{v.buffer_minutes}'</span>)}
+        {overview.days.some((d) => d.categories.length < overview.categories.length) && <span className="rounded-full border border-fsl-warning/50 text-fsl-warning px-3 py-1">Alcune date non hanno tutte le categorie</span>}
+      </div>
+      <p className="text-xs text-fsl-slate">Vista di sola lettura con tutte le categorie insieme, come si vive il weekend al campo. Per spostare una gara usa la griglia della sua categoria.</p>
+      <TimeGrid board={overview} canWrite={false} />
     </div>
   );
 }
