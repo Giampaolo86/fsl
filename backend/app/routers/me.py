@@ -136,6 +136,29 @@ async def my_club_create_invite(tournament_id: str, user: CurrentUser = Depends(
     return inv.public()
 
 
+@router.post("/club/managers/{manager_id}/handover")
+async def my_club_handover(manager_id: str, tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Il Responsabile passa il ruolo principale a un altro dirigente già registrato; lui resta dirigente."""
+    from ..core.errors import bad_request
+    from ..repositories.registry import memberships, users
+    from ..services import audit
+    from ..services import org_clubs as org_clubs_svc
+
+    key = await _my_org_key(tournament_id, user)
+    oc = await org_clubs_svc.get(key)
+    if not oc or oc.manager_user_id != user.id:
+        raise forbidden("Solo il Responsabile della società può passare il ruolo")
+    if manager_id == user.id:
+        raise bad_request("Sei già il Responsabile")
+    club_ids = [c.id for c in await org_clubs_svc.tournament_clubs(key)]
+    target = await users.get(manager_id)
+    if not target or not await memberships.find_one({"user_id": manager_id, "role": "club_manager", "club_id": {"$in": club_ids}, "status": "active"}):
+        raise not_found("Dirigente")
+    await org_clubs_svc.org_clubs.update(oc.id, {"manager_user_id": manager_id, "email": target.email, "contact_name": target.full_name}, user.id)
+    await audit.record(user, "club.handover", "org_club", key, tournament_id, before={"manager_user_id": user.id}, after={"manager_user_id": manager_id})
+    return {"ok": True, "responsabile_id": manager_id}
+
+
 @router.get("/club/program")
 async def my_club_program(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
     """Giornate con gare della società (per il selettore di stampa)."""
