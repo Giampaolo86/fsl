@@ -2,8 +2,10 @@
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, EmailStr
 
 from ..core.deps import CurrentUser, get_current_user, require_tournament
 from ..core.errors import bad_request, conflict, forbidden, not_found
@@ -92,8 +94,16 @@ async def get_invite(key: str, user: CurrentUser = Depends(get_current_user)):
     return {"invite": inv.public() if inv else None, "valid": valid}
 
 
+class InviteIn(BaseModel):
+    email: Optional[EmailStr] = None
+    full_name: str = ""
+
+
 @router.post("/{key}/invite")
-async def create_invite(key: str, user: CurrentUser = Depends(get_current_user)):
+async def create_invite(key: str, request: Request, body: InviteIn | None = None, user: CurrentUser = Depends(get_current_user)):
+    """Codice per responsabile/dirigente; con `email` invia la mail di benvenuto (o restituisce il testo pronto da inoltrare)."""
+    from ..services import welcome_mail
+
     _staff(user)
     oc = await svc.get(key)
     if not oc:
@@ -101,8 +111,10 @@ async def create_invite(key: str, user: CurrentUser = Depends(get_current_user))
     for old in await invites.list({"org_key": key, "used_by": None}):
         await invites.update(old.id, {"expires_at": utcnow()}, user.id)
     inv = await invites.insert(ClubInvite(org_key=key, code=_code(), expires_at=utcnow() + timedelta(days=30)), user.id)
-    await audit.record(user, "org_club.invite", "org_club", oc.id, None, after={"code": inv.code})
-    return inv.public()
+    link = f"{welcome_mail.base_url(request)}/registrati-societa?codice={inv.code}"
+    mail = await welcome_mail.send(body.email if body else None, oc.name, user.full_name, inv.code, link, body.full_name if body else "")
+    await audit.record(user, "org_club.invite", "org_club", oc.id, None, after={"code": inv.code, "email": body.email if body else None, "emailed": mail["emailed"]})
+    return {**inv.public(), **mail, "link": link}
 
 
 async def _org_in_use(key: str) -> dict:

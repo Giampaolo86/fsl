@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ClubCrest } from "@/components/fsl/ClubCrest";
 import { EmptyState, LoadingState } from "@/components/fsl/States";
+import { InviteMailForm } from "@/components/fsl/InviteMailForm";
 import { api, apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 
@@ -14,7 +15,8 @@ export function InviteDialog({ club, onClose }) {
   const [data, setData] = useState(null);
   const load = useCallback(() => api.get(`/org-clubs/${club.org_key}/invite`).then((r) => setData(r.data)).catch((e) => toast.error(apiError(e))), [club.org_key]);
   useEffect(() => { load(); }, [load]);
-  const gen = () => api.post(`/org-clubs/${club.org_key}/invite`).then(() => { toast.success("Codice FSL generato"); load(); }).catch((e) => toast.error(apiError(e)));
+  const [sent, setSent] = useState(null);
+  const gen = (body) => api.post(`/org-clubs/${club.org_key}/invite`, body || null).then((r) => { setSent(body?.email ? r.data : null); toast.success(r.data.emailed ? `Email di benvenuto inviata a ${body.email}` : "Codice FSL generato"); load(); }).catch((e) => toast.error(apiError(e)));
   const inv = data?.invite;
   const link = inv ? `${window.location.origin}/registrati-societa?codice=${inv.code}` : "";
   return (
@@ -23,13 +25,16 @@ export function InviteDialog({ club, onClose }) {
         <DialogHeader><DialogTitle className="font-display uppercase text-2xl">{club.managers?.length ? "Invita un dirigente" : "Invito FSL"} · {club.name}</DialogTitle></DialogHeader>
         <p className="text-sm text-fsl-slate">{club.managers?.length ? "Chi si registra con questo codice diventa dirigente della società con pieni poteri, al pari del responsabile, in tutti i tornei a cui la società è iscritta. Ogni codice vale per una sola registrazione." : "Il responsabile si registra una sola volta con questo codice: la società entra nell'anagrafe FSL e lo stesso account la seguirà in tutti i tornei a cui la iscriverai."}</p>
         {club.managers?.length > 0 && <ul className="text-xs text-fsl-slate space-y-1" data-testid="org-invite-managers">{club.managers.map((m) => <li key={m.id} className="flex items-center gap-1.5"><UserRound className="h-3.5 w-3.5 text-fsl-gold" /> <span className="text-fsl-white">{m.full_name || m.email}</span> · {m.email}</li>)}</ul>}
-        {!data ? <LoadingState /> : inv && data.valid ? (
-          <div className="space-y-3">
-            <code className="block text-center text-2xl font-mono tracking-widest rounded-lg bg-navy-700/60 border border-fsl-gold/40 px-4 py-4 select-all" data-testid="org-invite-code">{inv.code}</code>
-            <p className="text-xs text-fsl-slate">Valido fino al {fmtDate(inv.expires_at)} · da usare su <span className="text-fsl-white">/registrati-societa</span></p>
-            <div className="flex gap-2"><button className="btn-primary flex-1" onClick={() => { navigator.clipboard?.writeText(link); toast.success("Link copiato"); }} data-testid="org-invite-copy"><Copy className="h-4 w-4" /> Copia link</button><button className="btn-ghost" onClick={gen} data-testid="org-invite-regen">Rigenera</button></div>
-          </div>
-        ) : <button className="btn-gold w-full" onClick={gen} data-testid="org-invite-generate"><KeyRound className="h-4 w-4" /> Genera codice FSL</button>}
+        {!data ? <LoadingState /> : <>
+          <InviteMailForm onSend={gen} sent={sent} testPrefix="org-invite" />
+          {inv && data.valid ? (
+            <div className="space-y-3">
+              <code className="block text-center text-2xl font-mono tracking-widest rounded-lg bg-navy-700/60 border border-fsl-gold/40 px-4 py-4 select-all" data-testid="org-invite-code">{inv.code}</code>
+              <p className="text-xs text-fsl-slate">Valido fino al {fmtDate(inv.expires_at)} · da usare su <span className="text-fsl-white">/registrati-societa</span></p>
+              <div className="flex gap-2"><button className="btn-primary flex-1" onClick={() => { navigator.clipboard?.writeText(link); toast.success("Link copiato"); }} data-testid="org-invite-copy"><Copy className="h-4 w-4" /> Copia link</button><button className="btn-ghost" onClick={() => gen()} data-testid="org-invite-regen">Rigenera</button></div>
+            </div>
+          ) : <button className="btn-ghost w-full h-9 text-xs" onClick={() => gen()} data-testid="org-invite-generate"><KeyRound className="h-4 w-4" /> Genera solo il codice (senza email)</button>}
+        </>}
       </DialogContent>
     </Dialog>
   );

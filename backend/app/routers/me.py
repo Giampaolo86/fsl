@@ -1,6 +1,9 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, EmailStr
 
 from ..core.deps import CurrentUser, get_current_user
 from ..core.errors import forbidden, not_found
@@ -119,21 +122,31 @@ async def my_club_remove_manager(manager_id: str, tournament_id: str, user: Curr
     return {"ok": True, "removed": len(ms)}
 
 
+class ManagerInviteIn(BaseModel):
+    email: Optional[EmailStr] = None
+    full_name: str = ""
+
+
 @router.post("/club/invite")
-async def my_club_create_invite(tournament_id: str, user: CurrentUser = Depends(get_current_user)):
+async def my_club_create_invite(tournament_id: str, request: Request, body: ManagerInviteIn | None = None, user: CurrentUser = Depends(get_current_user)):
+    """Nuovo codice per un dirigente; con `email` invia anche la mail di benvenuto (link + guida) o restituisce il testo pronto da inoltrare."""
     from datetime import timedelta
 
     from ..models.base import utcnow
     from ..models.domain import ClubInvite
-    from ..services import audit
+    from ..services import audit, welcome_mail
+    from ..services import org_clubs as org_clubs_svc
     from .org_clubs import _code, invites
 
     key = await _my_org_key(tournament_id, user)
     for old in await invites.list({"org_key": key, "used_by": None}):
         await invites.update(old.id, {"expires_at": utcnow()}, user.id)
     inv = await invites.insert(ClubInvite(org_key=key, code=_code(), expires_at=utcnow() + timedelta(days=30)), user.id)
-    await audit.record(user, "club.invite_manager", "org_club", key, tournament_id, after={"code": inv.code})
-    return inv.public()
+    oc = await org_clubs_svc.get(key)
+    link = f"{welcome_mail.base_url(request)}/registrati-societa?codice={inv.code}"
+    mail = await welcome_mail.send(body.email if body else None, oc.name if oc else "la società", user.full_name, inv.code, link, body.full_name if body else "")
+    await audit.record(user, "club.invite_manager", "org_club", key, tournament_id, after={"code": inv.code, "email": body.email if body else None, "emailed": mail["emailed"]})
+    return {**inv.public(), **mail, "link": link}
 
 
 @router.post("/club/managers/{manager_id}/handover")
