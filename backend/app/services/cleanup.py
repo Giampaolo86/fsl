@@ -67,6 +67,29 @@ async def delete_tournament(tournament_id: str) -> dict:
     return removed
 
 
+async def purge_demo_tournaments() -> list[dict]:
+    """All'avvio: elimina definitivamente i tornei demo del seed (anche archiviati e copie «-N»), con backup ripristinabile 30 giorni. Idempotente."""
+    import logging
+
+    from . import backups
+
+    out = []
+    async for t in db.tournaments.find({}, {"slug": 1, "name": 1}):
+        if not is_test_tournament(t.get("slug", ""), t.get("name", "")):
+            continue
+        tid = str(t["_id"])
+        try:
+            await backups.export_tournament(tid, f"auto-purge demo {t.get('slug')}", "system")
+        except Exception as e:  # noqa: BLE001
+            logging.getLogger("fsl").warning("backup demo %s non riuscito: %s", t.get("slug"), e)
+        removed = await delete_tournament(tid)
+        out.append({"slug": t.get("slug"), "name": t.get("name"), "removed": removed})
+    if out:
+        await block_demo_seed("tornei demo eliminati automaticamente all'avvio")
+        logging.getLogger("fsl").warning("Tornei demo eliminati all'avvio: %s", [o["slug"] for o in out])
+    return out
+
+
 async def delete_user(user_id: str) -> dict:
     from .owner import assert_not_owner_id
 

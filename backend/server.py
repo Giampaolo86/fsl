@@ -152,6 +152,9 @@ async def startup():
 
     await legacy_indexes()
     await seed_all()
+    from app.services.cleanup import purge_demo_tournaments
+
+    await purge_demo_tournaments()
     from app.services.linkcodes import ensure_link_codes
 
     await ensure_link_codes()
