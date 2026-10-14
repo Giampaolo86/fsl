@@ -1,10 +1,10 @@
-import { Copy, LayoutGrid, Settings, Trophy, Users, Calendar, Grid3X3, Trash2 } from "lucide-react";
+import { Copy, Eye, EyeOff, LayoutGrid, Settings, Trophy, Users, Calendar, Grid3X3, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { StatusBadge } from "./StatusBadge";
 import { ProgressBar } from "./Primitives";
 import { FORMULA, fmtPeriod } from "@/lib/format";
 
-export function TournamentCard({ t, onDuplicate, onDelete, canWrite }) {
+export function TournamentCard({ t, onDuplicate, onDelete, onTogglePublished, canWrite }) {
   const isArchived = t.status === "archived";
   return (
     <article className="fsl-card overflow-hidden flex flex-col animate-rise" data-testid={`tournament-card-${t.slug}`}>
@@ -37,6 +37,11 @@ export function TournamentCard({ t, onDuplicate, onDelete, canWrite }) {
           <span>· {t.season_label || FORMULA[t.settings?.formula]}</span>
         </div>
         <ProgressBar value={t.counts?.completion_pct ?? 0} label={isArchived ? "Torneo archiviato · sola lettura" : "Completamento torneo"} />
+        <button type="button" className={`flex items-center gap-2 w-full rounded-md border px-3 h-9 text-xs transition-colors ${t.published ? "border-fsl-success/40 text-fsl-success hover:bg-fsl-success/10" : "border-fsl-warning/40 text-fsl-warning hover:bg-fsl-warning/10"} disabled:opacity-60`} onClick={() => onTogglePublished?.(t)} disabled={!canWrite || !onTogglePublished || isArchived} title={t.published ? "Visibile sul sito pubblico: clicca per nasconderlo" : "Non visibile sul sito pubblico: clicca per pubblicarlo"} aria-pressed={!!t.published} data-testid={`tournament-card-published-${t.slug}`}>
+          {t.published ? <Eye className="h-4 w-4" aria-hidden="true" /> : <EyeOff className="h-4 w-4" aria-hidden="true" />}
+          <span className="font-semibold">{t.published ? "Visibile sul sito" : "Nascosto dal sito"}</span>
+          <span className="ml-auto text-[10px] uppercase tracking-wider opacity-70">{t.published ? "Nascondi" : "Pubblica"}</span>
+        </button>
         <div className="mt-auto space-y-2">
           <Link to={`/admin/t/${t.id}`} className="btn-primary w-full" data-testid={`tournament-card-open-${t.slug}`}>
             <LayoutGrid className="h-4 w-4" aria-hidden="true" /> Apri Control Room

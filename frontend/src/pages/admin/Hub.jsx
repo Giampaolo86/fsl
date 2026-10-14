@@ -22,6 +22,11 @@ export default function Hub() {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("created");
   const canWrite = user.is_super_admin || user.role === "director";
+  const togglePublished = async (t) => {
+    const next = !t.published;
+    if (!window.confirm(next ? `Pubblicare «${t.name}» sul sito? Comparirà in homepage e nella pagina Tornei per tutti.` : `Nascondere «${t.name}» dal sito? Resta visibile solo allo staff loggato.`)) return;
+    try { await api.patch(`/tournaments/${t.id}`, { published: next }); toast.success(next ? "Torneo pubblicato sul sito" : "Torneo nascosto dal sito"); refresh(); } catch (e) { toast.error(apiError(e)); }
+  };
   const deleteTournament = async (t) => {
     const typed = window.prompt(`Eliminazione DEFINITIVA di «${t.name}»: società, squadre, rose, gare, risultati, foto e vendite del torneo verranno cancellati per sempre.\n\nPer confermare scrivi il nome del torneo:`);
     if (typed === null) return;
@@ -102,7 +107,7 @@ export default function Hub() {
         ) : (
           <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-4" data-testid="hub-tournament-grid">
             {visible.map((t) => (
-              <TournamentCard key={t.id} t={t} canWrite={canWrite} onDuplicate={(src) => navigate(`/admin/tornei/nuovo?mode=duplicate&source=${src.id}`)} onDelete={user.is_super_admin ? deleteTournament : undefined} />
+              <TournamentCard key={t.id} t={t} canWrite={canWrite} onDuplicate={(src) => navigate(`/admin/tornei/nuovo?mode=duplicate&source=${src.id}`)} onDelete={user.is_super_admin ? deleteTournament : undefined} onTogglePublished={canWrite ? togglePublished : undefined} />
             ))}
           </div>
         )}

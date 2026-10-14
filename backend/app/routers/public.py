@@ -89,9 +89,17 @@ def _can_preview(user, t) -> bool:
     return bool(user and (user.is_super_admin or user.role in ("super_admin", "director") or user.role_in(t.id)))
 
 
+def _hidden_demo(t) -> bool:
+    """In produzione i tornei demo/di test del seed non escono mai sul sito, anche se pubblicati."""
+    from ..services import backups, cleanup
+
+    return backups.db_is_production_like() and cleanup.is_test_tournament(t.slug, t.name)
+
+
 async def _published(slug: str, request: Optional[Request] = None):
     t = await tournaments.find_one({"slug": slug})
-    if not t or (not t.published and not _can_preview(await _staff(request), t)):
+    staff = await _staff(request)
+    if not t or (not t.published and not _can_preview(staff, t)) or (_hidden_demo(t) and not staff):
         raise not_found("Torneo")
     return t
 
@@ -152,7 +160,7 @@ async def _top_scorers(t_id: str, ms, limit=10):
 
 @router.get("/tournaments")
 async def list_public():
-    ts = await tournaments.list({"published": True}, sort=[("start_date", -1)])
+    ts = [t for t in await tournaments.list({"published": True}, sort=[("start_date", -1)]) if not _hidden_demo(t)]
     out = []
     for t in ts:
         s = await settings_repo.find_one({"tournament_id": t.id})
