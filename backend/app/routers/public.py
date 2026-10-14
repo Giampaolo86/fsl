@@ -90,10 +90,10 @@ def _can_preview(user, t) -> bool:
 
 
 def _hidden_demo(t) -> bool:
-    """In produzione i tornei demo/di test del seed non escono mai sul sito, anche se pubblicati."""
-    from ..services import backups, cleanup
+    """I tornei demo/di test del seed non escono mai sul sito pubblico, anche se pubblicati (qualunque sia il nome del DB)."""
+    from ..services import cleanup
 
-    return backups.db_is_production_like() and cleanup.is_test_tournament(t.slug, t.name)
+    return cleanup.is_test_tournament(t.slug, t.name)
 
 
 async def _published(slug: str, request: Optional[Request] = None):

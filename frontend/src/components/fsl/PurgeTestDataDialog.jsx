@@ -5,8 +5,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { api, apiError } from "@/lib/api";
 import { withReauth } from "@/lib/reauth";
 
-const TEST_RE = /^(test|qa|demo|prova)[-_]|^(winter-stars-2025|la-serie-a-dei-bambini|torneo-degli-amici|future-cup-weekend)$/i;
-export const looksLikeTest = (t) => TEST_RE.test(t.slug || "") || TEST_RE.test(t.name || "");
+const TEST_RE = /^(test|qa|demo|prova)[-_ ]|^(winter-stars-2025|la-serie-a-dei-bambini|torneo-degli-amici|future-cup-weekend)(-\d+)?$/i;
+const DEMO_NAMES = ["winter stars 2025", "la serie a dei bambini", "torneo degli amici", "future cup weekend"];
+export const looksLikeTest = (t) => TEST_RE.test(t.slug || "") || TEST_RE.test(t.name || "") || DEMO_NAMES.includes((t.name || "").trim().toLowerCase());
 
 export function PurgeTestDataDialog({ tournaments, onDone, user }) {
   const [open, setOpen] = useState(false);

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { Archive, Grid3X3, Plus, Search, Trophy, Users, Volleyball } from "lucide-react";
+import { Archive, Trash2, Grid3X3, Plus, Search, Trophy, Users, Volleyball } from "lucide-react";
 import { KpiTile, PageHeader, SectionTitle } from "@/components/fsl/Primitives";
 import { TournamentCard } from "@/components/fsl/TournamentCard";
 import { PurgeTestDataDialog } from "@/components/fsl/PurgeTestDataDialog";
@@ -120,16 +120,19 @@ export default function Hub() {
         ) : (
           <div className="fsl-card divide-y divide-white/[0.06]" data-testid="hub-archived-list">
             {archived.map((t) => (
-              <Link key={t.id} to={`/admin/t/${t.id}`} className="flex items-center gap-4 px-4 h-16 hover:bg-white/[0.04] transition-colors" data-testid={`hub-archived-item-${t.slug}`}>
-                <Archive className="h-5 w-5 text-fsl-slate" aria-hidden="true" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold truncate">{t.name}</div>
-                  <div className="text-xs text-fsl-slate num">
-                    {t.summary?.teams_capacity} squadre · {t.counts?.fields} campi · {fmtPeriod(t.start_date, t.end_date)}
+              <div key={t.id} className="flex items-center gap-2 pr-2 hover:bg-white/[0.04] transition-colors" data-testid={`hub-archived-row-${t.slug}`}>
+                <Link to={`/admin/t/${t.id}`} className="flex-1 min-w-0 flex items-center gap-4 px-4 h-16" data-testid={`hub-archived-item-${t.slug}`}>
+                  <Archive className="h-5 w-5 text-fsl-slate shrink-0" aria-hidden="true" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold truncate">{t.name} <span className="text-xs text-fsl-slate font-normal">/{t.slug}</span></div>
+                    <div className="text-xs text-fsl-slate num">
+                      {t.summary?.teams_capacity} squadre · {t.counts?.fields} campi · {fmtPeriod(t.start_date, t.end_date)}
+                    </div>
                   </div>
-                </div>
-                <StatusBadge status={t.status} />
-              </Link>
+                  <StatusBadge status={t.status} />
+                </Link>
+                {user.is_super_admin && <button type="button" className="btn-ghost h-9 w-9 p-0 text-fsl-danger shrink-0" onClick={() => deleteTournament(t)} title="Elimina definitivamente (con backup)" aria-label={`Elimina ${t.name}`} data-testid={`hub-archived-delete-${t.slug}`}><Trash2 className="h-4 w-4" /></button>}
+              </div>
             ))}
           </div>
         )}

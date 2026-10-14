@@ -12,12 +12,14 @@ def is_test_account(email: str) -> bool:
 
 
 DEMO_TOURNAMENT_SLUGS = {"la-serie-a-dei-bambini", "torneo-degli-amici", "future-cup-weekend", "winter-stars-2025"}
-_TEST_TOURNAMENT_RE = re.compile(r"^(test|qa|demo|prova)[-_]", re.I)
+DEMO_TOURNAMENT_NAMES = {"la serie a dei bambini", "torneo degli amici", "future cup weekend", "winter stars 2025"}
+_DEMO_SLUG_RE = re.compile(r"^(" + "|".join(re.escape(s) for s in DEMO_TOURNAMENT_SLUGS) + r")(-\d+)?$", re.I)
+_TEST_TOURNAMENT_RE = re.compile(r"^(test|qa|demo|prova)[-_ ]", re.I)
 
 
 def is_test_tournament(slug: str, name: str = "") -> bool:
-    """Tornei demo del seed o di collaudo: gli unici eliminabili in blocco anche in produzione."""
-    return (slug or "") in DEMO_TOURNAMENT_SLUGS or bool(_TEST_TOURNAMENT_RE.search(slug or "")) or bool(_TEST_TOURNAMENT_RE.search(name or ""))
+    """Tornei demo del seed (anche le copie «-2», «-3»… create da seed ripetuti) o di collaudo: mai pubblici, eliminabili in blocco."""
+    return bool(_DEMO_SLUG_RE.match(slug or "")) or (name or "").strip().lower() in DEMO_TOURNAMENT_NAMES or bool(_TEST_TOURNAMENT_RE.search(slug or "")) or bool(_TEST_TOURNAMENT_RE.search(name or ""))
 
 
 async def disable_test_accounts_in_production() -> list[str]:
