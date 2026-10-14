@@ -68,7 +68,7 @@ export default function ClubsGlobal() {
         <KpiTile icon={Pencil} value={drafts.length} label="Bozze società da approvare" hint={drafts.length ? "Vai nel torneo → Società" : undefined} testId="clubs-global-kpi-drafts" />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <input className="fsl-input h-10 w-56" placeholder="Cerca società o città…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="clubs-global-search" />
+        <input className="fsl-input h-10 w-full sm:w-56" placeholder="Cerca società o città…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="clubs-global-search" />
         <select className="fsl-input h-10 w-auto" value={tid} onChange={(e) => setTid(e.target.value)} data-testid="clubs-global-tournament">
           <option value="">Tutti i tornei</option>
           {tournaments.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
@@ -79,18 +79,18 @@ export default function ClubsGlobal() {
       </div>
       {rows.length === 0 ? <EmptyState title="Nessuna società" description="Nessuna società corrisponde ai filtri." /> : (
         <div className="fsl-card overflow-x-auto">
-          <table className="w-full table-dark" data-testid="clubs-global-table">
+          <table className="w-full table-dark table-cards" data-testid="clubs-global-table">
             <thead><tr><th className="w-8"><input type="checkbox" aria-label="Seleziona tutte" checked={rows.length > 0 && rows.every((c) => sel.includes(c.id))} onChange={(e) => setSel(e.target.checked ? rows.map((c) => c.id) : [])} data-testid="clubs-global-select-all" /></th><th>Società</th><th>Tornei · squadre</th><th>Homepage</th><th>Cosa manca</th><th>Pre-torneo</th><th className="text-right">Azioni</th></tr></thead>
             <tbody>
               {grouped.map((g) => { const c = g.main; return (
                 <tr key={g.key} data-testid={`clubs-global-row-${c.id}`}>
-                  <td><input type="checkbox" aria-label="Seleziona" checked={g.entries.every((x) => sel.includes(x.id))} onChange={(e) => setSel(e.target.checked ? [...new Set([...sel, ...g.entries.map((x) => x.id)])] : sel.filter((x) => !g.entries.some((y) => y.id === x)))} data-testid={`clubs-global-select-${c.id}`} /></td>
-                  <td><div className="flex items-center gap-3"><ClubCrest club={c} size={32} /><div><div className="font-semibold">{c.name}</div><div className="text-xs text-fsl-slate">{c.city || "—"}{g.entries.length > 1 && <span className="ml-2 text-fsl-gold num">{g.entries.length} tornei</span>}</div></div></div></td>
-                  <td className="text-xs"><div className="flex flex-wrap gap-1">{g.entries.map((x) => <Link key={x.id} to={`/admin/t/${x.tournament_id}/societa/${x.id}?seq=1`} className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 hover:border-fsl-gold hover:text-fsl-gold" title={`Modifica in ${x.tournament_name}`} data-testid={`clubs-global-entry-${x.id}`}>{x.tournament_name} <span className="num text-fsl-slate">· {x.teams_count}</span></Link>)}</div></td>
-                  <td><ScoreBar score={Math.min(...g.entries.map((x) => x.score))} /></td>
-                  <td><Checks c={c} labels={data.labels} /></td>
-                  <td title={c.readiness?.todo?.length ? `Da fare: ${c.readiness.todo.join(", ")}` : "Pronta"} data-testid={`clubs-global-readiness-${c.id}`}><ScoreBar score={c.readiness?.score ?? 0} /><div className="text-[10px] text-fsl-slate num">{c.readiness ? `${c.readiness.done}/${c.readiness.total} fatte` : "—"}</div></td>
-                  <td className="text-right">
+                  <td className="table-cards-check"><input type="checkbox" aria-label="Seleziona" checked={g.entries.every((x) => sel.includes(x.id))} onChange={(e) => setSel(e.target.checked ? [...new Set([...sel, ...g.entries.map((x) => x.id)])] : sel.filter((x) => !g.entries.some((y) => y.id === x)))} data-testid={`clubs-global-select-${c.id}`} /></td>
+                  <td className="pr-8 md:pr-4"><div className="flex items-center gap-3"><ClubCrest club={c} size={32} /><div><div className="font-semibold">{c.name}</div><div className="text-xs text-fsl-slate">{c.city || "—"}{g.entries.length > 1 && <span className="ml-2 text-fsl-gold num">{g.entries.length} tornei</span>}</div></div></div></td>
+                  <td className="text-xs" data-label="Tornei · squadre"><div className="flex flex-wrap gap-1">{g.entries.map((x) => <Link key={x.id} to={`/admin/t/${x.tournament_id}/societa/${x.id}?seq=1`} className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 hover:border-fsl-gold hover:text-fsl-gold" title={`Modifica in ${x.tournament_name}`} data-testid={`clubs-global-entry-${x.id}`}>{x.tournament_name} <span className="num text-fsl-slate">· {x.teams_count}</span></Link>)}</div></td>
+                  <td data-label="Homepage"><ScoreBar score={Math.min(...g.entries.map((x) => x.score))} /></td>
+                  <td data-label="Cosa manca"><Checks c={c} labels={data.labels} /></td>
+                  <td data-label="Pre-torneo" title={c.readiness?.todo?.length ? `Da fare: ${c.readiness.todo.join(", ")}` : "Pronta"} data-testid={`clubs-global-readiness-${c.id}`}><ScoreBar score={c.readiness?.score ?? 0} /><div className="text-[10px] text-fsl-slate num">{c.readiness ? `${c.readiness.done}/${c.readiness.total} fatte` : "—"}</div></td>
+                  <td className="text-right" data-label="Azioni">
                     <div className="inline-flex gap-1">
                       <Link to={`/admin/t/${c.tournament_id}/societa/${c.id}?seq=1`} className="btn-gold h-9" data-testid={`clubs-global-edit-${c.id}`}><Pencil className="h-4 w-4" /> Modifica</Link>
                       <Link to={`/club/${c.org_key || c.slug}`} target="_blank" rel="noreferrer" className="btn-ghost h-9" title="Scheda società: tutti i tornei, gruppi e rose" data-testid={`clubs-global-open-${c.id}`}><ExternalLink className="h-4 w-4" /> Scheda</Link>

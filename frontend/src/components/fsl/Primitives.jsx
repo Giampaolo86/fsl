@@ -2,16 +2,16 @@ import { Link } from "react-router-dom";
 export function KpiTile({ icon: Icon, value, label, hint, gold = false, testId, to }) {
   const Tag = to ? Link : "div";
   return (
-    <Tag to={to} className={`${gold ? "fsl-card-gold" : "fsl-card"} flex items-center gap-4 px-5 py-4 animate-rise ${to ? "hover:border-fsl-gold/60 hover:-translate-y-0.5 transition-[transform,border-color] cursor-pointer" : ""}`} aria-label={to ? `${label}: apri la sezione` : undefined} data-testid={testId}>
+    <Tag to={to} className={`${gold ? "fsl-card-gold" : "fsl-card"} flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 animate-rise ${to ? "hover:border-fsl-gold/60 hover:-translate-y-0.5 transition-[transform,border-color] cursor-pointer" : ""}`} aria-label={to ? `${label}: apri la sezione` : undefined} data-testid={testId}>
       {Icon && (
-        <div className="h-12 w-12 shrink-0 rounded-full border border-fsl-gold/40 bg-ink-950/60 flex items-center justify-center">
-          <Icon className="h-5 w-5 text-fsl-gold" aria-hidden="true" />
+        <div className="h-10 w-10 sm:h-12 sm:w-12 shrink-0 rounded-full border border-fsl-gold/40 bg-ink-950/60 flex items-center justify-center">
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-fsl-gold" aria-hidden="true" />
         </div>
       )}
       <div className="min-w-0">
-        <div className="font-display font-extrabold text-3xl leading-none num text-fsl-white">{value}</div>
-        <div className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-fsl-slate">{label}</div>
-        {hint && <div className="mt-0.5 text-xs text-fsl-slate/80 truncate">{hint}</div>}
+        <div className="font-display font-extrabold text-2xl sm:text-3xl leading-none num text-fsl-white">{value}</div>
+        <div className="mt-1 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-fsl-slate">{label}</div>
+        {hint && <div className="mt-0.5 text-xs text-fsl-slate/80 line-clamp-2 sm:truncate">{hint}</div>}
       </div>
     </Tag>
   );

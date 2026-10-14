@@ -109,22 +109,22 @@ export default function UsersPage() {
         <FilterChips value={group} onChange={setGroup} options={GROUPS} counts={counts} testId="users-group" />
         <div className="flex gap-2 lg:ml-auto">
           <select className="fsl-input w-48" value={tid} onChange={(e) => setTid(e.target.value)} data-testid="users-tournament-filter"><option value="">Tutti i tornei</option>{(tournaments || []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-          <input className="fsl-input w-56" placeholder="Cerca nome o email…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="users-search" />
+          <input className="fsl-input w-full sm:w-56" placeholder="Cerca nome o email…" value={q} onChange={(e) => setQ(e.target.value)} data-testid="users-search" />
         </div>
       </div>
       <div className="fsl-card overflow-x-auto">
-        <table className="w-full table-dark" data-testid="users-table">
+        <table className="w-full table-dark table-cards" data-testid="users-table">
           <thead><tr><th>Utente</th><th>Ruolo</th><th>Tornei assegnati</th><th>MFA</th><th>Stato</th><th className="text-right">Azioni</th></tr></thead>
           <tbody>
             {shown.length === 0 && <tr><td colSpan={6} className="text-center text-sm text-fsl-slate py-8" data-testid="users-empty">Nessun utente con questi filtri.</td></tr>}
             {shown.map((u) => (
               <tr key={u.id} data-testid={`user-row-${u.email}`}>
                 <td><div className="font-semibold">{u.full_name}</div><div className="text-xs text-fsl-slate">{u.email}</div></td>
-                <td><span className="inline-flex items-center gap-1.5 text-xs"><UserCog className="h-3.5 w-3.5 text-fsl-gold" /> {u.role_label}</span></td>
-                <td className="text-xs text-fsl-slate">{u.role === "club_manager" && u.memberships.some((m) => m.club_name) && <div className="text-fsl-white font-semibold" data-testid={`user-club-name-${u.email}`}>{[...new Set(u.memberships.map((m) => m.club_name).filter(Boolean))].join(", ")}</div>}{u.is_super_admin ? "Tutti i tornei" : u.memberships.map((m) => m.tournament_name).filter(Boolean).join(", ") || "—"}{u.role === "club_manager" && [...new Set(u.memberships.map((m) => m.org_club_key).filter(Boolean))].map((k) => <Link key={k} to={`/admin/societa/${k}`} className="ml-2 inline-flex items-center gap-1 text-fsl-gold hover:underline" title="Homepage unica della società, valida per tutti i tornei" data-testid={`user-club-home-${u.email}`}><Pencil className="h-3 w-3" /> Homepage società</Link>)}</td>
-                <td className="text-xs" data-testid={`user-mfa-${u.email}`}>{u.mfa_enabled ? <span className="text-fsl-success">Attiva</span> : u.mfa_required ? <span className="text-fsl-warning">Da configurare al login</span> : <span className="text-fsl-slate">Non attiva</span>}</td>
-                <td className="text-xs"><span className={u.status === "active" ? "text-fsl-success" : "text-fsl-danger"}>● {u.status === "active" ? "Attivo" : "Disabilitato"}</span>{u.must_change_password && <div className="text-[10px] text-fsl-slate">password temporanea</div>}</td>
-                <td className="text-right">{canCreate && u.id !== user.id && <UserActions u={u} me={user} onChanged={load} />}</td>
+                <td data-label="Ruolo"><span className="inline-flex items-center gap-1.5 text-xs"><UserCog className="h-3.5 w-3.5 text-fsl-gold" /> {u.role_label}</span></td>
+                <td className="text-xs text-fsl-slate" data-label="Società e tornei">{u.role === "club_manager" && u.memberships.some((m) => m.club_name) && <div className="text-fsl-white font-semibold" data-testid={`user-club-name-${u.email}`}>{[...new Set(u.memberships.map((m) => m.club_name).filter(Boolean))].join(", ")}</div>}{u.is_super_admin ? "Tutti i tornei" : u.memberships.map((m) => m.tournament_name).filter(Boolean).join(", ") || "—"}{u.role === "club_manager" && [...new Set(u.memberships.map((m) => m.org_club_key).filter(Boolean))].map((k) => <Link key={k} to={`/admin/societa/${k}`} className="ml-2 inline-flex items-center gap-1 text-fsl-gold hover:underline" title="Homepage unica della società, valida per tutti i tornei" data-testid={`user-club-home-${u.email}`}><Pencil className="h-3 w-3" /> Homepage società</Link>)}</td>
+                <td className="text-xs" data-label="2FA" data-testid={`user-mfa-${u.email}`}>{u.mfa_enabled ? <span className="text-fsl-success">Attiva</span> : u.mfa_required ? <span className="text-fsl-warning">Da configurare al login</span> : <span className="text-fsl-slate">Non attiva</span>}</td>
+                <td className="text-xs" data-label="Stato"><span className={u.status === "active" ? "text-fsl-success" : "text-fsl-danger"}>● {u.status === "active" ? "Attivo" : "Disabilitato"}</span>{u.must_change_password && <div className="text-[10px] text-fsl-slate">password temporanea</div>}</td>
+                <td className="text-right" data-label="Azioni">{canCreate && u.id !== user.id && <UserActions u={u} me={user} onChanged={load} />}</td>
               </tr>
             ))}
           </tbody>

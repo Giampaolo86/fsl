@@ -188,6 +188,113 @@
   .table-dark tbody tr {
     @apply transition-colors hover:bg-white/[0.04];
   }
+  .table-dark td .btn-ghost,
+  .table-dark td .btn-gold,
+  .table-dark td .btn-primary,
+  .table-dark td .btn-danger,
+  .table-dark td .rounded-full {
+    white-space: nowrap;
+  }
+}
+
+/* Mobile: tabelle a schede (ogni riga diventa una card; th nascosti, etichette da data-label) */
+@media (max-width: 767px) {
+  .table-cards,
+  .table-cards tbody,
+  .table-cards tr,
+  .table-cards td {
+    display: block;
+    width: 100%;
+  }
+  .table-cards thead {
+    display: none;
+  }
+  .table-cards tbody tr {
+    @apply rounded-xl border border-white/10 bg-ink-950/40 mb-3 p-3;
+  }
+  .table-cards td {
+    height: auto;
+    min-height: 0;
+    padding: 0.25rem 0;
+    border: 0;
+    font-size: 0.875rem;
+  }
+  .table-cards td.text-right {
+    text-align: left;
+  }
+  .table-cards td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin-bottom: 0.25rem;
+  }
+  .table-cards td .inline-flex.gap-1,
+  .table-cards td .flex.gap-1 {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .table-cards td .inline-flex.gap-1 > *,
+  .table-cards td .flex.gap-1 > .btn-ghost,
+  .table-cards td .flex.gap-1 > .btn-gold {
+    flex: 1 1 calc(50% - 0.25rem);
+    min-width: calc(50% - 0.25rem);
+  }
+  .table-cards td.table-cards-hide {
+    display: none;
+  }
+  .table-cards td.table-cards-check {
+    position: absolute;
+    right: 0.75rem;
+    top: 0.75rem;
+    width: auto;
+  }
+  .table-cards tbody tr {
+    position: relative;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value {
+    text-align: left;
+    min-height: 1.25rem;
+  }
+  @media (max-width: 767px) {
+    .fsl-input {
+      max-width: 100%;
+    }
+    /* iOS ingrandisce la pagina se un campo ha font < 16px */
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  @media (max-width: 767px) {
+    .fsl-page,
+    main > .max-w-\[1400px\] {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
 }
 
 @layer base {

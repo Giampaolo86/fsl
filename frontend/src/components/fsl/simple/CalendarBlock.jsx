@@ -134,13 +134,15 @@ export function CalendarBlock({ tid, board, reload, canWrite, onEdit, onSwap, on
           <div className="md:ml-auto rounded-lg border border-white/10 bg-ink-950/40 p-3 space-y-2 w-full md:w-auto md:min-w-[520px]" data-testid="cal-setup">
             <div className="flex items-center justify-between"><span className="text-[11px] uppercase tracking-wider text-fsl-slate">Quando si gioca</span><button type="button" className="text-xs text-fsl-gold hover:underline" onClick={addSession} data-testid="cal-add-session">+ Aggiungi sessione</button></div>
             {sessions.map((sess, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-2" data-testid={`cal-session-${i}`}>
-                <input type="date" className="fsl-input h-9 w-36 sm:w-40" value={sess.date} onChange={(e) => updS(i, "date", e.target.value)} data-testid={`cal-session-date-${i}`} />
+              <div key={i} className="grid grid-cols-[minmax(0,1fr)_auto] sm:flex sm:flex-wrap items-center gap-2" data-testid={`cal-session-${i}`}>
+                <input type="date" className="fsl-input h-9 w-full sm:w-40" value={sess.date} onChange={(e) => updS(i, "date", e.target.value)} data-testid={`cal-session-date-${i}`} />
                 <span className="text-xs text-fsl-slate w-20 truncate hidden sm:inline">{dayLabel(sess.date)}</span>
-                <input type="time" className="fsl-input h-9 w-24 sm:w-28" value={sess.start_time} onChange={(e) => updS(i, "start_time", e.target.value)} data-testid={`cal-session-start-${i}`} />
-                <span className="text-xs text-fsl-slate">→</span>
-                <input type="time" className="fsl-input h-9 w-24 sm:w-28" value={sess.end_time} onChange={(e) => updS(i, "end_time", e.target.value)} data-testid={`cal-session-end-${i}`} />
-                {sessions.length > 1 && <button type="button" className="text-fsl-slate hover:text-fsl-danger" onClick={() => setSessions(sessions.filter((_, j) => j !== i))} aria-label="Rimuovi sessione" data-testid={`cal-session-remove-${i}`}><X className="h-4 w-4" /></button>}
+                {sessions.length > 1 ? <button type="button" className="text-fsl-slate hover:text-fsl-danger sm:order-last" onClick={() => setSessions(sessions.filter((_, j) => j !== i))} aria-label="Rimuovi sessione" data-testid={`cal-session-remove-${i}`}><X className="h-4 w-4" /></button> : <span className="sm:hidden" />}
+                <div className="col-span-2 sm:col-span-1 flex items-center gap-2">
+                  <input type="time" className="fsl-input h-9 flex-1 sm:flex-none sm:w-28 min-w-[7rem]" value={sess.start_time} onChange={(e) => updS(i, "start_time", e.target.value)} data-testid={`cal-session-start-${i}`} />
+                  <span className="text-xs text-fsl-slate">→</span>
+                  <input type="time" className="fsl-input h-9 flex-1 sm:flex-none sm:w-28 min-w-[7rem]" value={sess.end_time} onChange={(e) => updS(i, "end_time", e.target.value)} data-testid={`cal-session-end-${i}`} />
+                </div>
               </div>
             ))}
             <div className="flex flex-wrap items-end gap-2 pt-1">
